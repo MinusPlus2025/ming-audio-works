@@ -106,7 +106,7 @@
 <body>
 <div class="atrium-shell">
   <canvas id="sphereCanvas"></canvas>
-  <div class="pm-hint" id="pmHint" style="left:54%;top:47.5%"><span class="ring"></span><span>点球面种星</span></div>
+  <div class="pm-hint" id="pmHint" style="left:50%;top:88%"><span class="ring"></span><span>载入一首歌，看星球呼吸</span></div>
   <input type="file" id="upAudio1" class="hidden-input" accept="audio/*">
 
   <div class="guide-modal" id="guideModal">
@@ -1561,7 +1561,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); reque
 <script>
 
 (function(){
-  var cfg = {"title": "先让一颗星发声", "sub": "ASTRASPHERE · 星籁", "lede": "这不是播放器。星球自己转，只有星标跨过金色子午线时，声音才会响。", "steps": [["01", "点球面", "在球面上点一下，种下一颗星标"], ["02", "等它转到中线", "星标跨过金色子午线，才会触发声音"], ["03", "拖拽星球", "上下拖拽改变倾角与滤波器，左右拖拽改变转速"]], "note": "底部可载入音频，进入音频反应；灵敏度可调。建议戴耳机。 载入音频=分析源：画面只跟导入文件的能量，不再被生成合成器带偏；再点“卸载音频”回到生成模式。", "panel": "#0d1526", "ink": "#eaf2ff", "subc": "#9fb3d1", "accent": "#7dd3fc", "line": "#22304d", "dark": true, "shareTitle": "星籁 ASTRASPHERE", "shareSub": "天体引力合成器 · WEB AUDIO", "shareFile": "Astrasphere"};
+  var cfg = {"title": "载入一首歌，让星球呼吸", "sub": "ASTRASPHERE · 星籁", "lede": "这不是播放器。载入一首歌，星球会跟着能量呼吸；想自己种星，点球面。", "steps": [["01", "载入一首歌", "底栏“载入音频”，或把音频拖进来"], ["02", "看星球", "能量、脉冲、星环跟着音乐呼吸"], ["03", "也可以种星", "点球面种下星标，拖拽星球改引力"]], "note": "载入音频=分析源：画面只跟导入文件的能量；再点“卸载音频”回到生成模式。也可以点球面种星，自己生成星铃。", "panel": "#0d1526", "ink": "#eaf2ff", "subc": "#9fb3d1", "accent": "#7dd3fc", "line": "#22304d", "dark": true, "shareTitle": "星籁 ASTRASPHERE", "shareSub": "天体引力合成器 · WEB AUDIO", "shareFile": "Astrasphere"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

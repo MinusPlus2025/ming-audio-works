@@ -102,7 +102,7 @@
 <body>
 <div class="pcb-viewport">
   <canvas id="pcbCanvas"></canvas>
-  <div class="pm-hint" id="pmHint" style="left:18%;top:16%"><span class="ring"></span><span>先点左上 RUN</span></div>
+  <div class="pm-hint" id="pmHint" style="left:50%;top:88%"><span class="ring"></span><span>载入干声，开始处理</span></div>
   <input type="file" id="upDry" class="hidden-input" accept="audio/*">
 
   <div class="guide-modal" id="guideModal">
@@ -132,7 +132,7 @@
   <button data-wa="rec">录制输出</button>
   <span class="wa-meter-label">IN</span><span class="wa-meter" title="输入电平"><i id="waMeterBar"></i></span>
   <button data-wa="help" class="ghost">说明</button>
-  <span class="wa-status" id="waStatus">生成模式</span>
+  <span class="wa-status" id="waStatus">输入模式 · 请载入干声</span>
   <span class="wa-sp">MING</span>
 </div>
 
@@ -153,7 +153,7 @@ function stopUserAudio(updateUI) {
   if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
   if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
   userAudioBuffer = null;
-  state.isRunning = true;
+  state.isRunning = false;
   if (updateUI !== false) { updateUserAudioUI(false); waApplyMix(); waToast('干声已卸载：生成引擎恢复'); }
 }
 function handleUserAudioUpload(file, ctx, targetNode) {
@@ -169,7 +169,7 @@ function handleUserAudioUpload(file, ctx, targetNode) {
       userAudioSource.connect(userAudioGainNode);
       if (inputGain) userAudioGainNode.connect(inputGain); else userAudioGainNode.connect(targetNode);
       userAudioSource.start(0);
-      state.isRunning = true;
+      state.isRunning = false;
       updateUserAudioUI(true);
       if (typeof waOnInputLoaded === 'function') waOnInputLoaded();
     }, function(){ if (typeof waToast === 'function') waToast('音频解码失败：换一个 WAV/MP3 试试'); });
@@ -309,7 +309,7 @@ var STEMS = [
 ];
 
 var state = {
-  isRunning: true,
+  isRunning: false,
   stemIdx: 0,
   gear: 4,
   faders: [0.78, 0.58, 0.86, 0.65, 0.74, 0.52],
@@ -670,6 +670,7 @@ function initAudio() {
   masterGain.connect(comp); comp.connect(audioCtx.destination);
   updateTapeHardwareDSP();
   ensureIOGraph(audioCtx, comp);
+  if (typeof waApplyMix === 'function') waApplyMix();
 }
 document.getElementById('upDry').addEventListener('change', function(e) {
   initAudio();
@@ -681,6 +682,7 @@ function triggerStationAudio(station, car) {
     state.ripples.push({ x: station.x, y: station.y, r: 0.01, alpha: 0.95, col: car ? car.color : '#ee4823' });
     if (state.ripples.length > 18) state.ripples.shift();
   }
+  if (!state.isRunning) return;
   if (userAudioBuffer) return;
   if (!audioCtx || !filterNode) return;
   if (!car) car = { t: 0.25, ratio: 1.0, pan: 0.0 };
@@ -820,6 +822,7 @@ function handleBoardDown(e) {
   // RUN/STOP Top-Left Tire Knob
   if (Math.hypot(px - 0.098, py - 0.058) < 0.042) {
     state.isRunning = !state.isRunning;
+    if (typeof waApplyMix === 'function') waApplyMix();
     showControlHUD('TRANSPORT', state.isRunning ? 1.0 : 0.0, 0.098, 0.058);
     return;
   }
@@ -1112,7 +1115,7 @@ function drawOpenReelSpool(cx, cy, r, angle, dpr, reelLabel) {
 function drawBoard() {
   var w = canvas.width, h = canvas.height, dpr = Math.min(w / 1200, h / 900);
   ctx.clearRect(0, 0, w, h);
-  if (state.isRunning) state.reelAngle += 0.032 * (state.gear / 4.0);
+  if (state.isRunning || userAudioBuffer) state.reelAngle += 0.032 * ((state.isRunning ? state.gear : 2.2) / 4.0);
 
   var bx = w * 0.055, by = h * 0.082, bw = w * 0.88, bh = h * 0.875;
 
@@ -1359,7 +1362,7 @@ function drawBoard() {
   ctx.beginPath();
   for (var s = 0; s < 24; s++) {
     var sx = scopeX + (s / 23) * scopeW;
-    var sy = scopeY + scopeH * 0.5 + (Math.sin(state.reelAngle * 8 + s * 0.65) * 0.65 + Math.cos(state.reelAngle * 13 - s * 1.1) * 0.35) * scopeH * 0.38 * (state.isRunning ? 1 : 0.1);
+    var sy = scopeY + scopeH * 0.5 + (Math.sin(state.reelAngle * 8 + s * 0.65) * 0.65 + Math.cos(state.reelAngle * 13 - s * 1.1) * 0.35) * scopeH * 0.38 * ((state.isRunning || userAudioBuffer) ? 1 : 0.1);
     if (s === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
   }
   ctx.stroke();
@@ -1384,7 +1387,7 @@ function drawBoard() {
   ctx.fillStyle = '#ebe5d3'; ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2 * dpr;
   ctx.fillRect(vuX, vuY, vuW, vuH); ctx.strokeRect(vuX, vuY, vuW, vuH);
   for (var i = 0; i < 14; i++) {
-    if (state.isRunning && Math.random() < 0.35) state.vuLevels[i] = 0.2 + Math.random() * 0.78;
+    if ((state.isRunning || userAudioBuffer) && Math.random() < 0.35) state.vuLevels[i] = 0.2 + Math.random() * 0.78;
     var barH = state.vuLevels[i] * (vuH - 4 * dpr);
     ctx.fillStyle = i < 4 ? '#ee4823' : (i < 10 ? '#0a9943' : '#264899');
     ctx.fillRect(vuX + (4 + i * 10) * dpr, vuY + vuH - barH - 2 * dpr, 5 * dpr, barH);
@@ -1403,7 +1406,8 @@ function drawBoard() {
     }
   }
 
-  var speedScale = state.isRunning ? (state.gear / 4.0) : 0.0;
+  var visualRun = state.isRunning || userAudioBuffer;
+  var speedScale = visualRun ? (state.isRunning ? (state.gear / 4.0) : 0.26) : 0.0;
   CARS.forEach((car, cIdx) => {
     var oldT = car.t;
     car.t = (car.t + car.speed * speedScale) % 1.0;
@@ -1558,7 +1562,7 @@ function waApplyMix() {
   inputWet.gain.setTargetAtTime(waBypass ? 0 : waWet, audioCtx.currentTime, 0.02);
   inputDry.gain.setTargetAtTime(waBypass ? 1 : 1 - waWet, audioCtx.currentTime, 0.02);
   var st = document.getElementById('waStatus');
-  var mode = userAudioBuffer ? '输入模式 · 外部音频' : (state.isRunning ? '生成模式' : '输入模式');
+  var mode = userAudioBuffer ? '输入模式 · 外部音频' : (state.isRunning ? '生成模式' : '输入模式 · 请载入干声');
   if (st) st.textContent = mode + (waBypass ? ' · 旁通' : ' · 干湿 ' + Math.round(waWet * 100) + '%');
 }
 function waToggleRecord() {
@@ -1628,7 +1632,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
 <script>
 
 (function(){
-  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。面板 1–4 选曲风，白色旋钮 STEM TONE 可拖，6 段 EQ 推子上下拖动。 载入干声=输入源：替换生成引擎，但赛车/转盘/画面保持运转；再点“卸载干声”恢复生成。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先载入一段干声", "sub": "WAVEARCHITECT · KERS-0174", "lede": "这不是生成器。载入一段干声，磁带链才开始工作；想听生成器，点左上 RUN。", "steps": [["01", "载入干声", "底栏“载入干声”，或把音频拖进来"], ["02", "调磁带", "预设/干湿/6 段 EQ/磁带旋钮，听前后差异"], ["03", "录下来", "录制输出，或导出一段处理后的音频"]], "note": "输入优先：没有干声时保持安静。赛车/焊盘只做视觉和调制，不再偷偷加音符；想听生成器，点左上 RUN。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
@@ -1680,6 +1684,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
   card.querySelector('.pm-demo').addEventListener('click', function(){
     close();
     setTimeout(function(){
+      try { state.isRunning = true; if (typeof waApplyMix === 'function') waApplyMix(); } catch(e){}
       var c = document.querySelector('canvas'); if(!c) return;
       var r = c.getBoundingClientRect();
       var x = r.left + r.width * 0.5, y = r.top + r.height * 0.52;

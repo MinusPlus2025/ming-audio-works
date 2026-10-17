@@ -2429,6 +2429,29 @@ function drawLoom() {
 }
 
 function loop() { drawLoom(); requestAnimationFrame(loop); }
+
+function twMidiMessage(e) {
+  var d = e && e.data; if (!d || d.length < 2) return;
+  var cmd = d[0] & 0xf0, note = d[1], vel = d[2] || 0;
+  if (cmd !== 0x90 || vel === 0) return;
+  initAudio(); if (!audioCtx) return;
+  var freq = 440 * Math.pow(2, (note - 69) / 12);
+  var src = null;
+  for (var i = 0; i < THREADS.length; i++) { if (THREADS[i].active !== false) { src = THREADS[i]; break; } }
+  if (!src) src = { p1: { x: 0.5, y: 0.5 }, p2: { x: 0.5, y: 0.5 }, len: 0.4, angle: state.radarAngle, rim: false };
+  var th = Object.assign({}, src, { colorId: state.activeSpool, vel: Math.min(0.85, 0.25 + vel / 160), rim: false });
+  playSilkThreadSegment(th, false, freq);
+}
+function twInitMidi() {
+  if (!navigator.requestMIDIAccess) return;
+  navigator.requestMIDIAccess().then(function(access){
+    function bind(){ access.inputs.forEach(function(input){ input.onmidimessage = twMidiMessage; }); }
+    bind(); access.onstatechange = bind;
+    var st = document.getElementById('twStatus');
+    if (st && !userAudioBuffer) st.textContent = '织锦模式 · MIDI 就绪';
+  }).catch(function(){});
+}
+
 document.getElementById('upAudio4').addEventListener('change', function(e) { initAudio(); handleUserAudioUpload(e.target.files[0], audioCtx, masterGain); });
 window.addEventListener('DOMContentLoaded', () => {
   resize();
@@ -2439,12 +2462,13 @@ window.addEventListener('DOMContentLoaded', () => {
   requestAnimationFrame(loop);
   twBindBar();
   twBindTips();
+  twInitMidi();
 });
 </script>
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。 顶部“传音频”是底音：载入后只作 32% 循环底音，不改变织机音高与画面；再点一次“停底音”卸载。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。 顶部“传音频”是底音：载入后只作 32% 循环底音，不改变织机音高与画面；再点一次“停底音”卸载。 支持 Web MIDI 键盘：接上键盘，按键直接拨弦。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

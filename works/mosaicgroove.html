@@ -69,6 +69,7 @@
   .mg-bar button:hover { background: #ffffff; border-color: #d92b1e; }
   .mg-bar .mg-bpm { display: inline-flex; align-items: center; gap: 4px; color: #f4f1ea; }
   .mg-bar .mg-bpm b { min-width: 34px; text-align: center; font-size: 13px; color: #ffd166; }
+  #mgSongBtn.on { background: #e02819; color: #fff; }
   .mg-bar .mg-sp { margin-left: auto; color: #8f8a80; letter-spacing: .12em; font-size: 10px; }
   .mg-toast {
     position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
@@ -139,7 +140,7 @@
   <button data-act="proj" title="导出四场景工程 JSON">工程</button>
   <button data-act="loadproj" title="导入工程 JSON">导入</button>
   <button data-act="help">说明</button>
-  <span class="mg-sp">MING</span>
+  <button data-act="song" id="mgSongBtn" title="Song 模式：A→B→C→D 串联">Song</button>
 </div>
 
 <script>
@@ -243,7 +244,7 @@ for (var r = 0; r < ROWS; r++) {
   for (var c = 0; c < COLS; c++) grid[r][c] = { color: 0, shape: 0, glow: 0, ai: false };
 }
 
-var mgScenes = [null, null, null, null], mgActiveScene = 0;
+var mgScenes = [null, null, null, null], mgActiveScene = 0, mgSongMode = false, mgSongScene = 0;
 var state = {
   brush: 1,
   triBrush: false,
@@ -755,6 +756,14 @@ setInterval(() => {
   if (mgNow < mgNextStepAt) return;
   mgNextStepAt = mgNow + 60000 / (state.bpm || 111) / 4;
   state.step = (state.step + 1) % 31;
+  if (mgSongMode && state.step === 0) {
+    mgSaveScene();
+    mgSongScene = (mgSongScene + 1) % 4;
+    mgActiveScene = mgSongScene;
+    if (!mgScenes[mgSongScene]) mgScenes[mgSongScene] = mgGridSnapshot();
+    mgGridApply(mgScenes[mgSongScene]);
+    mgUpdateSceneButtons();
+  }
   if (state.step % 8 === 0) state.barCount3 = ((state.barCount3 || 0) + 1) % 8;
   if (state.step === 0 && state.playMode3 === 1) evolveMusicalGameOfLife();
   var col = state.step + 1;
@@ -844,7 +853,7 @@ function mgUpdateSceneButtons() {
 function mgSwitchScene(i) {
   if (i === mgActiveScene) return;
   mgSaveScene();
-  mgActiveScene = i;
+  mgActiveScene = i; mgSongScene = i;
   if (!mgScenes[i]) mgScenes[i] = mgGridSnapshot();
   mgGridApply(mgScenes[i]);
   mgUpdateSceneButtons();
@@ -999,6 +1008,12 @@ function mgBindBar() {
       else if (a === 'wav') mgWAV();
       else if (a === 'proj') mgExportProject();
       else if (a === 'loadproj') { var pf = document.getElementById('mgProjFile'); if (pf) pf.click(); }
+      else if (a === 'song') {
+        mgSongMode = !mgSongMode;
+        btn.classList.toggle('on', mgSongMode);
+        if (mgSongMode) mgSongScene = mgActiveScene;
+        mgToast(mgSongMode ? 'Song 模式：A→B→C→D 每 31 步切换' : 'Song 模式关闭');
+      }
       else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
       else if (a === 'bpmup' || a === 'bpmdown') {
         mgSetBpm((state.bpm || 111) + (a === 'bpmup' ? 1 : -1));
@@ -1229,7 +1244,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "A/B/C/D 是什么", "四份独立的 31 步图案，像同一面墙的四个版本：A 主段、B 变奏、C break、D drop。点字母切换，编辑自动存回当前场景；工程和批量 MIDI 会带上四个场景。"]], "note": "底部可撤销、直接输入 BPM、切换 A/B/C/D 场景；工程 JSON 与批量 MIDI 会带上四个场景。建议戴耳机。 顶部“传”=底音：循环播放，不改变瓷砖图案；载入后按钮变“停”，再点卸载。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "A/B/C/D 是什么", "四份独立的 31 步图案，像同一面墙的四个版本：A 主段、B 变奏、C break、D drop。点字母切换，编辑自动存回当前场景；工程和批量 MIDI 会带上四个场景。"]], "note": "底部可撤销、直接输入 BPM、切换 A/B/C/D 场景；工程 JSON 与批量 MIDI 会带上四个场景。建议戴耳机。 顶部“传”=底音：循环播放，不改变瓷砖图案；载入后按钮变“停”，再点卸载。 Song 模式会每 31 步自动串联 A→B→C→D，适合做段落试听。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
