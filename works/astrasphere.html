@@ -605,15 +605,15 @@ function triggerCelestialVoice(freq, panVal, customRole) {
   // Map role to pure single-note real instrument in DLS_W1
   var dlsKeyMap = {
     fmbell: 'fmbell',
-    harp: 'harp',
+    harp: 'kalimba',
     organ: 'organ',
-    cs80brass: 'cs80brass',
+    cs80brass: 'strings',
     solararp: 'kalimba',
-    shimmer: 'flute',
+    shimmer: 'fmbell',
     choir: 'choir',
     strings: 'strings'
   };
-  var dKey = dlsKeyMap[bankKey] || (['harp','fmbell','organ','cs80brass','choir','kalimba','strings','flute'][state.sysIdx % 8]);
+  var dKey = dlsKeyMap[bankKey] || (['kalimba','fmbell','organ','choir','strings','kalimba','organ','fmbell'][state.sysIdx % 8]);
   var dur = (dKey === 'organ' || dKey === 'choir' || dKey === 'strings') ? 0.95 : 0.65;
   playDlsNote_DLS_W1(audioCtx, filt, dKey, freq, 0.44, dur, 0.012, 1.0);
 

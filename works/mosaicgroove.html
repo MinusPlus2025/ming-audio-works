@@ -516,6 +516,76 @@ function playDlsNote_DLS_W3(ctx, dest, key, targetFreq, gainVal, durSec, attSec,
   return src;
 }
 
+
+var mgNoiseBuffer = null;
+function mgNoise(ctx) {
+  if (mgNoiseBuffer) return mgNoiseBuffer;
+  var len = Math.floor(ctx.sampleRate * 1.0);
+  mgNoiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  var d = mgNoiseBuffer.getChannelData(0);
+  for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return mgNoiseBuffer;
+}
+function mgKick(dest, gain) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(165, now);
+  o.frequency.exponentialRampToValueAtTime(44, now + 0.13);
+  g.gain.setValueAtTime(gain, now);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+  o.connect(g); g.connect(dest); o.start(now); o.stop(now + 0.32);
+  var n = ctx.createBufferSource(); n.buffer = mgNoise(ctx);
+  var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1800;
+  var ng = ctx.createGain(); ng.gain.setValueAtTime(gain * 0.22, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+  n.connect(hp); hp.connect(ng); ng.connect(dest); n.start(now); n.stop(now + 0.03);
+}
+function mgSnare(dest, gain) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var n = ctx.createBufferSource(); n.buffer = mgNoise(ctx);
+  var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1750; bp.Q.value = 0.8;
+  var ng = ctx.createGain(); ng.gain.setValueAtTime(gain, now); ng.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  n.connect(bp); bp.connect(ng); ng.connect(dest); n.start(now); n.stop(now + 0.20);
+  var o = ctx.createOscillator(), og = ctx.createGain();
+  o.type = 'triangle'; o.frequency.setValueAtTime(185, now);
+  og.gain.setValueAtTime(gain * 0.35, now); og.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+  o.connect(og); og.connect(dest); o.start(now); o.stop(now + 0.12);
+}
+function mgHat(dest, gain, open) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var n = ctx.createBufferSource(); n.buffer = mgNoise(ctx);
+  var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7200;
+  var ng = ctx.createGain(); ng.gain.setValueAtTime(gain, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + (open ? 0.18 : 0.05));
+  n.connect(hp); hp.connect(ng); ng.connect(dest); n.start(now); n.stop(now + (open ? 0.20 : 0.06));
+}
+function mgBass(dest, freq, gain, dur) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, now);
+  f.type = 'lowpass'; f.Q.value = 8; f.frequency.setValueAtTime(420, now);
+  f.frequency.exponentialRampToValueAtTime(130, now + dur);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  o.connect(f); f.connect(g); g.connect(dest); o.start(now); o.stop(now + dur + 0.02);
+  var s = ctx.createOscillator(), sg = ctx.createGain();
+  s.type = 'sine'; s.frequency.setValueAtTime(freq * 0.5, now);
+  sg.gain.setValueAtTime(gain * 0.5, now); sg.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  s.connect(sg); sg.connect(dest); s.start(now); s.stop(now + dur + 0.02);
+}
+
+
+function mgStab(dest, freq, gain, dur) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var f = ctx.createBiquadFilter(), g = ctx.createGain();
+  f.type = 'lowpass'; f.Q.value = 3; f.frequency.setValueAtTime(3600, now);
+  f.frequency.exponentialRampToValueAtTime(900, now + dur);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  f.connect(g); g.connect(dest);
+  [1.0, 1.006].forEach(function(mul){
+    var o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(freq * mul, now);
+    o.connect(f); o.start(now); o.stop(now + dur + 0.02);
+  });
+}
+
 function triggerTileSound(r, c, cell) {
   if (!audioCtx || !cell || cell.color <= 0) return;
   var now = audioCtx.currentTime;
@@ -528,25 +598,17 @@ function triggerTileSound(r, c, cell) {
   pan.pan.value = Math.max(-0.85, Math.min(0.85, ((c / COLS) - 0.5) * 1.5));
 
   if (colId === 6) {
-    // Black Tile (color 6): Studio 909 Percussion + Real Sidechain Ducking!
-    // Lower rows (r >= 12) = Punchy Kick + Sidechain Duck; Mid rows (7..11) = Fat Snare; Upper rows (2..6) = Crisp Hi-Hat
     pan.connect(masterGain);
     if (r >= 12) {
-      playDlsNote_DLS_W3(audioCtx, pan, 'kick', 52.0, 0.68, 0.30, 0.002, 1.0);
-      var o = audioCtx.createOscillator(), g = audioCtx.createGain();
-      o.frequency.setValueAtTime(145, now);
-      o.frequency.exponentialRampToValueAtTime(42, now + 0.12);
-      g.gain.setValueAtTime(0.50, now);
-      g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      o.connect(g); g.connect(pan); o.start(now); o.stop(now + 0.26);
+      mgKick(pan, 0.72);
       if (sidechainGain) {
         sidechainGain.gain.setValueAtTime(0.12, now);
         sidechainGain.gain.linearRampToValueAtTime(1.0, now + 0.22);
       }
     } else if (r >= 7) {
-      playDlsNote_DLS_W3(audioCtx, pan, 'snare', 180.0, 0.48, 0.24, 0.002, 1.0);
+      mgSnare(pan, 0.48);
     } else {
-      playDlsNote_DLS_W3(audioCtx, pan, shape === 4 ? 'ohhat' : 'hihat', 440.0, 0.34, shape === 4 ? 0.28 : 0.10, 0.002, 1.0);
+      mgHat(pan, shape === 4 ? 0.30 : 0.26, shape === 4);
     }
     return;
   }
@@ -558,6 +620,8 @@ function triggerTileSound(r, c, cell) {
   // 4 (Green)  -> Clean Jazz Guitar ('s4')
   // 5 (Purple) -> Analog Saw Lead ('s5')
   pan.connect(sidechainGain);
+  if (colId === 3) { mgBass(pan, freq * 0.5, 0.42, 0.24); return; }
+  if (colId === 4) { mgStab(pan, freq, 0.34, 0.18); return; }
   var dKey = 's' + colId;
 
   // Polygon Shape (shape 0..4) -> Musical Articulation:
