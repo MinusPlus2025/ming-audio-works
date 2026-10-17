@@ -75,6 +75,9 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .wa-toast.on { opacity: 1; }
+
+  .wa-meter { width: 96px; height: 9px; background: #10251a; border: 1px solid #2b4a38; border-radius: 4px; overflow: hidden; display: inline-block; }
+  .wa-meter i { display: block; height: 100%; width: 0; background: #d9f99d; transition: width .06s linear; }
 </style>
 </head>
 <body>
@@ -107,6 +110,7 @@
   <label>干湿 <input type="range" id="waWet" min="0" max="1" step="0.01" value="0.65"></label>
   <button data-wa="bypass" class="ghost">旁通</button>
   <button data-wa="rec">录制输出</button>
+  <span class="wa-meter" title="输入电平"><i id="waMeterBar"></i></span>
   <button data-wa="help" class="ghost">说明</button>
   <span class="wa-status" id="waStatus">生成模式</span>
   <span class="wa-sp">MING · INPUT FX</span>
@@ -290,6 +294,7 @@ var state = {
 
 var audioCtx = null, masterGain = null, filterNode = null, tapeDelayL = null, tapeDelayR = null;
 var inputGain = null, inputDry = null, inputWet = null, waWet = 0.65, waBypass = false;
+var inputAnalyser = null;
 
 
 var PCB_SAMPLES = {};
@@ -614,6 +619,7 @@ function initAudio() {
   inputWet.gain.value = waWet; inputDry.gain.value = 1 - waWet;
   inputGain.connect(inputWet); inputWet.connect(filterNode);
   inputGain.connect(inputDry); inputDry.connect(masterGain);
+  inputAnalyser = audioCtx.createAnalyser(); inputAnalyser.fftSize = 512; inputGain.connect(inputAnalyser);
   var comp = audioCtx.createDynamicsCompressor();
 
   // Connect Serial Tape & EQ Chain: filterNode -> eqFilters[0..5] -> satNode -> wowDelay -> biasNode -> masterGain & Ping-Pong BBD Delay
@@ -1533,6 +1539,16 @@ function waToggleRecord() {
   };
   mediaRecorder.start(200); isRecordingVideo = true; waToast('开始录制输出');
 }
+function waMeterLoop() {
+  requestAnimationFrame(waMeterLoop);
+  if (!inputAnalyser) return;
+  var b = new Float32Array(inputAnalyser.fftSize);
+  inputAnalyser.getFloatTimeDomainData(b);
+  var s = 0; for (var i = 0; i < b.length; i++) s += b[i] * b[i];
+  var pct = Math.min(100, Math.sqrt(s / b.length) * 320);
+  var el = document.getElementById('waMeterBar');
+  if (el) el.style.width = pct.toFixed(1) + '%';
+}
 function waBindBar() {
   var up = document.getElementById('upDry');
   var bar = document.getElementById('waBar'); if (!bar) return;
@@ -1551,7 +1567,7 @@ function waBindBar() {
   waApplyMix();
 }
 
-window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); waBindBar(); });
+window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); waBindBar(); waMeterLoop(); });
 </script>
 <script>
 
@@ -1583,7 +1599,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
   .pm-ghost{background:transparent;color:var(--pm-ink);border-color:var(--pm-line)}
   .pm-ghost:hover{border-color:var(--pm-accent);color:var(--pm-accent)}
   .pm-note{font-size:11.5px;line-height:1.7;color:var(--pm-sub);border-top:1px dashed var(--pm-line);padding-top:12px}
-  .pm-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
+  .pm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
   .pm-toast.on{opacity:1}
   `;
   document.head.appendChild(st);

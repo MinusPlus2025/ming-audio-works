@@ -77,12 +77,17 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .mg-toast.on { opacity: 1; }
+
+  .mg-scenes { display: inline-flex; align-items: center; gap: 4px; color: #f4f1ea; }
+  .mg-scenes button { min-width: 26px; padding: 5px 7px; }
+  .mg-scenes button.on { background: #d92b1e; color: #fff; border-color: #d92b1e; }
 </style>
 </head>
 <body>
 <div class="wall-frame">
   <canvas id="wallCanvas"></canvas>
   <input type="file" id="upAudio3" class="hidden-input" accept="audio/*">
+  <input type="file" id="mgProjFile" class="hidden-input" accept="application/json,.json">
 
   <div class="guide-modal" id="guideModal">
     <div class="guide-card">
@@ -99,15 +104,16 @@
 
 <div class="mg-bar" id="mgBar">
   <button data-act="undo" title="Ctrl/Cmd+Z">撤销</button>
-  <button data-act="save" title="保存到本机浏览器">保存工程</button>
-  <button data-act="load" title="读取本机工程">读取</button>
+    <span class="mg-scenes">场景 <button data-scene="0" class="on">A</button><button data-scene="1">B</button><button data-scene="2">C</button><button data-scene="3">D</button></span>
   <span class="mg-bpm">BPM
     <button data-act="bpmdown">−</button><b id="mgBpm">111</b><button data-act="bpmup">＋</button>
   </span>
   <button data-act="midi">导出 MIDI</button>
   <button data-act="wav">导出 WAV</button>
+  <button data-act="proj">导出工程</button>
+  <button data-act="loadproj">导入工程</button>
   <button data-act="help">说明</button>
-  <span class="mg-sp">MING · PATTERN WORKFLOW</span>
+  <span class="mg-sp">MING</span>
 </div>
 
 <script>
@@ -202,6 +208,7 @@ for (var r = 0; r < ROWS; r++) {
   for (var c = 0; c < COLS; c++) grid[r][c] = { color: 0, shape: 0, glow: 0, ai: false };
 }
 
+var mgScenes = [null, null, null, null], mgActiveScene = 0;
 var state = {
   brush: 1,
   triBrush: false,
@@ -656,6 +663,62 @@ function mgLoad() {
     mgToast('工程已读取');
   } catch (e) { mgToast('工程读取失败'); }
 }
+
+function mgGridSnapshot() {
+  return grid.map(function(row){ return row.map(function(c){ return [c.color, c.shape, c.ai ? 1 : 0]; }); });
+}
+function mgGridApply(snap) {
+  if (!snap) return;
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    var v = snap[r] && snap[r][c];
+    if (v) { grid[r][c].color = v[0]; grid[r][c].shape = v[1]; grid[r][c].ai = !!v[2]; }
+  }
+}
+function mgSaveScene() {
+  mgScenes[mgActiveScene] = mgGridSnapshot();
+}
+function mgUpdateSceneButtons() {
+  var btns = document.querySelectorAll('#mgBar [data-scene]');
+  btns.forEach(function(b, i){ b.classList.toggle('on', i === mgActiveScene); });
+}
+function mgSwitchScene(i) {
+  if (i === mgActiveScene) return;
+  mgSaveScene();
+  mgActiveScene = i;
+  if (!mgScenes[i]) mgScenes[i] = mgGridSnapshot();
+  mgGridApply(mgScenes[i]);
+  mgUpdateSceneButtons();
+  mgToast('已切换到场景 ' + 'ABCD'[i]);
+}
+function mgExportProject() {
+  mgSaveScene();
+  var data = {
+    format: 'mosaicgroove-project', version: 1, bpm: state.bpm, active: mgActiveScene,
+    scenes: mgScenes.map(function(s, i){ return s || (i === mgActiveScene ? mgGridSnapshot() : null); })
+  };
+  var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MosaicGroove_Project.json'; a.click();
+  mgToast('工程 JSON 已导出（含 4 个场景）');
+}
+function mgImportProject(file) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var d = JSON.parse(e.target.result);
+      if (!d || d.format !== 'mosaicgroove-project' || !Array.isArray(d.scenes)) throw new Error('bad');
+      mgScenes = [0,1,2,3].map(function(i){ return d.scenes[i] || null; });
+      mgActiveScene = Math.max(0, Math.min(3, d.active || 0));
+      if (typeof d.bpm === 'number') { state.bpm = Math.max(70, Math.min(160, d.bpm)); var b = document.getElementById('mgBpm'); if (b) b.textContent = state.bpm; }
+      if (!mgScenes[mgActiveScene]) mgScenes[mgActiveScene] = mgGridSnapshot();
+      mgGridApply(mgScenes[mgActiveScene]);
+      mgUpdateSceneButtons();
+      mgToast('工程已导入：场景 ' + 'ABCD'[mgActiveScene]);
+    } catch (err) { mgToast('工程文件格式不正确'); }
+  };
+  reader.readAsText(file);
+}
+
 function mgMidiPitch(r, color) {
   if (color === 6) return r >= 12 ? 36 : (r >= 7 ? 38 : 42);
   var f = ROW_FREQS[r % ROW_FREQS.length];
@@ -720,6 +783,11 @@ function mgWAV() {
 function mgBindBar() {
   var bar = document.getElementById('mgBar'); if (!bar) return;
   var bpmLabel = document.getElementById('mgBpm');
+  bar.querySelectorAll('[data-scene]').forEach(function(btn){
+    btn.addEventListener('click', function(){ mgSwitchScene(parseInt(btn.getAttribute('data-scene'), 10) || 0); });
+  });
+  var projFile = document.getElementById('mgProjFile');
+  if (projFile) projFile.addEventListener('change', function(e){ mgImportProject(e.target.files[0]); });
   bar.querySelectorAll('[data-act]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var a = btn.getAttribute('data-act');
@@ -728,6 +796,8 @@ function mgBindBar() {
       else if (a === 'load') mgLoad();
       else if (a === 'midi') mgMIDI();
       else if (a === 'wav') mgWAV();
+      else if (a === 'proj') mgExportProject();
+      else if (a === 'loadproj') { var pf = document.getElementById('mgProjFile'); if (pf) pf.click(); }
       else if (a === 'help') document.getElementById('guideModal').classList.add('open');
       else if (a === 'bpmup' || a === 'bpmdown') {
         state.bpm = Math.max(70, Math.min(160, (state.bpm || 111) + (a === 'bpmup' ? 1 : -1)));
@@ -983,12 +1053,12 @@ function drawWall() {
 }
 
 function loop() { drawWall(); requestAnimationFrame(loop); }
-window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); drawWall(); requestAnimationFrame(loop); mgBindBar(); });
+window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); drawWall(); requestAnimationFrame(loop); mgBindBar(); mgScenes[0] = mgGridSnapshot(); mgUpdateSceneButtons(); });
 </script>
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"]], "note": "底部工具栏可撤销、改 BPM、保存工程、导出 MIDI/WAV。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"]], "note": "底部工具栏可撤销、改 BPM、A/B/C/D 场景、导出工程 JSON 与 MIDI/WAV。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
@@ -1015,7 +1085,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
   .pm-ghost{background:transparent;color:var(--pm-ink);border-color:var(--pm-line)}
   .pm-ghost:hover{border-color:var(--pm-accent);color:var(--pm-accent)}
   .pm-note{font-size:11.5px;line-height:1.7;color:var(--pm-sub);border-top:1px dashed var(--pm-line);padding-top:12px}
-  .pm-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
+  .pm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
   .pm-toast.on{opacity:1}
   `;
   document.head.appendChild(st);
