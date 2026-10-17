@@ -10,12 +10,12 @@
     width: 100%; height: 100%;
     background: #ece6d8;
     font-family: 'Courier New', 'JetBrains Mono', 'PingFang SC', monospace;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
     overflow: hidden;
   }
   .pcb-viewport {
     width: calc(100vw - 12px); max-width: 1200px;
-    height: calc(100vh - 12px); max-height: 900px;
+    height: calc(100vh - 72px); max-height: 860px;
     position: relative;
     display: flex; align-items: center; justify-content: center;
   }
@@ -51,6 +51,30 @@
     background: #ee4823; color: #ffffff; border: 2px solid #1c2024;
     padding: 8px 24px; border-radius: 8px; font-weight: 800; cursor: pointer;
   }
+
+  .wa-bar {
+    width: calc(100vw - 12px); max-width: 1200px; min-height: 50px;
+    background: #0a371f; color: #d9f99d; border: 3px solid #1c2024; border-radius: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 0 14px;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  .wa-bar button {
+    background: #ee4823; color: #fff; border: 2px solid #1c2024; border-radius: 4px;
+    font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer;
+  }
+  .wa-bar button:hover { filter: brightness(1.08); }
+  .wa-bar button.ghost { background: #d9f99d; color: #0a371f; border-color: #0a371f; }
+  .wa-bar label { display: inline-flex; align-items: center; gap: 6px; color: #d9f99d; }
+  .wa-bar input[type=range] { width: 100px; accent-color: #ee4823; }
+  .wa-bar .wa-status { font-weight: 700; color: #fde68a; }
+  .wa-bar .wa-sp { margin-left: auto; font-size: 10px; letter-spacing: .12em; color: #86efac; }
+  .wa-toast {
+    position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
+    background: #0a371f; color: #f0fdf4; border: 1px solid #ee4823;
+    padding: 8px 14px; border-radius: 999px; font-size: 12px; z-index: 90;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .wa-toast.on { opacity: 1; }
 </style>
 </head>
 <body>
@@ -77,6 +101,17 @@
   </div>
 </div>
 
+<div class="wa-bar" id="waBar">
+  <button data-wa="load">载入干声</button>
+  <button data-wa="gen" class="ghost">生成引擎</button>
+  <label>干湿 <input type="range" id="waWet" min="0" max="1" step="0.01" value="0.65"></label>
+  <button data-wa="bypass" class="ghost">旁通</button>
+  <button data-wa="rec">录制输出</button>
+  <button data-wa="help" class="ghost">说明</button>
+  <span class="wa-status" id="waStatus">生成模式</span>
+  <span class="wa-sp">MING · INPUT FX</span>
+</div>
+
 <script>
 var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
 
@@ -95,7 +130,11 @@ function handleUserAudioUpload(file, ctx, targetNode) {
       userAudioSource = ctx.createBufferSource();
       userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
       var gain = ctx.createGain(); gain.gain.value = 0.78;
-      userAudioSource.connect(gain); gain.connect(targetNode); userAudioSource.start(0);
+      userAudioSource.connect(gain);
+      if (inputGain) gain.connect(inputGain); else gain.connect(targetNode);
+      userAudioSource.start(0);
+      state.isRunning = false;
+      if (typeof waOnInputLoaded === 'function') waOnInputLoaded();
     });
   };
   reader.readAsArrayBuffer(file);
@@ -250,6 +289,7 @@ var state = {
 };
 
 var audioCtx = null, masterGain = null, filterNode = null, tapeDelayL = null, tapeDelayR = null;
+var inputGain = null, inputDry = null, inputWet = null, waWet = 0.65, waBypass = false;
 
 
 var PCB_SAMPLES = {};
@@ -568,6 +608,12 @@ function initAudio() {
   fbGainR = audioCtx.createGain(); fbGainR.gain.value = 0.36;
 
   masterGain = audioCtx.createGain(); masterGain.gain.value = 0.88;
+  // Dedicated input-FX bus: dry + wet (tape/EQ chain) for uploaded audio
+  inputGain = audioCtx.createGain(); inputGain.gain.value = 1.0;
+  inputDry = audioCtx.createGain(); inputWet = audioCtx.createGain();
+  inputWet.gain.value = waWet; inputDry.gain.value = 1 - waWet;
+  inputGain.connect(inputWet); inputWet.connect(filterNode);
+  inputGain.connect(inputDry); inputDry.connect(masterGain);
   var comp = audioCtx.createDynamicsCompressor();
 
   // Connect Serial Tape & EQ Chain: filterNode -> eqFilters[0..5] -> satNode -> wowDelay -> biasNode -> masterGain & Ping-Pong BBD Delay
@@ -1450,12 +1496,67 @@ setInterval(() => {
   }
 }, 135);
 function loop() { drawBoard(); requestAnimationFrame(loop); }
-window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); });
+
+function waToast(msg) {
+  var t = document.querySelector('.wa-toast'); if (t) t.remove();
+  t = document.createElement('div'); t.className = 'wa-toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add('on'); });
+  setTimeout(function(){ t.classList.remove('on'); setTimeout(function(){ t.remove(); }, 250); }, 1800);
+}
+function waOnInputLoaded() {
+  var st = document.getElementById('waStatus');
+  if (st) st.textContent = '输入模式 · 干湿 ' + Math.round(waWet * 100) + '%';
+  waToast('干声已载入：已停掉生成引擎，只处理输入');
+}
+function waApplyMix() {
+  if (!inputWet || !inputDry) return;
+  inputWet.gain.setTargetAtTime(waBypass ? 0 : waWet, audioCtx.currentTime, 0.02);
+  inputDry.gain.setTargetAtTime(waBypass ? 1 : 1 - waWet, audioCtx.currentTime, 0.02);
+  var st = document.getElementById('waStatus');
+  if (st) st.textContent = (state.isRunning ? '生成模式' : '输入模式') + (waBypass ? ' · 旁通' : ' · 干湿 ' + Math.round(waWet * 100) + '%');
+}
+function waToggleRecord() {
+  if (!audioCtx) initAudio();
+  if (!mediaStreamDest) ensureIOGraph(audioCtx, masterGain);
+  if (!mediaStreamDest) { waToast('当前浏览器不支持录音'); return; }
+  if (isRecordingVideo && mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop(); isRecordingVideo = false; waToast('录制结束，正在导出'); return;
+  }
+  recordedChunks = [];
+  var mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+  mediaRecorder = mime ? new MediaRecorder(mediaStreamDest.stream, { mimeType: mime }) : new MediaRecorder(mediaStreamDest.stream);
+  mediaRecorder.ondataavailable = function(e){ if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = function(){
+    var blob = new Blob(recordedChunks, { type: mime || 'audio/webm' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'KERS0174_InputFX.webm'; a.click();
+  };
+  mediaRecorder.start(200); isRecordingVideo = true; waToast('开始录制输出');
+}
+function waBindBar() {
+  var up = document.getElementById('upDry');
+  var bar = document.getElementById('waBar'); if (!bar) return;
+  bar.querySelectorAll('[data-wa]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var a = btn.getAttribute('data-wa');
+      if (a === 'load') { if (up) up.click(); }
+      else if (a === 'gen') { state.isRunning = !state.isRunning; waApplyMix(); waToast(state.isRunning ? '生成引擎已开启' : '生成引擎已停止'); }
+      else if (a === 'bypass') { waBypass = !waBypass; btn.textContent = waBypass ? '旁通 · 开' : '旁通'; waApplyMix(); }
+      else if (a === 'rec') waToggleRecord();
+      else if (a === 'help') document.getElementById('guideModal').classList.add('open');
+    });
+  });
+  var wet = document.getElementById('waWet');
+  if (wet) wet.addEventListener('input', function(){ waWet = parseFloat(wet.value); waApplyMix(); });
+  waApplyMix();
+}
+
+window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); waBindBar(); });
 </script>
 <script>
 
 (function(){
-  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "赛车越多、档位越高，抽头越密。右下角磁带盘可以按住拖动。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通在底部。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
