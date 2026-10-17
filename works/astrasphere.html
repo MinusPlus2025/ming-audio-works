@@ -736,6 +736,7 @@ canvas.addEventListener('mousedown', (e) => {
     TRACK_STEMS[tIdx].muted = !TRACK_STEMS[tIdx].muted;
     if (tIdx === 0 && pulsarGain && audioCtx) pulsarGain.gain.setTargetAtTime(TRACK_STEMS[0].muted ? 0.0001 : 0.24, audioCtx.currentTime, 0.08);
     if (tIdx === 1 && nebulaGain && audioCtx) nebulaGain.gain.setTargetAtTime(TRACK_STEMS[1].muted ? 0.0001 : 0.22, audioCtx.currentTime, 0.08);
+    if (typeof asToast === 'function') asToast('声部：' + TRACK_STEMS[tIdx].name + (TRACK_STEMS[tIdx].muted ? ' · 已静音' : ' · 已开启'));
     return;
   }
 
@@ -1313,6 +1314,8 @@ function drawScene() {
 
   // Left-Side 4 Cosmic Stem Mixer Cards
   ctx.save();
+  ctx.fillStyle = '#94a3b8'; ctx.font = `700 ${8.5 * dpr}px sans-serif`;
+  ctx.fillText('声部开关 · 点击静音 / 开启', 22 * dpr, 0.25 * h);
   TRACK_STEMS.forEach((ts, idx) => {
     var cardX = 22 * dpr, cardY = (0.275 + idx * 0.098) * h, cardW = 190 * dpr, cardH = 46 * dpr;
     ctx.fillStyle = ts.muted ? 'rgba(15, 20, 32, 0.45)' : 'rgba(18, 26, 48, 0.88)';
@@ -1325,6 +1328,11 @@ function drawScene() {
     ctx.fillStyle = ts.muted ? '#64748b' : ts.hex;
     ctx.beginPath(); ctx.arc(cardX + 20 * dpr, cardY + cardH * 0.5, 4.5 * dpr, 0, Math.PI * 2); ctx.fill();
 
+    ctx.textAlign = 'right';
+    ctx.fillStyle = ts.muted ? '#64748b' : '#86efac';
+    ctx.font = `800 ${7 * dpr}px monospace`;
+    ctx.fillText(ts.muted ? 'OFF' : 'ON', cardX + cardW - 10 * dpr, cardY + 16 * dpr);
+    ctx.textAlign = 'left';
     ctx.fillStyle = ts.muted ? '#64748b' : '#f8fafc';
     ctx.font = `800 ${10.5 * dpr}px sans-serif`;
     ctx.fillText(ts.name, cardX + 32 * dpr, cardY + 19 * dpr);
