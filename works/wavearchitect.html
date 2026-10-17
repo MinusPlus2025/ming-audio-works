@@ -1596,6 +1596,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
     + '<ol class="pm-steps">'+steps+'</ol>'
     + '<div class="pm-actions">'
     +   '<button class="pm-primary" type="button">开始</button>'
+    +   '<button class="pm-ghost pm-demo" type="button">一键试听</button>'
     +   '<button class="pm-ghost pm-full" type="button">全屏演示</button>'
     +   '<button class="pm-ghost pm-save" type="button">保存分享图</button>'
     + '</div>'
@@ -1604,6 +1605,17 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
   function open(){ modal.classList.add('open'); modal.style.display='flex'; }
   function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 按 ? 重新查看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
   card.querySelector('.pm-primary').addEventListener('click', close);
+  card.querySelector('.pm-demo').addEventListener('click', function(){
+    close();
+    setTimeout(function(){
+      var c = document.querySelector('canvas'); if(!c) return;
+      var r = c.getBoundingClientRect();
+      var x = r.left + r.width * 0.5, y = r.top + r.height * 0.52;
+      ['mousedown','mouseup'].forEach(function(t){
+        c.dispatchEvent(new MouseEvent(t,{clientX:x,clientY:y,bubbles:true,button:0}));
+      });
+    }, 400);
+  });
   card.querySelector('.pm-full').addEventListener('click', function(){ close(); try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} });
   card.querySelector('.pm-save').addEventListener('click', function(){
     var c = document.querySelector('canvas'); if(!c) return;
