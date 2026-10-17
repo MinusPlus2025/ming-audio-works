@@ -1460,7 +1460,7 @@ canvas.addEventListener('mousedown', (e) => {
         });
       }
       else if (tb.id === 'video') toggleVideoRecording(canvas, audioCtx, masterGain, 'ThreadWeave_Loom');
-      else if (tb.id === 'guide') document.getElementById('guideModal').classList.add('open');
+      else if (tb.id === 'guide') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
       return;
     }
   }

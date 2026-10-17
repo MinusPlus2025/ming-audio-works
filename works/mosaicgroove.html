@@ -238,12 +238,26 @@ function clearMosaicWall() {
 function seedDefaultMosaicArtwork() {
   clearMosaicWall();
   var p = [
-    [6,3,3,0],[7,2,3,0],[7,3,6,0],[7,4,6,0],[8,3,3,0],[9,3,3,0],[10,2,6,0],[10,4,6,0],[11,2,6,0],[11,4,6,0],[12,2,1,2],[12,4,6,4],
-    [10,7,6,0],[11,6,5,0],[11,7,5,0],[11,8,5,0],[12,7,5,0],[13,7,5,0],[14,6,6,2],[14,7,6,0],[14,8,6,4],[15,6,6,0],[15,8,6,0],[16,6,1,2],[16,8,1,4],
-    [4,12,1,0],[5,12,2,0],[5,13,6,0],[6,10,6,0],[6,11,2,0],[6,12,2,0],[6,13,6,0],[7,12,5,0],[8,11,3,0],[8,12,3,1],[8,13,3,3],[9,11,3,0],[9,14,3,0],[10,11,3,0],[10,15,3,0],[11,11,6,2],
-    [9,17,2,0],[10,17,1,0],[10,18,1,0],[11,15,6,0],[11,16,1,0],[11,17,6,0],[12,17,5,0],[13,16,2,0],[13,17,4,0],[13,18,2,0],[14,16,2,0],[14,18,4,0],[14,19,3,0],[15,16,6,0],[15,18,6,0],[15,19,5,0],[15,20,6,0],[16,19,6,0],[17,19,6,0],[18,18,2,0],[18,19,2,0],[18,20,2,0],[19,18,2,1],[19,20,2,2],
-    [13,23,6,0],[14,22,3,0],[14,23,5,0],[14,24,3,0],[15,23,3,0],[16,23,3,0],[17,22,1,0],[17,23,1,0],[17,24,1,0],[18,21,1,3],[18,25,1,4],
-    [3,19,1,0],[3,20,2,0],[3,25,5,0],[4,19,2,0],[4,20,1,0],[4,24,1,0],[4,25,6,0],[4,26,1,0],[5,24,5,0],[5,25,1,0],[6,25,1,0],[6,26,1,1],[7,25,1,0],[8,24,1,0],[8,26,1,0],[9,24,2,0],[9,26,2,0],[10,27,2,1],[10,28,5,3],[11,28,4,2],[11,29,6,4]
+    // kick: 1, 5, 9, 13, 17, 21, 25, 29
+    [13,1,6,0],[13,5,6,0],[13,9,6,0],[13,13,6,0],[13,17,6,0],[13,21,6,0],[13,25,6,0],[13,29,6,0],
+    // snare: backbeat 5, 13, 21, 29
+    [9,5,6,0],[9,13,6,0],[9,21,6,0],[9,29,6,0],
+    // closed hats on 8ths (skip 1/17/25 where chords + bass already fill the column)
+    [4,3,6,0],[4,5,6,0],[4,7,6,0],[4,9,6,0],[4,11,6,0],[4,13,6,0],[4,15,6,0],
+    [4,19,6,0],[4,21,6,0],[4,23,6,0],[4,27,6,0],[4,29,6,0],[4,31,6,0],
+    // open hats
+    [4,8,6,4],[4,16,6,4],[4,24,6,4],
+    // bass: C minor roots
+    [17,1,3,0],[17,4,3,0],[16,7,3,0],[15,11,3,0],[17,13,3,0],[17,17,3,0],[17,20,3,0],[16,23,3,0],[15,27,3,0],[17,29,3,0],
+    // chord stabs: Cm7 (C Eb G Bb)
+    [11,1,2,0],[12,1,2,0],
+    [9,9,2,0],[8,9,2,0],
+    [8,17,2,0],[11,17,2,0],
+    [9,25,2,0],[12,25,2,0],
+    // lead motif
+    [7,3,1,0],[9,6,1,1],[8,10,1,0],[6,14,1,2],[7,18,1,0],[9,22,1,1],[8,26,1,0],[6,30,1,2],
+    // pink accents
+    [11,12,5,0],[11,28,5,0]
   ];
   p.forEach(([r, c, col, sh]) => {
     if (r < ROWS && c < COLS) grid[r][c] = { color: col, shape: sh, glow: 0, ai: false };
@@ -352,7 +366,9 @@ function initAudio() {
   clubPunch.gain.value = 3.5;
   sidechainGain.connect(clubPunch);
   clubPunch.connect(masterGain);
-  masterGain.connect(comp);
+  var toneHP = audioCtx.createBiquadFilter(); toneHP.type = 'highpass'; toneHP.frequency.value = 55;
+  var toneLP = audioCtx.createBiquadFilter(); toneLP.type = 'lowpass'; toneLP.frequency.value = 11000;
+  masterGain.connect(toneHP); toneHP.connect(toneLP); toneLP.connect(comp);
   comp.connect(audioCtx.destination);
   ensureIOGraph(audioCtx, comp);
 }
@@ -879,29 +895,6 @@ function handleTileClick(e, isDown, isDouble) {
     else if (c === 26) seedDefaultMosaicArtwork();
     else if (c === 27) clearMosaicWall();
     else if (c === 28) document.getElementById('upAudio3').click();
-    else if (c === 29) {
-      exportCurrentStateWAV('MosaicGroove_PolygonMatrix', function(L, R, sr, N) {
-        for (var step = 0; step < 56; step++) {
-          var t0 = step * 0.14;
-          if (t0 >= 7.8) break;
-          var col = (step % 31) + 1;
-          var pan = ((col / COLS) - 0.5) * 1.4;
-          for (var r = 2; r < ROWS - 1; r++) {
-            var cell = grid[r][col];
-            if (!cell || cell.color <= 0) continue;
-            var f = ROW_FREQS[r % ROW_FREQS.length];
-            if (cell.color === 6) {
-              var dKey = (r >= 12) ? 'kick' : (r >= 7 ? 'snare' : 'hihat');
-              mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W3_DATA, dKey, t0, 0.22, r >= 12 ? 52.0 : 180.0, 0.45, pan, 1.0);
-            } else {
-              var mKey = 's' + cell.color;
-              var sl = (cell.shape === 1) ? 0.75 : (cell.shape === 2 ? 1.33 : 1.0);
-              mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W3_DATA, mKey, t0, 0.32, f, 0.36, pan, sl);
-            }
-          }
-        }
-      });
-    }
     else if (c === 30) toggleVideoRecording(canvas, audioCtx, masterGain, 'MosaicGroove_Wall');
     return;
   }
@@ -1023,8 +1016,6 @@ function drawWall() {
       drawSingleTile(c * cw, 0, cw, ch, '#1c1d1f', 0, dpr, 0, '清', 'CLR', '#ffffff');
     } else if (c === 28) {
       drawSingleTile(c * cw, 0, cw, ch, '#e04f8b', 0, dpr, 0, '传', 'AUDIO', '#ffffff');
-    } else if (c === 29) {
-      drawSingleTile(c * cw, 0, cw, ch, '#124296', 0, dpr, 0, '导', 'WAV', '#ffffff');
     } else if (c === 30) {
       drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0, '录', 'VIDEO', '#1c1d1f');
     } else {
@@ -1093,7 +1084,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"]], "note": "底部工具栏可撤销、改 BPM、A/B/C/D 场景、导出工程 JSON 与 MIDI/WAV。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "存场景", "点 A/B/C/D 切换四份图案；编辑自动存入当前场景；工程 JSON 和批量 MIDI 会带上四个场景"]], "note": "底部工具栏可撤销、改 BPM、A/B/C/D 场景、导出工程 JSON 与 MIDI/WAV。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

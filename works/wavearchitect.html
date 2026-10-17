@@ -825,9 +825,8 @@ function handleBoardDown(e) {
 
   // Left-Edge 7 Solder Pad Action Buttons
   if (px >= 0.005 && px <= 0.085 && py >= 0.56 && py <= 0.85) {
-    var padIdx = Math.max(0, Math.min(6, Math.round((py - 0.58) / 0.038)));
-    if (padIdx === 0) { document.getElementById('guideModal').classList.add('open'); return; }
-    if (padIdx === 1) {
+    var padIdx = Math.max(0, Math.min(3, Math.round((py - 0.58) / 0.065)));
+    if (padIdx === 0) {
       // +抽头: Add a new F1 Delay Tap Car while preserving existing cars!
       var ratios = [1.0, 1.498, 2.0, 0.75, 1.25, 1.335];
       var cols = ['#ee4823', '#264899', '#eab308', '#9333ea', '#06b6d4', '#10b981'];
@@ -843,10 +842,9 @@ function handleBoardDown(e) {
       triggerStationAudio(STATIONS[cId % STATIONS.length], CARS[CARS.length - 1]);
       return;
     }
-    if (padIdx === 2) { resetPCBToCleanDefault(); return; }
-    if (padIdx === 3) { state.stemIdx = (state.stemIdx + 1) % STEMS.length; return; }
-    if (padIdx === 4) { document.getElementById('upDry').click(); return; }
-    if (padIdx === 5) {
+    if (padIdx === 1) { resetPCBToCleanDefault(); return; }
+    if (padIdx === 2) { state.stemIdx = (state.stemIdx + 1) % STEMS.length; return; }
+    if (padIdx === 3) {
       exportCurrentStateWAV('WaveArchitect_AvantTape_MultiTap', function(L, R, sr, N) {
         var stem = STEMS[state.stemIdx % STEMS.length];
         var icTrans = Math.pow(2.0, ((state.activeChordPin || 0) % 12) / 12.0);
@@ -870,7 +868,6 @@ function handleBoardDown(e) {
       });
       return;
     }
-    if (padIdx === 6) { toggleVideoRecording(canvas, audioCtx, masterGain, 'WaveArchitect_PCB'); return; }
   }
 
   // Clicking on the PCB Racetrack places a new F1 Delay Tap Car at that exact track position (preserving existing cars)!
@@ -1142,9 +1139,9 @@ function drawBoard() {
   ctx.fillStyle = '#1c2024';
   for (var i = 0; i < 8; i++) ctx.fillRect(bx + 40 * dpr, by + (36 + i * 11) * dpr, 10 * dpr, 4 * dpr);
 
-  var leftLabels = ['?玩法', '+抽头', '清空车', '换曲风', '传音频', '导WAV', '录视频'];
-  ['#264899', '#1c2024', '#ebe5d3', '#1c2024', '#264899', '#0c9e44', '#ee4823'].forEach((col, idx) => {
-    var rpx = bx + 26 * dpr, rpy = by + bh * (0.58 + idx * 0.038);
+  var leftLabels = ['+抽头', '清空车', '换曲风', '导WAV'];
+  ['#1c2024', '#ebe5d3', '#1c2024', '#0c9e44'].forEach((col, idx) => {
+    var rpx = bx + 26 * dpr, rpy = by + bh * (0.58 + idx * 0.065);
     ctx.fillStyle = col; ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2 * dpr;
     ctx.beginPath(); ctx.arc(rpx, rpy, 9.5 * dpr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#ebe5d3'; ctx.font = `800 ${7.5 * dpr}px sans-serif`;
@@ -1587,7 +1584,7 @@ function waBindBar() {
       else if (a === 'gen') { state.isRunning = !state.isRunning; waApplyMix(); waToast(state.isRunning ? '生成引擎已开启' : '生成引擎已停止'); }
       else if (a === 'bypass') { waBypass = !waBypass; btn.textContent = waBypass ? '旁通 · 开' : '旁通'; waApplyMix(); }
       else if (a === 'rec') waToggleRecord();
-      else if (a === 'help') document.getElementById('guideModal').classList.add('open');
+      else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
     });
   });
   var preset = document.getElementById('waPreset');

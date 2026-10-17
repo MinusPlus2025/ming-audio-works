@@ -311,9 +311,7 @@ var BOTTOM_PILLS = [
   { id: 'drop',   x: 0.44, w: 0.12, label: '✦ 超新星引力波' },
   { id: 'meteor', x: 0.56, w: 0.11, label: '☄️ 召唤流星群' },
   { id: 'clear',  x: 0.67, w: 0.09, label: '↺ 重置宇宙' },
-  { id: 'upload', x: 0.76, w: 0.08, label: '📂 传音频' },
-  { id: 'wav',    x: 0.84, w: 0.07, label: '🎵 导WAV' },
-  { id: 'guide',  x: 0.92, w: 0.07, label: '? 说明' }
+  { id: 'wav',    x: 0.84, w: 0.07, label: '🎵 导WAV' }
 ];
 
 var LASER_ARCS = [];
@@ -1448,7 +1446,7 @@ function asBindBar() {
         if (audioReactive) { audioCtx && audioCtx.resume && audioCtx.resume(); asToast('音频反应已开启：载入音频或让合成器驱动画面'); }
         else { var st = document.getElementById('asStatus'); if (st) st.textContent = '生成模式'; }
       }
-      else if (a === 'help') document.getElementById('guideModal').classList.add('open');
+      else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
     });
   });
   var sens = document.getElementById('asSens');
