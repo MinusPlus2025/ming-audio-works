@@ -10,12 +10,12 @@
     width: 100%; height: 100%;
     background: #cfc9be;
     font-family: 'Inter', -apple-system, 'PingFang SC', monospace;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
     overflow: hidden;
   }
   .wall-frame {
     width: calc(100vw - 12px); max-width: 1200px;
-    height: calc(100vh - 12px); max-height: 900px;
+    height: calc(100vh - 72px); max-height: 860px;
     background: #b8b2a6;
     border: 3px solid #2b2927;
     border-radius: 8px;
@@ -55,6 +55,28 @@
     background: #124296; color: #ffffff; border: none;
     padding: 9px 24px; border-radius: 8px; font-weight: 800; cursor: pointer;
   }
+
+  .mg-bar {
+    width: calc(100vw - 12px); max-width: 1200px; min-height: 50px;
+    background: #1c1d1f; color: #e9e4d8; border: 2px solid #2b2927; border-radius: 6px;
+    display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  .mg-bar button {
+    background: #f4f1ea; color: #1c1d1f; border: 1px solid #6f6a61; border-radius: 4px;
+    font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 10px; cursor: pointer;
+  }
+  .mg-bar button:hover { background: #ffffff; border-color: #d92b1e; }
+  .mg-bar .mg-bpm { display: inline-flex; align-items: center; gap: 4px; color: #f4f1ea; }
+  .mg-bar .mg-bpm b { min-width: 34px; text-align: center; font-size: 13px; color: #ffd166; }
+  .mg-bar .mg-sp { margin-left: auto; color: #8f8a80; letter-spacing: .12em; font-size: 10px; }
+  .mg-toast {
+    position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
+    background: #1c1d1f; color: #f4f1ea; border: 1px solid #6f6a61;
+    padding: 8px 14px; border-radius: 999px; font-size: 12px; z-index: 90;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .mg-toast.on { opacity: 1; }
 </style>
 </head>
 <body>
@@ -73,6 +95,19 @@
       <button class="close-btn" onclick="document.getElementById('guideModal').classList.remove('open')">开始在瓷砖墙上拼贴电音</button>
     </div>
   </div>
+</div>
+
+<div class="mg-bar" id="mgBar">
+  <button data-act="undo" title="Ctrl/Cmd+Z">撤销</button>
+  <button data-act="save" title="保存到本机浏览器">保存工程</button>
+  <button data-act="load" title="读取本机工程">读取</button>
+  <span class="mg-bpm">BPM
+    <button data-act="bpmdown">−</button><b id="mgBpm">111</b><button data-act="bpmup">＋</button>
+  </span>
+  <button data-act="midi">导出 MIDI</button>
+  <button data-act="wav">导出 WAV</button>
+  <button data-act="help">说明</button>
+  <span class="mg-sp">MING · PATTERN WORKFLOW</span>
 </div>
 
 <script>
@@ -174,7 +209,8 @@ var state = {
   isPlaying: true,
   step: 0,
   playMode3: 0, // 0=AI编曲, 1=🧬生命演化, 2=💣连锁波纹
-  chordIdx: 0
+  chordIdx: 0,
+  bpm: 111
 };
 
 function resize() {
@@ -553,8 +589,12 @@ function triggerChainReactionRipple(startR, startC, baseColor) {
   });
 }
 
+var mgNextStepAt = 0;
 setInterval(() => {
   if (!state.isPlaying) return;
+  var mgNow = performance.now();
+  if (mgNow < mgNextStepAt) return;
+  mgNextStepAt = mgNow + 60000 / (state.bpm || 111) / 4;
   state.step = (state.step + 1) % 31;
   if (state.step % 8 === 0) state.barCount3 = ((state.barCount3 || 0) + 1) % 8;
   if (state.step === 0 && state.playMode3 === 1) evolveMusicalGameOfLife();
@@ -571,12 +611,144 @@ setInterval(() => {
       if (triggered < 4) { triggerTileSound(r, col, cell); triggered++; }
     }
   }
-}, 135);
+}, 24);
+
+
+var mgUndoStack = [];
+function mgSnapshot() {
+  mgUndoStack.push(grid.map(function(row){ return row.map(function(c){ return { color: c.color, shape: c.shape, ai: c.ai }; }); }));
+  if (mgUndoStack.length > 40) mgUndoStack.shift();
+}
+function mgUndo() {
+  var s = mgUndoStack.pop();
+  if (!s) { mgToast('没有可撤销的操作'); return; }
+  for (var r = 0; r < ROWS; r++) for (var c = 0; c < COLS; c++) {
+    grid[r][c].color = s[r][c].color; grid[r][c].shape = s[r][c].shape; grid[r][c].ai = s[r][c].ai;
+  }
+  mgToast('已撤销');
+}
+function mgToast(msg) {
+  var t = document.querySelector('.mg-toast'); if (t) t.remove();
+  t = document.createElement('div'); t.className = 'mg-toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add('on'); });
+  setTimeout(function(){ t.classList.remove('on'); setTimeout(function(){ t.remove(); }, 250); }, 1800);
+}
+function mgSave() {
+  var data = {
+    grid: grid.map(function(row){ return row.map(function(c){ return [c.color, c.shape, c.ai ? 1 : 0]; }); }),
+    bpm: state.bpm, playMode3: state.playMode3, chordIdx: state.chordIdx, brush: state.brush
+  };
+  try { localStorage.setItem('mg.project.v1', JSON.stringify(data)); mgToast('工程已保存到本机'); }
+  catch (e) { mgToast('保存失败：浏览器存储不可用'); }
+}
+function mgLoad() {
+  var raw = null;
+  try { raw = localStorage.getItem('mg.project.v1'); } catch (e) {}
+  if (!raw) { mgToast('没有已保存的工程'); return; }
+  try {
+    var d = JSON.parse(raw);
+    if (d.grid) d.grid.forEach(function(row, r){ row.forEach(function(v, c){ if (grid[r] && grid[r][c]) { grid[r][c].color = v[0]; grid[r][c].shape = v[1]; grid[r][c].ai = !!v[2]; } }); });
+    if (typeof d.bpm === 'number') { state.bpm = Math.max(70, Math.min(160, Math.round(d.bpm))); var b = document.getElementById('mgBpm'); if (b) b.textContent = state.bpm; }
+    if (typeof d.playMode3 === 'number') state.playMode3 = d.playMode3;
+    if (typeof d.chordIdx === 'number') state.chordIdx = d.chordIdx;
+    if (typeof d.brush === 'number') state.brush = d.brush;
+    mgToast('工程已读取');
+  } catch (e) { mgToast('工程读取失败'); }
+}
+function mgMidiPitch(r, color) {
+  if (color === 6) return r >= 12 ? 36 : (r >= 7 ? 38 : 42);
+  var f = ROW_FREQS[r % ROW_FREQS.length];
+  return Math.max(0, Math.min(127, Math.round(69 + 12 * Math.log(f / 440) / Math.LN2)));
+}
+function mgVLQ(n) {
+  var b = [n & 0x7f];
+  while (n >>= 7) b.unshift((n & 0x7f) | 0x80);
+  return b;
+}
+function mgMIDI() {
+  var ev = [];
+  for (var c = 1; c < COLS; c++) for (var r = 2; r < ROWS - 1; r++) {
+    var cell = grid[r][c]; if (!cell || cell.color <= 0) continue;
+    var ch = cell.color === 6 ? 9 : (cell.color - 1);
+    var p = mgMidiPitch(r, cell.color);
+    var t = (c - 1) * 120;
+    var dur = cell.shape === 0 ? 240 : 120;
+    ev.push({ t: t, on: 1, ch: ch, p: p });
+    ev.push({ t: t + dur, on: 0, ch: ch, p: p });
+  }
+  ev.sort(function(a, b){ return a.t - b.t || a.on - b.on; });
+  var track = [], last = 0;
+  var tempo = Math.round(60000000 / (state.bpm || 111));
+  track.push(0, 0xFF, 0x51, 0x03, (tempo >> 16) & 255, (tempo >> 8) & 255, tempo & 255);
+  ev.forEach(function(e){
+    track = track.concat(mgVLQ(e.t - last)); last = e.t;
+    if (e.on) track.push(0x90 | e.ch, e.p, 100); else track.push(0x80 | e.ch, e.p, 0);
+  });
+  track = track.concat([0x00, 0xFF, 0x2F, 0x00]);
+  var header = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0];
+  var len = track.length;
+  var tr = [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 255, (len >> 16) & 255, (len >> 8) & 255, len & 255].concat(track);
+  var blob = new Blob([new Uint8Array(header.concat(tr))], { type: 'audio/midi' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MosaicGroove_Pattern.mid'; a.click();
+  mgToast('MIDI 已导出：31 步 / ' + (state.bpm || 111) + ' BPM');
+}
+function mgWAV() {
+  exportCurrentStateWAV('MosaicGroove_PolygonMatrix', function(L, R, sr, N) {
+    for (var step = 0; step < 56; step++) {
+      var t0 = step * 0.14;
+      if (t0 >= 7.8) break;
+      var col = (step % 31) + 1;
+      var pan = ((col / COLS) - 0.5) * 1.4;
+      for (var r = 2; r < ROWS - 1; r++) {
+        var cell = grid[r][col];
+        if (!cell || cell.color <= 0) continue;
+        var f = ROW_FREQS[r % ROW_FREQS.length];
+        if (cell.color === 6) {
+          var dKey = (r >= 12) ? 'kick' : (r >= 7 ? 'snare' : 'hihat');
+          mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W3_DATA, dKey, t0, 0.22, r >= 12 ? 52.0 : 180.0, 0.45, pan, 1.0);
+        } else {
+          var mKey = 's' + cell.color;
+          var sl = (cell.shape === 1) ? 0.75 : (cell.shape === 2 ? 1.33 : 1.0);
+          mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W3_DATA, mKey, t0, 0.32, f, 0.36, pan, sl);
+        }
+      }
+    }
+  });
+  mgToast('WAV 已导出：8 秒 / 48kHz');
+}
+function mgBindBar() {
+  var bar = document.getElementById('mgBar'); if (!bar) return;
+  var bpmLabel = document.getElementById('mgBpm');
+  bar.querySelectorAll('[data-act]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var a = btn.getAttribute('data-act');
+      if (a === 'undo') mgUndo();
+      else if (a === 'save') mgSave();
+      else if (a === 'load') mgLoad();
+      else if (a === 'midi') mgMIDI();
+      else if (a === 'wav') mgWAV();
+      else if (a === 'help') document.getElementById('guideModal').classList.add('open');
+      else if (a === 'bpmup' || a === 'bpmdown') {
+        state.bpm = Math.max(70, Math.min(160, (state.bpm || 111) + (a === 'bpmup' ? 1 : -1)));
+        if (bpmLabel) bpmLabel.textContent = state.bpm;
+        mgNextStepAt = 0;
+      }
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if (!(e.metaKey || e.ctrlKey)) return;
+    if (e.key === 'z' || e.key === 'Z') { e.preventDefault(); mgUndo(); }
+    if (e.key === 's' || e.key === 'S') { e.preventDefault(); mgSave(); }
+  });
+  mgBindBar.done = true;
+}
 
 var hoverCol = -1, hoverRow = -1, topClickRipples = [], animTime3 = 0.0, isPainting = false;
 
 function handleTileClick(e, isDown, isDouble) {
   initAudio();
+  mgSnapshot();
   var rect = canvas.getBoundingClientRect();
   var c = Math.max(0, Math.min(COLS - 1, Math.floor(((e.clientX - rect.left) / rect.width) * COLS)));
   var r = Math.max(0, Math.min(ROWS - 1, Math.floor(((e.clientY - rect.top) / rect.height) * ROWS)));
@@ -811,12 +983,12 @@ function drawWall() {
 }
 
 function loop() { drawWall(); requestAnimationFrame(loop); }
-window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); drawWall(); requestAnimationFrame(loop); });
+window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); drawWall(); requestAnimationFrame(loop); mgBindBar(); });
 </script>
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"]], "note": "当前导出为 8 秒 WAV；双击切砖有五种奏法。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"]], "note": "底部工具栏可撤销、改 BPM、保存工程、导出 MIDI/WAV。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
