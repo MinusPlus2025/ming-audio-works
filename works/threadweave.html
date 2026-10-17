@@ -87,6 +87,12 @@
     box-shadow: 0 8px 24px rgba(0,0,0,.35); max-width: 260px;
   }
   .tw-tip b { color: #fde68a; font-weight: 700; }
+
+  #upImage, #upAudio4 {
+    position: fixed !important; left: -9999px !important; top: 0 !important;
+    width: 1px !important; height: 1px !important; opacity: 0 !important;
+    display: block !important; pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -113,7 +119,7 @@
 </div>
 
 <div class="tw-bar" id="twBar">
-  <button data-tw="upload">上传图片</button>
+  <button data-tw="upload" title="也可以把图片直接拖进页面">上传图片</button>
   <button data-tw="clear" class="ghost">清除图样</button>
   <button data-tw="invert" class="ghost">反相</button>
   <label>阈值 <input type="range" id="twThreshold" min="0.25" max="0.85" step="0.01" value="0.55"></label>
@@ -2072,6 +2078,12 @@ function twBindBar() {
   var up = document.getElementById('upImage');
   if (up) up.addEventListener('change', function(e){ twLoadImage(e.target.files[0]); });
   var bar = document.getElementById('twBar'); if (!bar) return;
+  document.addEventListener('dragover', function(e){ e.preventDefault(); });
+  document.addEventListener('drop', function(e){
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && f.type && f.type.indexOf('image/') === 0) twLoadImage(f);
+  });
   bar.querySelectorAll('[data-tw]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var a = btn.getAttribute('data-tw');
