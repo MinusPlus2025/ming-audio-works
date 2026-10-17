@@ -1148,7 +1148,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     + '<div class="pm-note">'+cfg.note+'</div>'
     + '</div>';
   function open(){ modal.classList.add('open'); modal.style.display='flex'; }
-  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 点底部「说明」重看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} }
   card.querySelector('.pm-primary').addEventListener('click', close);
   card.querySelector('.pm-demo').addEventListener('click', function(){
     close();
