@@ -109,6 +109,9 @@
   <button data-tw="clear" class="ghost">清除图样</button>
   <button data-tw="invert" class="ghost">反相</button>
   <label>阈值 <input type="range" id="twThreshold" min="0.25" max="0.85" step="0.01" value="0.55"></label>
+  <label>密度 <input type="range" id="twDensity" min="0" max="0.6" step="0.01" value="0.12"></label>
+  <button data-tw="color" class="ghost">颜色映射 · 开</button>
+  <button data-tw="sound">导出声图</button>
   <span class="tw-status" id="twStatus">织锦模式</span>
   <span class="tw-sp">MING · IMAGE LOOM</span>
 </div>
@@ -543,6 +546,7 @@ function findStencilPartnerPeg(pegId) {
 }
 var THREADS = [];
 var loomImage = null, loomBackup = null, imageThreshold = 0.55, imageInvert = false;
+var imageColorMap = true, densityThreshold = 0.12;
 var KNOTS = [];
 var SILK_PARTICLES = [];
 
@@ -1079,14 +1083,14 @@ function playSilkThreadSegment(th, isUserStrum, forcedFreq) {
   var midX = (p1 && p2) ? ((p1.nx + p2.nx) * 0.5) : 0.50;
   var midY = (p1 && p2) ? ((p1.ny + p2.ny) * 0.5) : 0.53;
   var centerDist = Math.hypot(midX - 0.50, midY - 0.53); // 0.0 center .. 0.35 rim
-  var isOuterRim = centerDist > 0.18;
+  var isOuterRim = (th.rim !== undefined) ? th.rim : (centerDist > 0.18);
 
   // Duration scales naturally with physical thread length (long threads sustain longer)
   var dur = (0.42 + normLen * 0.75) * (isUserStrum ? 1.25 : 1.0);
   var vel = th.vel || (isUserStrum ? 0.46 : 0.34);
 
   var pan = audioCtx.createStereoPanner();
-  pan.pan.value = Math.max(-0.82, Math.min(0.82, (midX - 0.50) * 2.2));
+  pan.pan.value = (th.panOverride !== undefined) ? Math.max(-0.85, Math.min(0.85, th.panOverride)) : Math.max(-0.82, Math.min(0.82, (midX - 0.50) * 2.2));
   pan.connect(masterGain);
 
   if (cid === 0) {
@@ -1236,6 +1240,7 @@ setInterval(() => {
   var crossedThreads = [];
   for (var i = 0; i < THREADS.length; i++) {
     var th = THREADS[i];
+    if (th.active === false) continue;
     var ta = ((th.angle || 0) + Math.PI * 2) % (Math.PI * 2);
     if (angleCrossed(ta, normOld, normNew)) {
       th.glow = 1.45;
@@ -1822,7 +1827,38 @@ function twToast(msg) {
 }
 function twUpdateStatus() {
   var el = document.getElementById('twStatus');
-  if (el) el.textContent = loomImage ? ('图样模式 · ' + THREADS.length + ' 根丝线') : '织锦模式';
+  if (el) {
+    var active = THREADS.filter(function(t){ return t.active !== false; }).length;
+    el.textContent = loomImage ? ('图样模式 · ' + active + '/' + THREADS.length + ' 根发声') : '织锦模式';
+  }
+}
+
+function twRgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  var h = 0;
+  if (d > 0.00001) {
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, mx > 0 ? d / mx : 0, mx];
+}
+function twHueDist(a, b) { var d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); }
+function twHexHue(hex) {
+  var v = parseInt(hex.slice(1), 16);
+  return twRgbToHsv((v >> 16) & 255, (v >> 8) & 255, v & 255)[0];
+}
+var TW_SPOOL_HUES = SPOOLS.map(function(sp){ return twHexHue(sp.hex); });
+function twNearestSpool(hue, sat) {
+  if (sat < 0.10) return state.activeSpool;
+  var best = 0, bd = 999;
+  for (var i = 0; i < TW_SPOOL_HUES.length; i++) {
+    var d = twHueDist(hue, TW_SPOOL_HUES[i]);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
 }
 function twApplyImage() {
   if (!loomImage || THREADS.length === 0) return;
@@ -1832,22 +1868,42 @@ function twApplyImage() {
   var threshold = imageThreshold;
   THREADS.forEach(function(t) {
     var a = t.angle || 0, dx = Math.cos(a), dy = Math.sin(a);
-    var best = 0, peak = 0;
+    var best = 0, peak = 0, edges = 0, wasOn = false;
+    var hueSum = 0, hueW = 0, fx = 256, fy = 256;
     for (var r = 0.12; r <= 0.96; r += 0.012) {
       var x = Math.round(256 + dx * r * 256), y = Math.round(256 + dy * r * 256);
       if (x < 0 || x >= s || y < 0 || y >= s) continue;
       var i = (y * s + x) * 4;
-      var lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) / 255;
-      if (imageInvert) lum = 1 - lum;
-      if (lum > peak) peak = lum;
-      if (lum > threshold && r > best) best = r;
+      var rr = data[i], gg = data[i + 1], bb = data[i + 2];
+      var lum = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255;
+      var hsv = twRgbToHsv(rr, gg, bb);
+      var signal = Math.max(lum, hsv[1] * 0.65, hsv[2] * 0.5);
+      if (imageInvert) signal = 1 - signal;
+      if (signal > peak) peak = signal;
+      var on = signal > threshold;
+      if (on && !wasOn) edges++;
+      wasOn = on;
+      if (on) {
+        best = r; fx = x; fy = y;
+        hueSum += hsv[0] * signal * hsv[1];
+        hueW += signal * hsv[1];
+      }
     }
-    if (best <= 0) best = 0.30;
-    t.len = Math.max(0.12, Math.min(0.72, 0.12 + 0.60 * best));
-    t.vel = Math.max(0.18, Math.min(0.62, 0.18 + 0.50 * peak));
+    var density = Math.min(1, edges / 6);
+    t.len = best > 0 ? Math.max(0.12, Math.min(0.72, 0.12 + 0.60 * best)) : 0.30;
+    t.vel = Math.max(0.16, Math.min(0.64, 0.16 + 0.48 * peak));
+    t.density = density;
+    t.active = best > 0 && density >= densityThreshold;
+    t.panOverride = Math.max(-0.85, Math.min(0.85, (fx / 512 - 0.5) * 1.7));
+    t.rim = best > 0.62;
+    t.img = true;
+    if (imageColorMap && hueW > 0.02) {
+      t.colorId = twNearestSpool(hueSum / hueW, 1.0);
+    }
   });
   twUpdateStatus();
-  twToast('已把图片织成 ' + THREADS.length + ' 根丝线');
+  var active = THREADS.filter(function(t){ return t.active !== false; }).length;
+  twToast('图片已映射：' + active + '/' + THREADS.length + ' 根丝线触发 · 颜色/位置/密度');
 }
 function twLoadImage(file) {
   if (!file) return;
@@ -1875,6 +1931,68 @@ function twClearImage() {
   twUpdateStatus();
   twToast('已回到织锦模式');
 }
+
+function twArrayBufferToBase64(buf) {
+  var bytes = new Uint8Array(buf), bin = '', chunk = 0x8000;
+  for (var i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+function twRenderWav(seconds) {
+  var sr = 48000, N = Math.floor(sr * seconds);
+  var L = new Float32Array(N), R = new Float32Array(N);
+  if (THREADS.length > 0) {
+    var sc = SCALES[state.scaleIdx % SCALES.length].notes;
+    var keyMap4 = ['guzheng', 'pipa', 'guqin', 'erhu', 'dizi', 'bianzhong', 'sheng', 'tanggu'];
+    for (var i = 0; i < THREADS.length; i++) {
+      var th = THREADS[i];
+      if (th.active === false) continue;
+      var angNorm = (((th.angle || 0) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
+      var normLen = Math.max(0.0, Math.min(1.0, ((th.len || 0.35) - 0.12) / 0.58));
+      var deg = Math.round((1.0 - normLen) * (sc.length - 1));
+      var f = sc[Math.max(0, Math.min(sc.length - 1, deg))];
+      var kName = keyMap4[(th.colorId || 0) % 8];
+      var pan = (th.panOverride !== undefined) ? th.panOverride : Math.cos(th.angle || 0) * 0.75;
+      var gain = Math.max(0.14, Math.min(0.75, (th.vel || 0.38) * 1.35));
+      mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, angNorm * 3.9, 0.45 + normLen * 0.45, f, gain, pan, 1.0);
+      mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, 4.0 + angNorm * 3.9, 0.45 + normLen * 0.45, f, gain, pan, 1.0);
+    }
+  }
+  var buffer = new ArrayBuffer(44 + N * 4), view = new DataView(buffer);
+  function writeStr(o, str) { for (var i = 0; i < str.length; i++) view.setUint8(o + i, str.charCodeAt(i)); }
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + N * 4, true); writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true);
+  view.setUint32(24, sr, true); view.setUint32(28, sr * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, N * 4, true);
+  var off = 44;
+  for (var j = 0; j < N; j++) {
+    var sL = Math.max(-1, Math.min(1, L[j])), sR = Math.max(-1, Math.min(1, R[j]));
+    view.setInt16(off, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+    view.setInt16(off + 2, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
+    off += 4;
+  }
+  return buffer;
+}
+function twExportSoundPattern() {
+  twToast('正在渲染 8 秒音频…');
+  var png = canvas.toDataURL('image/png');
+  var wav = twRenderWav(8.0);
+  var b64 = twArrayBufferToBase64(wav);
+  var html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>穿针织音 · 有声图案</title>'
+    + '<style>body{margin:0;background:#f6efe2;color:#2b1810;font-family:"Songti SC","STSong",serif;text-align:center;padding:30px}'
+    + 'h1{font-size:28px;margin:6px 0 4px}p{font-size:13px;color:#6d5f4e;line-height:1.7}'
+    + 'img{max-width:92vw;max-height:66vh;border:3px solid #4a2511;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.25)}'
+    + 'audio{width:min(720px,92vw);margin:18px auto;display:block}.tag{letter-spacing:.18em;font-size:11px;color:#a8342a}</style></head><body>'
+    + '<div class="tag">MING · SOUNDING PATTERN</div><h1>穿针织音 · 有声图案</h1>'
+    + '<p>颜色 → 乐器 · 半径 → 音高/奏法 · 横向 → 声像 · 密度 → 触发</p>'
+    + '<img src="' + png + '">'
+    + '<audio controls autoplay loop src="data:audio/wav;base64,' + b64 + '"></audio>'
+    + '<p>8 秒离线渲染 · 48kHz / 16-bit · 由穿针织音生成</p></body></html>';
+  var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ThreadWeave_SoundingPattern.html'; a.click();
+  twToast('有声图案已导出：单文件，含图案与 8 秒音频');
+}
 function twBindBar() {
   var up = document.getElementById('upImage');
   if (up) up.addEventListener('change', function(e){ twLoadImage(e.target.files[0]); });
@@ -1885,13 +2003,16 @@ function twBindBar() {
       if (a === 'upload') { var u = document.getElementById('upImage'); if (u) u.click(); }
       else if (a === 'clear') twClearImage();
       else if (a === 'invert') { imageInvert = !imageInvert; btn.textContent = imageInvert ? '反相 · 开' : '反相'; if (loomImage) twApplyImage(); }
+      else if (a === 'color') { imageColorMap = !imageColorMap; btn.textContent = imageColorMap ? '颜色映射 · 开' : '颜色映射 · 关'; if (loomImage) twApplyImage(); }
+      else if (a === 'sound') twExportSoundPattern();
     });
   });
   var th = document.getElementById('twThreshold');
   if (th) th.addEventListener('input', function(){ imageThreshold = parseFloat(th.value) || 0.55; if (loomImage) twApplyImage(); });
+  var den = document.getElementById('twDensity');
+  if (den) den.addEventListener('input', function(){ densityThreshold = parseFloat(den.value) || 0.12; if (loomImage) twApplyImage(); });
   twUpdateStatus();
 }
-
 function drawLoom() {
   var w = canvas.width, h = canvas.height, dpr = Math.min(w / 1200, h / 900);
   ctx.clearRect(0, 0, w, h);
@@ -2147,7 +2268,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传任意图片，把图织成丝线；右侧纹样改变调式与织体。建议戴耳机。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
