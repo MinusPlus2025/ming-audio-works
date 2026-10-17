@@ -209,6 +209,18 @@ var SPOOLS = [
   { id: 7, icon: 'tanggu',    name: '墨玉·堂鼓木鱼', sub: 'TANGGU DRUM',    hex: '#27272a', wood: '#991b1b', gold: '#fde047' }
 ];
 
+// Richer timbre: a second resonance/attack layer per instrument (still the same source samples).
+var TIMBRE_LAYERS = {
+  0: { key: 'guzheng_hi', ratio: 1.0,  gain: 0.16, hp: 1200, dur: 0.55 },
+  1: { key: 'pipa_body',  ratio: 1.0,  gain: 0.18, hp: 220,  dur: 0.80 },
+  2: { key: 'guqin_harm', ratio: 2.0,  gain: 0.10, hp: 800,  dur: 0.75 },
+  3: { key: 'erhu',       ratio: 1.004,gain: 0.10, hp: 320,  dur: 0.95 },
+  4: { key: 'dizi',       ratio: 1.003,gain: 0.08, hp: 650,  dur: 0.90 },
+  5: { key: 'bian_low',   ratio: 0.5,  gain: 0.12, hp: 120,  dur: 1.10 },
+  6: { key: 'sheng',      ratio: 1.006,gain: 0.10, hp: 300,  dur: 0.90 },
+  7: { key: 'muyu',       ratio: 2.0,  gain: 0.08, hp: 400,  dur: 0.35 }
+};
+
 // 8 Classical Chinese Non-Heritage Patterns (Right Column 1:1 Miniature Loom Previews!)
 var PATTERN_HOOPS = [
   { id: 'dunhuang', y: 0.168, name: '敦煌藻井莲花', sub: 'DUNHUANG LOTUS', col: '#b91c1c' },
@@ -878,6 +890,20 @@ function initAudio() {
   bodyWarmth.gain.value = 2.5;
   masterGain.connect(bodyWarmth);
   bodyWarmth.connect(comp);
+
+  // Short wooden-body resonance (0.32 s), parallel and subtle — not a hall reverb.
+  var bodyIRLen = Math.floor(audioCtx.sampleRate * 0.32);
+  var bodyIR = audioCtx.createBuffer(2, bodyIRLen, audioCtx.sampleRate);
+  for (var ch = 0; ch < 2; ch++) {
+    var d = bodyIR.getChannelData(ch);
+    for (var i = 0; i < bodyIRLen; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bodyIRLen, 3.2) * 0.5;
+    }
+  }
+  bodyConv = audioCtx.createConvolver(); bodyConv.buffer = bodyIR;
+  bodySend = audioCtx.createGain(); bodySend.gain.value = 0.09;
+  masterGain.connect(bodyConv); bodyConv.connect(bodySend); bodySend.connect(comp);
+
   comp.connect(audioCtx.destination);
   ensureIOGraph(audioCtx, comp);
 }
@@ -1092,6 +1118,16 @@ function playSilkThreadSegment(th, isUserStrum, forcedFreq) {
   var pan = audioCtx.createStereoPanner();
   pan.pan.value = (th.panOverride !== undefined) ? Math.max(-0.85, Math.min(0.85, th.panOverride)) : Math.max(-0.82, Math.min(0.82, (midX - 0.50) * 2.2));
   pan.connect(masterGain);
+
+  // Timbre enrichment layer: second attack/body/resonance sample per instrument.
+  var layer = TIMBRE_LAYERS[cid];
+  if (layer) {
+    var lf = audioCtx.createBiquadFilter();
+    lf.type = 'highpass'; lf.frequency.value = layer.hp; lf.Q.value = 0.6;
+    lf.connect(pan);
+    var lgain = Math.max(0.03, Math.min(0.22, (th.vel || 0.34) * layer.gain * 1.6));
+    triggerDlsVoice4(audioCtx, lf, layer.key, freq * layer.ratio, lgain, dur * layer.dur, 0.006, 0, 0, 1.0);
+  }
 
   if (cid === 0) {
     // 0: 朱砂·古筝 (Guzheng) — Real Plucked Guzheng/Koto String + Left-Hand Pressing Bend (吟揉) on inner threads, Grace-note 花指 on outer threads
@@ -2268,7 +2304,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
