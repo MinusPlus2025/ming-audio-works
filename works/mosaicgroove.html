@@ -81,11 +81,28 @@
   .mg-scenes { display: inline-flex; align-items: center; gap: 4px; color: #f4f1ea; }
   .mg-scenes button { min-width: 26px; padding: 5px 7px; }
   .mg-scenes button.on { background: #d92b1e; color: #fff; border-color: #d92b1e; }
+
+  .pm-hint {
+    position: absolute; z-index: 25; transform: translate(-50%, -50%); display: none;
+    background: rgba(18, 12, 8, 0.84); color: #fff; padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 700; letter-spacing: .04em; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; line-height: 1.4;
+  }
+  .pm-hint .ring {
+    display: block; width: 34px; height: 34px; border: 2px solid #fff; border-radius: 50%;
+    margin: 0 auto 7px; animation: pmHintPulse 1.6s ease-out infinite;
+  }
+  @keyframes pmHintPulse {
+    0% { transform: scale(.8); opacity: .9; }
+    70% { transform: scale(1.35); opacity: 0; }
+    100% { opacity: 0; }
+  }
 </style>
 </head>
 <body>
 <div class="wall-frame">
   <canvas id="wallCanvas"></canvas>
+  <div class="pm-hint" id="pmHint" style="left:50%;top:52%"><span class="ring"></span><span>点砖画图案</span></div>
   <input type="file" id="upAudio3" class="hidden-input" accept="audio/*">
   <input type="file" id="mgProjFile" class="hidden-input" accept="application/json,.json">
 
@@ -1131,7 +1148,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     + '<div class="pm-note">'+cfg.note+'</div>'
     + '</div>';
   function open(){ modal.classList.add('open'); modal.style.display='flex'; }
-  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 点底部「说明」重看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 点底部「说明」重看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
   card.querySelector('.pm-primary').addEventListener('click', close);
   card.querySelector('.pm-demo').addEventListener('click', function(){
     close();
@@ -1165,6 +1182,20 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
   open();
 })();
 
+</script>
+
+<script>
+(function(){
+  var hint = document.getElementById('pmHint'); if (!hint) return;
+  function hide(){ hint.style.display = 'none'; }
+  window.pmShowHint = function(){
+    hint.style.display = 'block';
+    clearTimeout(window.__pmHintT);
+    window.__pmHintT = setTimeout(hide, 8000);
+  };
+  var c = document.querySelector('canvas');
+  if (c) { c.addEventListener('pointerdown', hide, { once: true }); c.addEventListener('mousedown', hide, { once: true }); }
+})();
 </script>
 </body>
 </html>
