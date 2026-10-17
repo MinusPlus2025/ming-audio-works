@@ -78,6 +78,8 @@
 
   .wa-meter { width: 96px; height: 9px; background: #10251a; border: 1px solid #2b4a38; border-radius: 4px; overflow: hidden; display: inline-block; }
   .wa-meter i { display: block; height: 100%; width: 0; background: #d9f99d; transition: width .06s linear; }
+
+  .wa-bar select { background: #d9f99d; color: #0a371f; border: 2px solid #0a371f; border-radius: 4px; font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 8px; }
 </style>
 </head>
 <body>
@@ -106,6 +108,7 @@
 
 <div class="wa-bar" id="waBar">
   <button data-wa="load">载入干声</button>
+  <label>预设 <select id="waPreset"><option value="init">Init</option><option value="slap">Tape Slap</option><option value="dub">Dub Chamber</option><option value="radio">Broken Radio</option></select></label>
   <button data-wa="gen" class="ghost">生成引擎</button>
   <label>干湿 <input type="range" id="waWet" min="0" max="1" step="0.01" value="0.65"></label>
   <button data-wa="bypass" class="ghost">旁通</button>
@@ -1549,6 +1552,21 @@ function waMeterLoop() {
   var el = document.getElementById('waMeterBar');
   if (el) el.style.width = pct.toFixed(1) + '%';
 }
+function waPreset(name) {
+  var P = {
+    init:  { f: [0.50,0.50,0.50,0.50,0.50,0.50], t: [0.50,0.30,0.60], m: [0.50,0.50,0.50], g: 4, wet: 0.65 },
+    slap:  { f: [0.55,0.50,0.50,0.55,0.62,0.50], t: [0.35,0.20,0.75], m: [0.40,0.50,0.60], g: 6, wet: 0.35 },
+    dub:   { f: [0.62,0.50,0.42,0.45,0.35,0.55], t: [0.55,0.75,0.40], m: [0.65,0.50,0.35], g: 2, wet: 0.75 },
+    radio: { f: [0.35,0.45,0.60,0.50,0.30,0.80], t: [0.85,0.90,0.20], m: [0.80,0.50,0.25], g: 3, wet: 0.85 }
+  }[name] || null;
+  if (!P) return;
+  state.faders = P.f.slice(); state.tapeKnobs = P.t.slice(); state.midKnobs = P.m.slice(); state.gear = P.g;
+  waWet = P.wet; waBypass = false;
+  var wet = document.getElementById('waWet'); if (wet) wet.value = waWet;
+  var bp = document.querySelector('[data-wa=bypass]'); if (bp) bp.textContent = '旁通';
+  if (audioCtx) { updateTapeHardwareDSP(); waApplyMix(); }
+  waToast('预设：' + name + ' · 干湿 ' + Math.round(waWet * 100) + '%');
+}
 function waBindBar() {
   var up = document.getElementById('upDry');
   var bar = document.getElementById('waBar'); if (!bar) return;
@@ -1562,6 +1580,8 @@ function waBindBar() {
       else if (a === 'help') document.getElementById('guideModal').classList.add('open');
     });
   });
+  var preset = document.getElementById('waPreset');
+  if (preset) preset.addEventListener('change', function(){ waPreset(preset.value); });
   var wet = document.getElementById('waWet');
   if (wet) wet.addEventListener('input', function(){ waWet = parseFloat(wet.value); waApplyMix(); });
   waApplyMix();
@@ -1572,7 +1592,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
 <script>
 
 (function(){
-  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通在底部。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

@@ -79,6 +79,14 @@
     opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .tw-toast.on { opacity: 1; }
+
+  .tw-tip {
+    position: fixed; z-index: 95; pointer-events: none; display: none;
+    background: #2b1810; color: #fbf6ea; border: 1px solid #d4af37;
+    padding: 7px 11px; border-radius: 5px; font-size: 14px; line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); max-width: 260px;
+  }
+  .tw-tip b { color: #fde68a; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -116,6 +124,7 @@
   <span class="tw-sp">MING · IMAGE LOOM</span>
 </div>
 <input type="file" id="upImage" class="hidden-input" accept="image/*">
+<div id="twTip" class="tw-tip"></div>
 
 <script>
 var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
@@ -2029,6 +2038,36 @@ function twExportSoundPattern() {
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ThreadWeave_SoundingPattern.html'; a.click();
   twToast('有声图案已导出：单文件，含图案与 8 秒音频');
 }
+function twBindTips() {
+  var tip = document.getElementById('twTip'); if (!tip) return;
+  function hide(){ tip.style.display = 'none'; }
+  canvas.addEventListener('mousemove', function(e){
+    var r = canvas.getBoundingClientRect();
+    var mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height;
+    var html = '';
+    if (mx < 0.17) {
+      for (var s = 0; s < SPOOLS.length; s++) {
+        if (Math.abs(my - (0.168 + s * 0.100)) < 0.046) {
+          html = '<b>' + SPOOLS[s].name + '</b><br>' + SPOOLS[s].sub;
+          break;
+        }
+      }
+    } else if (mx > 0.83) {
+      for (var p = 0; p < PATTERN_HOOPS.length; p++) {
+        if (Math.abs(my - PATTERN_HOOPS[p].y) < 0.050) {
+          html = '<b>' + PATTERN_HOOPS[p].name + '</b><br>' + PATTERN_HOOPS[p].sub;
+          break;
+        }
+      }
+    }
+    if (!html) { hide(); return; }
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(window.innerWidth - 270, e.clientX + 16) + 'px';
+    tip.style.top = Math.min(window.innerHeight - 70, e.clientY + 16) + 'px';
+  });
+  canvas.addEventListener('mouseleave', hide);
+}
 function twBindBar() {
   var up = document.getElementById('upImage');
   if (up) up.addEventListener('change', function(e){ twLoadImage(e.target.files[0]); });
@@ -2299,12 +2338,13 @@ window.addEventListener('DOMContentLoaded', () => {
   drawLoom();
   requestAnimationFrame(loop);
   twBindBar();
+  twBindTips();
 });
 </script>
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停左侧乐器或右侧纹样可看大字提示。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
