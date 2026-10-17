@@ -135,7 +135,7 @@
   <label>灵敏度 <input type="range" id="asSens" min="0.4" max="2.4" step="0.05" value="1.0"></label>
   <button data-as="help" class="ghost">说明</button>
   <span class="as-status" id="asStatus">生成模式</span>
-  <span class="as-sp">MING · AUDIO REACTIVE</span>
+  <span class="as-sp">MING</span>
 </div>
 
 <script>
@@ -1413,23 +1413,13 @@ function drawScene() {
   ctx.strokeStyle = 'rgba(147, 197, 253, 0.20)';
   ctx.beginPath(); ctx.moveTo(0, h * 0.062); ctx.lineTo(w, h * 0.062); ctx.stroke();
 
-  ['#ff5f56', '#ffbd2e', '#27c93f'].forEach((col, idx) => {
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc((18 + idx * 18) * dpr, h * 0.031, 5 * dpr, 0, Math.PI * 2); ctx.fill();
-  });
-
-  ctx.fillStyle = '#93c5fd';
-  ctx.beginPath(); ctx.roundRect(72 * dpr, h * 0.013, 76 * dpr, h * 0.036, 5 * dpr); ctx.fill();
-  ctx.fillStyle = '#090b10'; ctx.font = `800 ${8.5 * dpr}px monospace`;
-  ctx.fillText('WEB AUDIO', 81 * dpr, h * 0.036);
-
   var mainTitle = 'ASTRASPHERE · 星籁';
-  ctx.fillStyle = '#ffffff'; ctx.font = `800 ${12.5 * dpr}px sans-serif`;
-  ctx.fillText(mainTitle, 158 * dpr, h * 0.037);
+  ctx.fillStyle = '#ffffff'; ctx.font = `800 ${15.5 * dpr}px sans-serif`;
+  ctx.fillText(mainTitle, 20 * dpr, h * 0.037);
   var titleW = ctx.measureText(mainTitle).width;
 
   ctx.fillStyle = '#94a3b8'; ctx.font = `600 ${9.5 * dpr}px sans-serif`;
-  ctx.fillText('点击球面种星铃 · 拖拽星球多普勒变调 · 点底部切换5大天体形态', 158 * dpr + titleW + 18 * dpr, h * 0.037);
+  ctx.fillText('点击球面种星铃 · 拖拽星球多普勒变调 · 点底部切换5大天体形态', 20 * dpr + titleW + 16 * dpr, h * 0.037);
 
   ctx.fillStyle = 'rgba(147, 197, 253, 0.15)';
   ctx.strokeStyle = 'rgba(147, 197, 253, 0.50)';
@@ -1556,7 +1546,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); reque
   card.classList.add('pm-card');
   var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
   card.innerHTML = '<div class="pm-guide">'
-    + '<div class="pm-kicker">WEB AUDIO · 60 秒上手</div>'
+    + '<div class="pm-kicker">MING · 60 秒上手</div>'
     + '<h2>'+cfg.title+'</h2>'
     + '<p class="pm-lede">'+cfg.lede+'</p>'
     + '<ol class="pm-steps">'+steps+'</ol>'
@@ -1592,7 +1582,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); reque
     g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
     var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
     g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
-    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · WEB AUDIO', 60, H-38);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · 2026', 60, H-38);
     var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
   });
   document.addEventListener('keydown', function(e){

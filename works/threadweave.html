@@ -144,7 +144,7 @@
   <button data-tw="color" class="ghost">颜色映射 · 开</button>
   <button data-tw="sound">导出声图</button>
   <span class="tw-status" id="twStatus">织锦模式</span>
-  <span class="tw-sp">MING · IMAGE LOOM</span>
+  <span class="tw-sp">MING</span>
 </div>
 <input type="file" id="upImage" class="hidden-input" accept="image/*">
 <div id="twTip" class="tw-tip"></div>
@@ -2463,7 +2463,7 @@ window.addEventListener('DOMContentLoaded', () => {
   card.classList.add('pm-card');
   var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
   card.innerHTML = '<div class="pm-guide">'
-    + '<div class="pm-kicker">WEB AUDIO · 60 秒上手</div>'
+    + '<div class="pm-kicker">MING · 60 秒上手</div>'
     + '<h2>'+cfg.title+'</h2>'
     + '<p class="pm-lede">'+cfg.lede+'</p>'
     + '<ol class="pm-steps">'+steps+'</ol>'
@@ -2499,7 +2499,7 @@ window.addEventListener('DOMContentLoaded', () => {
     g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
     var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
     g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
-    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · WEB AUDIO', 60, H-38);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · 2026', 60, H-38);
     var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
   });
   document.addEventListener('keydown', function(e){

@@ -76,6 +76,7 @@
   }
   .wa-toast.on { opacity: 1; }
 
+  .wa-meter-label { font-size: 10px; letter-spacing: .12em; color: #86efac; }
   .wa-meter { width: 96px; height: 9px; background: #10251a; border: 1px solid #2b4a38; border-radius: 4px; overflow: hidden; display: inline-block; }
   .wa-meter i { display: block; height: 100%; width: 0; background: #d9f99d; transition: width .06s linear; }
 
@@ -129,10 +130,10 @@
   <label>干湿 <input type="range" id="waWet" min="0" max="1" step="0.01" value="0.65"></label>
   <button data-wa="bypass" class="ghost">旁通</button>
   <button data-wa="rec">录制输出</button>
-  <span class="wa-meter" title="输入电平"><i id="waMeterBar"></i></span>
+  <span class="wa-meter-label">IN</span><span class="wa-meter" title="输入电平"><i id="waMeterBar"></i></span>
   <button data-wa="help" class="ghost">说明</button>
   <span class="wa-status" id="waStatus">生成模式</span>
-  <span class="wa-sp">MING · INPUT FX</span>
+  <span class="wa-sp">MING</span>
 </div>
 
 <script>
@@ -1457,20 +1458,13 @@ function drawBoard() {
   ctx.save();
   ctx.fillStyle = '#1c2024'; ctx.fillRect(0, 0, w, h * 0.062);
   ctx.fillStyle = '#0a9943'; ctx.fillRect(0, h * 0.059, w, h * 0.004);
-  ['#ee4823', '#f59e0b', '#0a9943'].forEach((col, idx) => {
-    ctx.fillStyle = col; ctx.beginPath(); ctx.arc((18 + idx * 18) * dpr, h * 0.031, 5.5 * dpr, 0, Math.PI * 2); ctx.fill();
-  });
-  ctx.fillStyle = '#0a9943'; ctx.fillRect(70 * dpr, h * 0.013, 76 * dpr, h * 0.036);
-  ctx.fillStyle = '#ebe5d3'; ctx.font = `900 ${8.5 * dpr}px monospace`;
-  ctx.fillText('WEB AUDIO', 81 * dpr, h * 0.036);
-
   var titleStr = 'WAVEARCHITECT · KERS-0174';
-  ctx.font = `900 ${12 * dpr}px monospace`;
-  ctx.fillText(titleStr, 156 * dpr, h * 0.037);
+  ctx.font = `900 ${15.5 * dpr}px monospace`;
+  ctx.fillText(titleStr, 20 * dpr, h * 0.037);
   var tw = ctx.measureText(titleStr).width;
 
   ctx.fillStyle = '#94a3b8'; ctx.font = `700 ${9.2 * dpr}px sans-serif`;
-  ctx.fillText('按住右下角开盘磁带轮可实时搓盘变速 · 点赛道放磁头车', 156 * dpr + tw + 16 * dpr, h * 0.037);
+  ctx.fillText('按住右下角开盘磁带轮可实时搓盘变速 · 点赛道放磁头车', 20 * dpr + tw + 16 * dpr, h * 0.037);
 
   ctx.fillStyle = '#ebe5d3'; ctx.font = `700 ${9.0 * dpr}px monospace`;
   ctx.fillText(STEMS[state.stemIdx % STEMS.length].name + ' ▼', w * 0.62, h * 0.036);
@@ -1649,7 +1643,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
   card.classList.add('pm-card');
   var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
   card.innerHTML = '<div class="pm-guide">'
-    + '<div class="pm-kicker">WEB AUDIO · 60 秒上手</div>'
+    + '<div class="pm-kicker">MING · 60 秒上手</div>'
     + '<h2>'+cfg.title+'</h2>'
     + '<p class="pm-lede">'+cfg.lede+'</p>'
     + '<ol class="pm-steps">'+steps+'</ol>'
@@ -1685,7 +1679,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
     g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
     var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
     g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
-    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · WEB AUDIO', 60, H-38);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · 2026', 60, H-38);
     var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
   });
   document.addEventListener('keydown', function(e){
