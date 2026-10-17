@@ -143,25 +143,34 @@
 </div>
 
 <script>
-var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
 
 function ensureIOGraph(ctx, masterNode) {
   if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
   if (!mediaStreamDest && ctx.createMediaStreamDestination) { mediaStreamDest = ctx.createMediaStreamDestination(); masterNode.connect(mediaStreamDest); }
 }
 
+
+function stopUserAudio(updateUI) {
+  if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
+  if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
+  userAudioBuffer = null;
+  if (updateUI !== false && typeof mgToast === 'function') mgToast('底音已卸载');
+}
 function handleUserAudioUpload(file, ctx, targetNode) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(evt) {
     ctx.decodeAudioData(evt.target.result, function(decoded) {
+      stopUserAudio(false);
       userAudioBuffer = decoded;
-      if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} }
       userAudioSource = ctx.createBufferSource();
       userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
-      var gain = ctx.createGain(); gain.gain.value = 0.75;
-      userAudioSource.connect(gain); gain.connect(targetNode); userAudioSource.start(0);
-    });
+      userAudioGainNode = ctx.createGain(); userAudioGainNode.gain.value = 0.30;
+      userAudioSource.connect(userAudioGainNode); userAudioGainNode.connect(targetNode);
+      userAudioSource.start(0);
+      if (typeof mgToast === 'function') mgToast('底音已载入 · 单曲循环，点“停”卸载');
+    }, function(){ if (typeof mgToast === 'function') mgToast('音频解码失败：换一个 WAV/MP3 试试'); });
   };
   reader.readAsArrayBuffer(file);
 }
@@ -929,7 +938,7 @@ function handleTileClick(e, isDown, isDouble) {
     else if (c === 25) state.chordIdx = (state.chordIdx + 1) % 4;
     else if (c === 26) seedDefaultMosaicArtwork();
     else if (c === 27) clearMosaicWall();
-    else if (c === 28) document.getElementById('upAudio3').click();
+    else if (c === 28) { if (userAudioBuffer) stopUserAudio(); else document.getElementById('upAudio3').click(); }
     else if (c === 30) toggleVideoRecording(canvas, audioCtx, masterGain, 'MosaicGroove_Wall');
     return;
   }
@@ -1050,7 +1059,7 @@ function drawWall() {
     } else if (c === 27) {
       drawSingleTile(c * cw, 0, cw, ch, '#1c1d1f', 0, dpr, 0, '清', 'CLR', '#ffffff');
     } else if (c === 28) {
-      drawSingleTile(c * cw, 0, cw, ch, '#e04f8b', 0, dpr, 0, '传', 'AUDIO', '#ffffff');
+      drawSingleTile(c * cw, 0, cw, ch, '#e04f8b', 0, dpr, 0, userAudioBuffer ? '停' : '传', userAudioBuffer ? 'BED' : 'AUDIO', '#ffffff');
     } else if (c === 30) {
       drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0, '录', 'VIDEO', '#1c1d1f');
     } else {
@@ -1119,7 +1128,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "A/B/C/D 是什么", "四份独立的 31 步图案，像同一面墙的四个版本：A 主段、B 变奏、C break、D drop。点字母切换，编辑自动存回当前场景；工程和批量 MIDI 会带上四个场景。"]], "note": "底部可撤销、直接输入 BPM、切换 A/B/C/D 场景；工程 JSON 与批量 MIDI 会带上四个场景。建议戴耳机。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "A/B/C/D 是什么", "四份独立的 31 步图案，像同一面墙的四个版本：A 主段、B 变奏、C break、D drop。点字母切换，编辑自动存回当前场景；工程和批量 MIDI 会带上四个场景。"]], "note": "底部可撤销、直接输入 BPM、切换 A/B/C/D 场景；工程 JSON 与批量 MIDI 会带上四个场景。建议戴耳机。 顶部“传”=底音：循环播放，不改变瓷砖图案；载入后按钮变“停”，再点卸载。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

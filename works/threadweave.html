@@ -150,25 +150,40 @@
 <div id="twTip" class="tw-tip"></div>
 
 <script>
-var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
 
 function ensureIOGraph(ctx, masterNode) {
   if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
   if (!mediaStreamDest && ctx.createMediaStreamDestination) { mediaStreamDest = ctx.createMediaStreamDestination(); masterNode.connect(mediaStreamDest); }
 }
 
+
+function updateUserAudioUI(loaded) {
+  var hoop = TOP_HOOPS.find(function(t){ return t.id === 'upload'; });
+  if (hoop) { hoop.label = loaded ? '停底音' : '📂 传音频'; hoop.sub = loaded ? 'BED' : 'UPLOAD'; }
+  var st = document.getElementById('twStatus');
+  if (st) st.textContent = loaded ? '底音 · 单曲循环' : '织锦模式';
+}
+function stopUserAudio(updateUI) {
+  if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
+  if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
+  userAudioBuffer = null;
+  if (updateUI !== false) updateUserAudioUI(false);
+}
 function handleUserAudioUpload(file, ctx, targetNode) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(evt) {
     ctx.decodeAudioData(evt.target.result, function(decoded) {
+      stopUserAudio(false);
       userAudioBuffer = decoded;
-      if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} }
       userAudioSource = ctx.createBufferSource();
       userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
-      var gain = ctx.createGain(); gain.gain.value = 0.75;
-      userAudioSource.connect(gain); gain.connect(targetNode); userAudioSource.start(0);
-    });
+      userAudioGainNode = ctx.createGain(); userAudioGainNode.gain.value = 0.32;
+      userAudioSource.connect(userAudioGainNode); userAudioGainNode.connect(targetNode);
+      userAudioSource.start(0);
+      updateUserAudioUI(true);
+    }, function(){ if (typeof twToast === 'function') twToast('音频解码失败：换一个 WAV/MP3 试试'); });
   };
   reader.readAsArrayBuffer(file);
 }
@@ -1456,7 +1471,7 @@ canvas.addEventListener('mousedown', (e) => {
       } else if (tb.id === 'play') {
         state.isPlaying = !state.isPlaying;
         tb.label = state.isPlaying ? '■ 抚琴中' : '▶ 已暂停';
-      } else if (tb.id === 'upload') document.getElementById('upAudio4').click();
+      } else if (tb.id === 'upload') { if (userAudioBuffer) stopUserAudio(); else document.getElementById('upAudio4').click(); }
       else if (tb.id === 'wav') {
         exportCurrentStateWAV('ThreadWeave_MultiInstrument_Loom', function(L, R, sr, N) {
           var sc = SCALES[state.scaleIdx % SCALES.length].notes;
@@ -2429,7 +2444,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。 顶部“传音频”是底音：载入后只作 32% 循环底音，不改变织机音高与画面；再点一次“停底音”卸载。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

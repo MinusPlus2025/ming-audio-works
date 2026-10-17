@@ -137,29 +137,42 @@
 </div>
 
 <script>
-var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
 
 function ensureIOGraph(ctx, masterNode) {
   if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
   if (!mediaStreamDest && ctx.createMediaStreamDestination) { mediaStreamDest = ctx.createMediaStreamDestination(); masterNode.connect(mediaStreamDest); }
 }
 
+
+function updateUserAudioUI(loaded) {
+  var btn = document.querySelector('[data-wa="load"]');
+  if (btn) btn.textContent = loaded ? '卸载干声' : '载入干声';
+}
+function stopUserAudio(updateUI) {
+  if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
+  if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
+  userAudioBuffer = null;
+  state.isRunning = true;
+  if (updateUI !== false) { updateUserAudioUI(false); waApplyMix(); waToast('干声已卸载：生成引擎恢复'); }
+}
 function handleUserAudioUpload(file, ctx, targetNode) {
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(evt) {
     ctx.decodeAudioData(evt.target.result, function(decoded) {
+      stopUserAudio(false);
       userAudioBuffer = decoded;
-      if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} }
       userAudioSource = ctx.createBufferSource();
       userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
-      var gain = ctx.createGain(); gain.gain.value = 0.78;
-      userAudioSource.connect(gain);
-      if (inputGain) gain.connect(inputGain); else gain.connect(targetNode);
+      userAudioGainNode = ctx.createGain(); userAudioGainNode.gain.value = 0.78;
+      userAudioSource.connect(userAudioGainNode);
+      if (inputGain) userAudioGainNode.connect(inputGain); else userAudioGainNode.connect(targetNode);
       userAudioSource.start(0);
-      state.isRunning = false;
+      state.isRunning = true;
+      updateUserAudioUI(true);
       if (typeof waOnInputLoaded === 'function') waOnInputLoaded();
-    });
+    }, function(){ if (typeof waToast === 'function') waToast('音频解码失败：换一个 WAV/MP3 试试'); });
   };
   reader.readAsArrayBuffer(file);
 }
@@ -668,6 +681,7 @@ function triggerStationAudio(station, car) {
     state.ripples.push({ x: station.x, y: station.y, r: 0.01, alpha: 0.95, col: car ? car.color : '#ee4823' });
     if (state.ripples.length > 18) state.ripples.shift();
   }
+  if (userAudioBuffer) return;
   if (!audioCtx || !filterNode) return;
   if (!car) car = { t: 0.25, ratio: 1.0, pan: 0.0 };
   if (station) station.pulse = 1.0;
@@ -1532,15 +1546,16 @@ function waToast(msg) {
 }
 function waOnInputLoaded() {
   var st = document.getElementById('waStatus');
-  if (st) st.textContent = '输入模式 · 干湿 ' + Math.round(waWet * 100) + '%';
-  waToast('干声已载入：已停掉生成引擎，只处理输入');
+  if (st) st.textContent = '输入模式 · 外部音频';
+  waToast('干声已载入：输入源模式，画面保持运转');
 }
 function waApplyMix() {
   if (!inputWet || !inputDry) return;
   inputWet.gain.setTargetAtTime(waBypass ? 0 : waWet, audioCtx.currentTime, 0.02);
   inputDry.gain.setTargetAtTime(waBypass ? 1 : 1 - waWet, audioCtx.currentTime, 0.02);
   var st = document.getElementById('waStatus');
-  if (st) st.textContent = (state.isRunning ? '生成模式' : '输入模式') + (waBypass ? ' · 旁通' : ' · 干湿 ' + Math.round(waWet * 100) + '%');
+  var mode = userAudioBuffer ? '输入模式 · 外部音频' : (state.isRunning ? '生成模式' : '输入模式');
+  if (st) st.textContent = mode + (waBypass ? ' · 旁通' : ' · 干湿 ' + Math.round(waWet * 100) + '%');
 }
 function waToggleRecord() {
   if (!audioCtx) initAudio();
@@ -1590,7 +1605,7 @@ function waBindBar() {
   bar.querySelectorAll('[data-wa]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var a = btn.getAttribute('data-wa');
-      if (a === 'load') { if (up) up.click(); }
+      if (a === 'load') { if (userAudioBuffer) stopUserAudio(); else if (up) up.click(); }
       else if (a === 'gen') { state.isRunning = !state.isRunning; waApplyMix(); waToast(state.isRunning ? '生成引擎已开启' : '生成引擎已停止'); }
       else if (a === 'bypass') { waBypass = !waBypass; btn.textContent = waBypass ? '旁通 · 开' : '旁通'; waApplyMix(); }
       else if (a === 'rec') waToggleRecord();
@@ -1609,7 +1624,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
 <script>
 
 (function(){
-  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。面板 1–4 选曲风，白色旋钮 STEM TONE 可拖，6 段 EQ 推子上下拖动。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。面板 1–4 选曲风，白色旋钮 STEM TONE 可拖，6 段 EQ 推子上下拖动。 载入干声=输入源：替换生成引擎，但赛车/转盘/画面保持运转；再点“卸载干声”恢复生成。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
