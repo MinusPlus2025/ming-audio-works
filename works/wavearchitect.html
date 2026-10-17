@@ -93,7 +93,7 @@
       <p><strong>核心升级（Teenage Engineering 先锋工业风双盘开盘磁带机 × 4 套多乐器生成式放克/西海岸合成器引擎）</strong>：</p>
       <ul>
         <li><strong>1. 先锋双盘开盘式磁带工作站（右下角蓝色模块）</strong>：配备实时旋转的铝合金三叶供带盘/收带盘、黄铜导带轮、光学磁头示波器窗，<strong>直接按住旋转的磁带盘即可实时搓盘变速（Tape Scratch & Wow/Flutter）</strong>；</li>
-        <li><strong>2. 四套丰富多乐器生成式曲风（点击 `R · D · P` 或左侧 `换曲风` 切换）</strong>：
+        <li><strong>2. 四套丰富多乐器生成式曲风（点击面板 `1–4` 或左侧 `换曲风` 切换）</strong>：
           <br>· <strong>01 爵士放克电钢与萨克斯铜管</strong>（Fender Rhodes + Jazz Brass Section + 哇音贝斯）
           <br>· <strong>02 西海岸模块化磁带合成器</strong>（Buchla Lowpass Gate 木质打击泛音 + 磁带主音）
           <br>· <strong>03 灵魂乐旋转风琴与放克吉他</strong>（Hammond B3 Organ + Funky Wah Clavinet）
@@ -706,6 +706,7 @@ function getAllKnobDefs() {
   for (var i = 0; i < 3; i++) {
     list.push({ arr: state.tapeKnobs, idx: i, name: tpNames[i], px: 0.595 + (i + 0.5) * (0.285 / 3), py: 0.542 + 0.245 * 0.82, r: 0.032 });
   }
+  list.push({ arr: state.midKnobs, idx: 1, name: 'STEM TONE', px: 0.240, py: 0.209, r: 0.026 });
   return list;
 }
 
@@ -748,9 +749,13 @@ function handleBoardDown(e) {
   }
 
   // 2) Check 6-Band Graphic EQ Faders (px: 0.215..0.355, py: 0.245..0.335)
-  if (px >= 0.215 && px <= 0.355 && py >= 0.245 && py <= 0.335) {
+  if (px >= 0.215 && px <= 0.355 && py >= 0.245 && py <= 0.365) {
     var fIdx = Math.max(0, Math.min(5, Math.round((px - 0.23) / 0.022)));
     var eqNames = ['EQ 60Hz', 'EQ 180Hz', 'EQ 500Hz', 'EQ 1kHz', 'EQ 3kHz', 'EQ 8kHz'];
+    if (py > 0.322) {
+      showControlHUD(eqNames[fIdx], state.faders[fIdx], 0.23 + fIdx * 0.022, 0.258);
+      return;
+    }
     var newFVal = Math.max(0.05, Math.min(0.98, 1.0 - (py - 0.258) / 0.060));
     state.faders[fIdx] = newFVal;
     activeDrag2 = {
@@ -790,8 +795,10 @@ function handleBoardDown(e) {
 
   // R·D·P Mode Buttons & Stem Box
   if (py > 0.12 && py < 0.25 && px > 0.21 && px < 0.35) {
-    state.stemIdx = (state.stemIdx + 1) % STEMS.length;
-    showControlHUD('TAPE STEM', (state.stemIdx + 1) / 4, 0.28, 0.18);
+    var bIdx = Math.floor((px - 0.225) / 0.032);
+    if (bIdx >= 0 && bIdx <= 3 && py > 0.128 && py < 0.182) state.stemIdx = bIdx;
+    else state.stemIdx = (state.stemIdx + 1) % STEMS.length;
+    showControlHUD('STEM ' + (state.stemIdx + 1) + '/' + STEMS.length, (state.stemIdx + 1) / STEMS.length, 0.28, 0.18);
     triggerStationAudio(STATIONS[1], CARS[0]);
     return;
   }
@@ -1180,20 +1187,23 @@ function drawBoard() {
   // 5. PCB Hardware Modules (R·D·P Matrix, 6-Band EQ, 1-6 Gear Switches, 4 Orange Dual-Speaker Chips)
   drawTireKnob(bx + bw * 0.098, by + bh * 0.058, 17 * dpr, state.isRunning ? 0.85 : 0.15, '#ee4823', dpr, 'RUN/STOP');
 
-  ['R', 'D', 'P'].forEach((ch, idx) => {
+  ['1', '2', '3', '4'].forEach((ch, idx) => {
     var rx = bx + bw * (0.23 + idx * 0.032), ry = by + bh * 0.135;
-    ctx.fillStyle = idx === 0 ? '#ebe5d3' : '#ee4823';
+    var stemActive = (idx === state.stemIdx);
+    ctx.fillStyle = stemActive ? '#ebe5d3' : '#ee4823';
     ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2 * dpr;
     ctx.fillRect(rx, ry, 22 * dpr, 22 * dpr); ctx.strokeRect(rx, ry, 22 * dpr, 22 * dpr);
-    ctx.fillStyle = idx === 0 ? '#1c2024' : '#ebe5d3';
+    ctx.fillStyle = stemActive ? '#1c2024' : '#ebe5d3';
     ctx.font = `900 ${9 * dpr}px monospace`;
     ctx.fillText(ch, rx + 7 * dpr, ry + 15 * dpr);
   });
 
+  ctx.fillStyle = '#ebe5d3'; ctx.font = `700 ${7.5*dpr}px monospace`;
+  ctx.fillText('STEM ' + ((state.stemIdx||0)+1) + '/' + STEMS.length, bx + bw*0.225, by + bh*0.128);
   var mBoxX = bx + bw * 0.22, mBoxY = by + bh * 0.175, mBoxW = bw * 0.125, mBoxH = bh * 0.068;
   ctx.fillStyle = '#ebe5d3'; ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2.5 * dpr;
   ctx.fillRect(mBoxX, mBoxY, mBoxW, mBoxH); ctx.strokeRect(mBoxX, mBoxY, mBoxW, mBoxH);
-  drawTireKnob(mBoxX + 24 * dpr, mBoxY + mBoxH * 0.5, 14 * dpr, 0.65, '#0a9943', dpr);
+  drawTireKnob(mBoxX + 24 * dpr, mBoxY + mBoxH * 0.5, 14 * dpr, state.midKnobs[1] || 0.65, '#0a9943', dpr, 'STEM TONE');
   for (var i = 0; i < 4; i++) {
     var ly = mBoxY + (10 + i * 10) * dpr;
     ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 1.8 * dpr;
@@ -1592,7 +1602,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); reque
 <script>
 
 (function(){
-  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "底部可载入干声；载入后自动停生成引擎，干湿/旁通/预设/电平表在底部。面板 1–4 选曲风，白色旋钮 STEM TONE 可拖，6 段 EQ 推子上下拖动。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
