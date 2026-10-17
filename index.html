@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>四件交互式声音作品 · 投肯杯 2026</title>
+<meta name="description" content="四件在浏览器里直接运行的交互式声音作品：星籁、声波建筑师、电音瓷砖墙、穿针织音。全部声音实时合成，无需安装。">
+<style>
+  :root{
+    --paper:#f3ede2;
+    --paper-2:#e9e0d1;
+    --ink:#191410;
+    --ink-2:#4d433a;
+    --muted:#8a7c6c;
+    --line:#d8cbb8;
+    --red:#a8342a;
+    --red-dark:#7e241d;
+    --serif:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    line-height:1.6;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(168,52,42,.06), transparent 42%),
+      radial-gradient(circle at 88% 0%, rgba(120,90,50,.08), transparent 38%);
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 28px}
+  header{padding:26px 0 18px;border-bottom:1px solid var(--line)}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:20px}
+  .brand{display:flex;align-items:center;gap:12px;font-weight:800;letter-spacing:.14em;font-size:12px}
+  .seal{
+    width:38px;height:38px;border:1.5px solid var(--red);color:var(--red);
+    display:grid;place-items:center;font-family:var(--serif);font-size:15px;
+    letter-spacing:0;line-height:1;border-radius:3px;flex:none;
+  }
+  .brand small{display:block;font-weight:500;letter-spacing:.05em;color:var(--muted);font-size:10px;margin-top:3px}
+  .nav{display:flex;gap:22px;font-size:12px;color:var(--ink-2)}
+  .nav a:hover{color:var(--red)}
+  .hero{padding:64px 0 46px;display:grid;grid-template-columns:1.25fr .75fr;gap:48px;align-items:end}
+  .kicker{font-size:11px;letter-spacing:.24em;color:var(--red);font-weight:800;text-transform:uppercase;margin-bottom:18px}
+  h1{
+    font-family:var(--serif);font-weight:700;font-size:clamp(38px,5.4vw,68px);
+    line-height:1.14;letter-spacing:.01em;
+  }
+  h1 em{font-style:normal;color:var(--red)}
+  .lede{margin-top:22px;font-size:15px;color:var(--ink-2);max-width:540px}
+  .lede b{font-weight:700;color:var(--ink)}
+  .hero-side{border-left:1px solid var(--line);padding-left:26px;font-size:12.5px;color:var(--ink-2)}
+  .hero-side dl{display:grid;grid-template-columns:auto 1fr;gap:8px 14px}
+  .hero-side dt{color:var(--muted);white-space:nowrap}
+  .hero-side dd{font-weight:600}
+  .hero-side .note{margin-top:18px;color:var(--muted);font-size:11.5px;line-height:1.7}
+  .rule{display:flex;align-items:center;gap:14px;margin:0 0 30px;color:var(--muted);font-size:11px;letter-spacing:.16em}
+  .rule:before,.rule:after{content:"";height:1px;background:var(--line);flex:1}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:26px;padding-bottom:20px}
+  .card{
+    background:#fbf8f1;border:1px solid var(--line);border-radius:6px;overflow:hidden;
+    display:flex;flex-direction:column;transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease;
+    position:relative;
+  }
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 48px rgba(50,35,20,.14);border-color:#c3b29a}
+  .thumb{position:relative;aspect-ratio:4/3;overflow:hidden;background:#0b0d12}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .8s cubic-bezier(.2,.7,.2,1)}
+  .card:hover .thumb img{transform:scale(1.025)}
+  .thumb:after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+  .num{
+    position:absolute;top:12px;left:12px;z-index:2;background:rgba(243,237,226,.94);
+    color:var(--ink);font-size:10px;letter-spacing:.18em;font-weight:800;padding:5px 9px;border-radius:2px;
+  }
+  .open{
+    position:absolute;right:12px;bottom:12px;z-index:2;background:var(--red);color:#fff;
+    font-size:11.5px;font-weight:700;padding:8px 13px;border-radius:2px;letter-spacing:.06em;
+    opacity:0;transform:translateY(4px);transition:.3s;
+  }
+  .card:hover .open{opacity:1;transform:none}
+  .body{padding:20px 22px 22px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .meta{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--muted);letter-spacing:.08em}
+  .tag{border:1px solid var(--line);padding:2px 7px;border-radius:2px;color:var(--ink-2)}
+  h2{font-family:var(--serif);font-size:23px;line-height:1.3;font-weight:700;letter-spacing:.01em}
+  h2 span{display:block;font-family:var(--sans);font-size:10.5px;letter-spacing:.2em;color:var(--muted);font-weight:600;margin-top:5px}
+  .desc{font-size:13px;color:var(--ink-2);line-height:1.75}
+  .foot{margin-top:auto;padding-top:12px;border-top:1px dashed var(--line);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:12px}
+  .section{padding:54px 0;border-top:1px solid var(--line);margin-top:34px}
+  .section h3{font-family:var(--serif);font-size:26px;margin-bottom:18px}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;font-size:13px;color:var(--ink-2)}
+  .cols b{display:block;color:var(--ink);font-size:12px;letter-spacing:.1em;margin-bottom:7px}
+  footer{padding:34px 0 46px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .fine{font-size:11px;color:var(--muted);line-height:1.8}
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;gap:28px;padding:40px 0 34px}
+    .hero-side{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}
+    .grid{grid-template-columns:1fr}
+    .cols{grid-template-columns:1fr}
+    .nav{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand">
+      <div class="seal">投肯</div>
+      <div>2026 交互式声音作品<small>FOUR INTERACTIVE AUDIO WORKS · WEB AUDIO</small></div>
+    </div>
+    <nav class="nav">
+      <a href="#works">作品</a>
+      <a href="#how">怎么玩</a>
+      <a href="#tech">技术说明</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <div class="kicker">Touken Cup 2026 · Entry Collection</div>
+      <h1>把声音，<br>做成可以<em>摸到</em>的东西。</h1>
+      <p class="lede">
+        四件在浏览器里直接运行的交互式声音作品。没有安装、没有宿主、没有授权框：
+        点开就能听见，拖动就会变化。所有声音由 <b>Web Audio 实时合成</b>，
+        画面上的每一条线、每一块砖、每一颗星，都直接对应一个声音决定。
+      </p>
+    </div>
+    <aside class="hero-side">
+      <dl>
+        <dt>形态</dt><dd>Web App（单页，离线可运行）</dd>
+        <dt>声音</dt><dd>实时合成，非采样回放</dd>
+        <dt>运行</dt><dd>macOS / Windows · Chrome / Safari</dd>
+        <dt>安装</dt><dd>无需安装，无需登录</dd>
+        <dt>建议</dt><dd>戴耳机，全屏，先用 60 秒</dd>
+      </dl>
+      <p class="note">四个页面共享同一套浏览器音频引擎，但各自的输入方式、声音规则与使用场景不同；它们作为四件独立作品提交，不是四个版本。</p>
+    </aside>
+  </section>
+
+  <div class="rule" id="works">四件作品</div>
+
+  <section class="grid">
+    <a class="card" href="works/threadweave.html">
+      <div class="thumb">
+        <span class="num">01 / THREADWEAVE</span>
+        <img src="assets/covers/Cover_04_ThreadWeave_4x3_1200x900.png" alt="穿针织音：圆形绣绷与红色丝线的界面">
+        <span class="open">打开作品 →</span>
+      </div>
+      <div class="body">
+        <div class="meta"><span class="tag">国风 · 交互乐器</span><span>8 件民乐 · 104 根丝线</span></div>
+        <h2>穿针织音<span>THREADWEAVE · SILK LOOM</span></h2>
+        <p class="desc">把绣绷当乐器：丝线越长，音越低；梭子扫过哪根线，哪根线就发声；线离圆心越近，奏法越绵长。八种民乐音色、八种非遗纹样，构成一台可以“绣”出音乐的织机。</p>
+        <div class="foot"><span>点击丝线 / 启动竹梭</span><span>约 2 分钟上手</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="works/astrasphere.html">
+      <div class="thumb">
+        <span class="num">02 / ASTRASPHERE</span>
+        <img src="assets/covers/Cover_01_Astrasphere_4x3_1200x900.png" alt="星籁：3D 星球与轨道卫星的界面">
+        <span class="open">打开作品 →</span>
+      </div>
+      <div class="body">
+        <div class="meta"><span class="tag">生成音乐 · 视觉乐器</span><span>5 种天体形态</span></div>
+        <h2>星籁<span>ASTRASPHERE · CELESTIAL SYNTH</span></h2>
+        <p class="desc">星体自转，星标跨过中央子午线才触发声音；纬度决定音高，轨道半径决定快慢。你不是在按播放键，而是在调整一个星系，听它自己运转。</p>
+        <div class="foot"><span>点击球面 / 拖拽星球</span><span>约 1 分钟上手</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="works/wavearchitect.html">
+      <div class="thumb">
+        <span class="num">03 / WAVEARCHITECT</span>
+        <img src="assets/covers/Cover_02_WaveArchitect_4x3_1200x900.png" alt="声波建筑师：绿色 PCB 赛道与开盘磁带机的界面">
+        <span class="open">打开作品 →</span>
+      </div>
+      <div class="body">
+        <div class="meta"><span class="tag">效果器 · 声音设计</span><span>6 站点 · 6 档</span></div>
+        <h2>声波建筑师<span>WAVEARCHITECT · KERS-0174</span></h2>
+        <p class="desc">一块会跑的电路板。赛道上的每辆赛车都是一个移动的延迟读取磁头，经过焊盘站点时触发对应音程；档位改变磁头速度，IC 针脚按半音移调，右下角开盘机负责饱和、抖动与偏磁。</p>
+        <div class="foot"><span>点击赛车 / 旋钮 / 磁带盘</span><span>约 2 分钟上手</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="works/mosaicgroove.html">
+      <div class="thumb">
+        <span class="num">04 / MOSAICGROOVE</span>
+        <img src="assets/covers/Cover_03_MosaicGroove_4x3_1200x900.png" alt="电音瓷砖墙：彩色瓷砖矩阵与播放头的界面">
+        <span class="open">打开作品 →</span>
+      </div>
+      <div class="body">
+        <div class="meta"><span class="tag">律动 · 视觉音序器</span><span>16 行 × 31 列</span></div>
+        <h2>电音瓷砖墙<span>MOSAICGROOVE · TILE WALL</span></h2>
+        <p class="desc">在墙上贴瓷砖，就是写一段 beat。行决定音高，列决定时间，颜色决定乐器，砖的形状决定奏法：整块是延音，三角是滑音、连击或五度和声。双击切开一块砖，声音就换了。</p>
+        <div class="foot"><span>点击 / 双击瓷砖</span><span>约 30 秒上手</span></div>
+      </div>
+    </a>
+  </section>
+
+  <section class="section" id="how">
+    <h3>怎么玩：60 秒就够</h3>
+    <div class="cols">
+      <div><b>01 · 打开</b>点任意一张卡片。页面会在本地加载，不需要联网，也不需要安装任何东西。</div>
+      <div><b>02 · 开始</b>点一次“开始”按钮解锁浏览器音频，然后直接用鼠标点、拖、画。没有隐藏的播放键。</div>
+      <div><b>03 · 听变化</b>每个画面元素都对应一个声音参数。先乱点 10 秒，再找一条你喜欢的路径，重复它。</div>
+    </div>
+  </section>
+
+  <section class="section" id="tech">
+    <h3>技术说明（不修饰）</h3>
+    <div class="cols">
+      <div><b>声音</b>Web Audio API 实时合成：振荡器、滤波、延迟、混响与程序化包络。没有采样库，也没有预渲染的成品音轨。</div>
+      <div><b>画面</b>Canvas / SVG 实时绘制，跟随音频时钟；不是视频，也不是逐帧图片序列。界面与声音共用同一套参数。</div>
+      <div><b>边界</b>这是四件浏览器作品，不是 VST3/AU 插件，不能在 DAW 里加载；单页运行，不保存工程，刷新即重置。</div>
+    </div>
+    <p class="fine" style="margin-top:26px;max-width:760px">
+      制作方式：与 AI 结对编程完成。界面、交互与声音引擎由代码生成；部分作品内置可编辑的示例图案，方便第一次打开时就有声音。所有演示素材均来自作品本身的实时输出，未使用第三方采样或预制 Loop。
+    </p>
+  </section>
+</main>
+
+<footer class="wrap">
+  <span>投肯杯 2026 · 四件交互式声音作品</span>
+  <span>Web Audio · 无需安装 · 建议佩戴耳机</span>
+</footer>
+</body>
+</html>
