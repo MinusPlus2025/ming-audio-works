@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>弦外之音 · 物理建模弦乐器</title>
+<style>
+  :root{
+    --lacquer:#0b0907;
+    --lacquer-2:#120d09;
+    --gold:#b78c4c;
+    --gold-hi:#e7cd97;
+    --cinnabar:#a93a2b;
+    --silk:#ece2cd;
+    --muted:#8d7b63;
+    --line:rgba(183,140,76,.22);
+    --serif:"Songti SC","STSong","Noto Serif SC","Source Han Serif SC",Georgia,serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--lacquer);color:var(--silk);
+    font:13px/1.55 var(--sans);display:flex;flex-direction:column;overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  main{flex:1 1 auto;display:flex;min-height:0;position:relative}
+  #stageWrap{
+    position:relative;flex:1 1 auto;min-width:0;overflow:hidden;
+    background:
+      radial-gradient(120% 80% at 26% 10%, #1c130d 0%, #0d0a08 58%, #0b0907 100%);
+  }
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+  /* 竖排标题 */
+  #title{
+    position:absolute;left:26px;top:22px;display:flex;flex-direction:column;
+    align-items:center;gap:16px;pointer-events:none;z-index:2;
+  }
+  #title h1{
+    writing-mode:vertical-rl;margin:0;font-family:var(--serif);
+    font-size:34px;font-weight:600;letter-spacing:.18em;line-height:1;
+    color:var(--silk);text-shadow:0 0 28px rgba(231,205,151,.16);
+  }
+  #title .en{
+    writing-mode:vertical-rl;font-family:var(--mono);font-size:8.5px;
+    letter-spacing:.34em;color:var(--muted);
+  }
+  #title .seal{
+    width:34px;height:34px;background:var(--cinnabar);color:#f8ecd8;
+    display:grid;place-items:center;font-family:var(--serif);font-size:13px;
+    border-radius:2px;transform:rotate(-3deg);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);
+  }
+  #meta{
+    position:absolute;right:78px;top:22px;z-index:2;
+    font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--muted);
+  }
+  #helpBtn{
+    width:30px;height:30px;border-radius:50%;background:none;padding:0;
+    border:1px solid rgba(183,140,76,.45);color:var(--gold);cursor:pointer;font-size:11px;
+  }
+  #helpBtn:hover{border-color:var(--gold-hi);color:var(--gold-hi)}
+  #hint{
+    position:absolute;left:30px;bottom:42px;z-index:2;
+    font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--muted);
+    opacity:.9;transition:opacity .6s ease;pointer-events:none;
+  }
+  #hint.gone{opacity:0}
+
+  /* 右侧铭牌 */
+  
+  
+  
+  
+  
+  
+  .grp{display:flex;border:1px solid rgba(183,140,76,.3);border-radius:2px;overflow:hidden}
+  .grp button{
+    flex:1;background:none;border:0;color:var(--muted);cursor:pointer;
+    font-family:var(--mono);font-size:9px;letter-spacing:.12em;padding:6px 4px;
+    text-transform:uppercase;transition:.15s;
+  }
+  .grp button:hover{color:var(--silk)}
+  .grp button[aria-pressed="true"]{
+    background:rgba(183,140,76,.12);color:var(--gold-hi);
+    box-shadow:inset 0 -1px 0 var(--gold);
+  }
+  .rows{flex:1 1 auto;overflow-y:auto;padding:10px 16px 12px;scrollbar-width:thin}
+  .rows::-webkit-scrollbar{width:5px}
+  .rows::-webkit-scrollbar-thumb{background:rgba(183,140,76,.3);border-radius:3px}
+  .row{
+    display:grid;grid-template-columns:112px 1fr 50px;align-items:center;
+    gap:9px;height:22px;
+  }
+  .row .lab{
+    font-family:var(--serif);font-size:11px;color:#cfc0a4;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em;
+  }
+  .row .val{
+    font-family:var(--mono);font-size:9px;color:#95836c;text-align:right;
+    font-variant-numeric:tabular-nums;
+  }
+  .bar{
+    position:relative;height:16px;background:none;
+    border-bottom:1px solid rgba(183,140,76,.32);
+  }
+  .bar i{
+    position:absolute;left:0;bottom:0;height:1px;width:0;
+    background:linear-gradient(90deg,rgba(183,140,76,.45),var(--gold-hi));
+  }
+  .bar i::after{
+    content:"";position:absolute;right:-3px;bottom:-3px;width:6px;height:6px;
+    background:var(--gold-hi);transform:rotate(45deg);
+    box-shadow:0 0 6px rgba(231,205,151,.55);
+  }
+  .bar input{
+    position:absolute;inset:-5px 0;width:100%;height:24px;margin:0;
+    opacity:0;cursor:ew-resize;
+  }
+  
+  .dot{width:5px;height:5px;border-radius:50%;background:#4a3a2a;flex:0 0 auto}
+  .dot.on{background:var(--gold-hi);box-shadow:0 0 7px rgba(231,205,151,.8)}
+  #midiSel{
+    margin-left:auto;background:transparent;border:1px solid rgba(183,140,76,.25);
+    color:var(--muted);font:inherit;padding:3px 6px;border-radius:2px;
+  }
+
+  /* 底栏 */
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  /* 弹层 */
+  #help,#intro{
+    position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
+    padding:24px;background:rgba(7,5,3,.86);backdrop-filter:blur(6px);
+  }
+  #help{display:none}
+  #help.open,#intro{display:flex}
+  #intro.hide{display:none}
+  #help .card,#intro .card{
+    width:min(500px,100%);background:linear-gradient(180deg,#1a140f,#120d09);
+    border:1px solid rgba(183,140,76,.35);border-radius:3px;padding:26px 28px 22px;
+    position:relative;
+  }
+  #help .card::before,#intro .card::before{
+    content:"";position:absolute;inset:6px;border:1px solid rgba(183,140,76,.14);
+    pointer-events:none;
+  }
+  #intro .kicker{
+    font-family:var(--mono);font-size:9px;letter-spacing:.24em;color:var(--gold);
+    margin-bottom:12px;
+  }
+  #intro h2,#help h2{
+    font-family:var(--serif);font-size:24px;margin:0 0 14px;font-weight:600;letter-spacing:.08em;
+  }
+  #intro .sub{margin:0 0 22px;color:#b3a58f;font-size:12.5px;line-height:1.85;max-width:520px}
+  #intro .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:0 0 24px}
+  #intro .steps div{border-top:1px solid rgba(183,140,76,.28);padding-top:10px}
+  #intro .steps em{display:block;font-family:var(--serif);font-style:normal;font-size:17px;color:var(--gold);margin-bottom:4px}
+  #intro .steps b{display:block;font-size:12.5px;color:var(--silk);letter-spacing:.08em;margin-bottom:3px}
+  #intro .steps span{display:block;font-size:11px;line-height:1.7;color:#9c8b74}
+  #intro b{color:var(--gold-hi);font-weight:600}
+  #intro .go{
+    background:var(--cinnabar);border:0;color:#f8ecd8;border-radius:2px;
+    padding:9px 24px;font-family:var(--serif);font-size:14px;letter-spacing:.2em;
+    cursor:pointer;text-indent:.2em;
+  }
+  #intro .go:hover{filter:brightness(1.1)}
+  #intro .tiny{
+    display:block;margin-top:13px;font-family:var(--mono);font-size:9px;
+    color:#7f6e59;letter-spacing:.08em;
+  }
+  #help p{color:#c3b6a2;font-size:12.5px;line-height:1.85;margin:0 0 8px}
+  #help dl{display:grid;grid-template-columns:146px 1fr;gap:5px 12px;margin:12px 0 4px;font-size:11.5px}
+  #help dt{font-family:var(--mono);color:var(--gold);font-size:10px}
+  #help dd{margin:0;color:#b3a58f}
+  #help .close{
+    margin-top:16px;background:none;border:1px solid rgba(183,140,76,.4);color:var(--silk);
+    border-radius:2px;padding:6px 18px;cursor:pointer;font-family:var(--serif);
+    font-size:13px;letter-spacing:.14em;
+  }
+
+  @media (max-width: 900px){
+    body{overflow-y:auto;overflow-x:hidden}
+    main{flex-direction:column;min-height:auto}
+    #stageWrap{height:52vh;flex:0 0 auto}
+    #title{left:16px;top:16px;gap:10px}
+    #title h1{font-size:30px}
+    #title .seal{width:24px;height:24px;font-size:11px}
+    #meta{right:16px;top:16px;font-size:8px;letter-spacing:.12em;max-width:52%;text-align:right}
+    
+    #hint{left:22px;bottom:38px;font-size:9px;max-width:60%}
+    
+    .rows{max-height:40vh}
+    .row{grid-template-columns:104px 1fr 46px}
+    
+    
+  }
+
+
+  /* 悬浮控件：没有底栏，只有两组印章 */
+  #dock{
+    position:absolute;left:26px;right:26px;bottom:20px;z-index:3;
+    display:flex;align-items:flex-end;justify-content:space-between;
+    pointer-events:none;
+  }
+  #dock > *{pointer-events:auto}
+  .chips{display:flex;gap:8px}
+  .acts{display:flex;gap:8px;align-items:center}
+  .chip{
+    background:transparent;border:1px solid rgba(183,140,76,.34);color:#c9b894;
+    border-radius:2px;height:34px;min-width:54px;padding:0 14px;cursor:pointer;
+    font-family:var(--serif);font-size:13px;letter-spacing:.18em;text-indent:.18em;
+    transition:.18s;
+  }
+  .chip:hover{border-color:var(--gold);color:var(--gold-hi)}
+  .chip.on{background:var(--cinnabar);border-color:var(--cinnabar);color:#f8ecd8}
+  .sealBtn{
+    background:transparent;border:1px solid rgba(183,140,76,.42);color:var(--gold);
+    height:34px;min-width:58px;padding:0 14px;border-radius:2px;cursor:pointer;
+    font-family:var(--serif);font-size:13px;letter-spacing:.18em;text-indent:.18em;
+    transition:.18s;
+  }
+  .sealBtn:hover{background:rgba(183,140,76,.12);color:var(--gold-hi);border-color:var(--gold-hi)}
+  .sealBtn.round{min-width:34px;width:34px;padding:0;border-radius:50%;text-indent:0;
+    font-family:var(--mono);font-size:11px;letter-spacing:0}
+
+  /* 参数面板：非常驻侧栏，覆盖在乐器之上 */
+  #plate{
+    position:fixed;inset:0;z-index:20;display:none;padding:26px;
+    background:rgba(8,6,4,.94);backdrop-filter:blur(7px);
+  }
+  #plate.open{display:flex;align-items:center;justify-content:center}
+  #plate .sheet{
+    width:min(1120px,100%);max-height:calc(100vh - 52px);overflow:auto;
+    background:linear-gradient(180deg,#17110c,#0d0a08);
+    border:1px solid rgba(183,140,76,.3);padding:26px 32px 24px;position:relative;
+  }
+  #plate .sheet::before{
+    content:"";position:absolute;inset:7px;border:1px solid rgba(183,140,76,.12);pointer-events:none;
+  }
+  .plateHead{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    border-bottom:1px solid rgba(183,140,76,.2);padding-bottom:14px;margin-bottom:14px;
+  }
+  .plateHead .kicker{
+    font-family:var(--mono);font-size:9px;letter-spacing:.24em;color:var(--gold);
+  }
+  .plateHead h2{
+    font-family:var(--serif);font-size:23px;margin:7px 0 0;font-weight:600;letter-spacing:.1em;
+  }
+  #plateClose{
+    background:none;border:1px solid rgba(183,140,76,.35);color:var(--muted);
+    border-radius:2px;height:30px;padding:0 12px;cursor:pointer;
+    font-family:var(--serif);font-size:12px;letter-spacing:.1em;
+  }
+  #plateClose:hover{color:var(--gold-hi);border-color:var(--gold)}
+  .plateModes{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .plateModes .grp{width:230px}
+  .plateFoot{
+    margin-left:auto;display:flex;align-items:center;gap:9px;
+    font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:var(--muted);
+  }
+  #plate .rows{
+    display:grid;grid-auto-flow:column;grid-template-columns:1fr 1fr;
+    grid-template-rows:repeat(13,27px);column-gap:52px;
+    overflow:visible;padding:0 0 4px;
+  }
+  #plate .row{height:27px}
+</style>
+</head>
+<body>
+<main>
+  <div id="stageWrap">
+    <canvas id="stage"></canvas>
+    <div id="title">
+      <h1>弦外之音</h1>
+      <span class="seal">弦</span>
+    </div>
+    <div id="meta">OVERTONES · 6 STRINGS</div>
+    <div id="hint" data-i18n="hint.main">点击弦上任意位置：横向＝拨弦点，纵向＝按在第几品</div>
+
+    <div id="dock">
+      <div class="chips">
+        <button class="chip" data-p="0">空弦</button>
+        <button class="chip" data-p="1">吟揉</button>
+        <button class="chip" data-p="2">打品</button>
+        <button class="chip" data-p="3">泛音</button>
+      </div>
+      <div class="acts">
+        <button class="sealBtn" id="langBtn" title="Language">EN</button>
+        <button class="sealBtn" id="plateBtn" data-i18n="plate.open">参数</button>
+        <button class="sealBtn" id="exportBtn" data-i18n="export.btn">导出</button>
+        <button class="sealBtn round" id="helpBtn" title="参数说明">?</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="plate" aria-hidden="true">
+  <div class="sheet">
+    <div class="plateHead">
+      <div>
+        <div class="kicker" data-i18n="plate.kicker">物理模型参数 · 25</div>
+        <h2 data-i18n="plate.title">物理模型参数</h2>
+      </div>
+      <button id="plateClose" data-i18n="plate.close">关闭 ×</button>
+    </div>
+
+    <div class="plateModes">
+      <div class="grp" id="gModel">
+        <button data-v="kirchhoff" aria-pressed="true">Kirchhoff</button>
+        <button data-v="barrier" aria-pressed="false">Barrier</button>
+      </div>
+      <div class="grp" id="gFinger">
+        <button data-v="frets" aria-pressed="true">Frets</button>
+        <button data-v="finger" aria-pressed="false">Finger</button>
+      </div>
+      <div class="plateFoot">
+        <span class="dot" id="audioDot"></span><span id="audioTxt">AUDIO OFF</span>
+        <select id="midiSel"><option>MIDI · off</option></select>
+      </div>
+    </div>
+
+    <div class="rows" id="rows"></div>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="card">
+    <div class="kicker" data-i18n="intro.kicker">弦外之音 · OVERTONES</div>
+    <h2 data-i18n-html="intro.title">六弦物理建模，<br>实时合成。</h2>
+    <p class="sub" data-i18n="intro.sub">无采样、无循环。每个音由数字波导模型逐采样求解：激励、传播、单边非线性边界、环路损耗。</p>
+    <div class="steps">
+      <div><em data-i18n="intro.n1">一</em><b data-i18n="intro.s1t">激励</b><span data-i18n="intro.s1d">横向选拨弦点，纵向按品；拖动是滑音。</span></div>
+      <div><em data-i18n="intro.n2">二</em><b data-i18n="intro.s2t">预设</b><span data-i18n="intro.s2d">左下四个词，听同一根弦的另一面。</span></div>
+      <div><em data-i18n="intro.n3">三</em><b data-i18n="intro.s3t">参数</b><span data-i18n="intro.s3d">打开参数面板，编辑 25 个物理量。</span></div>
+    </div>
+    <button class="go" id="introGo" data-i18n="intro.go">开始</button>
+    <span class="tiny" data-i18n="intro.tiny">全部声音由弦模型实时合成 · 建议戴耳机</span>
+  </div>
+</div>
+
+<div id="help">
+  <div class="card">
+    <h2 data-i18n="help.title">信号链与参数</h2>
+    <p data-i18n="help.lead">每根弦是一条带延迟的波导：拨弦把一段三角位移写进延迟线，波在弦上往返，往返一次衰减一次；弦撞到品丝的时候被非线性地弹回，那就是“打品”的嗡嗡声。</p>
+    <dl>
+      <dt>Finger pos</dt><dd data-i18n="help.d1">手指沿弦的位置；Finger 模式下它直接决定有效弦长（滑音）。</dd>
+      <dt>Finger at fret</dt><dd data-i18n="help.d2">按在第几品，决定音高。</dd>
+      <dt>Finger force</dt><dd data-i18n="help.d3">按压力度：越大，接触阻尼越强，音头短、闷。</dd>
+      <dt>Pluck position</dt><dd data-i18n="help.d4">拨弦点。靠近琴桥更亮、更薄；靠近中间更圆。</dd>
+      <dt>Pluck force</dt><dd data-i18n="help.d5">拨弦力度，同时提高激励里的噪声成分。</dd>
+      <dt>Tension / Radius</dt><dd data-i18n="help.d6">张力轻微影响音高与亮度；线径决定弦的刚度（泛音偏离整数倍）。</dd>
+      <dt>Low / High Decay</dt><dd data-i18n="help.d7">整体衰减时间，与高频衰减速度。</dd>
+      <dt>Barrier Height / Alpha</dt><dd data-i18n="help.d8">品丝高度与撞上后的能量损失；高度调低就会持续打品。</dd>
+      <dt>Feedback pos / filter</dt><dd data-i18n="help.d9">把弦的信号送回弦上，形成共振或自激。</dd>
+    </dl>
+    <button class="close" id="helpClose" data-i18n="help.close">关闭</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   0. 参数表
+   ============================================================ */
+const PARAMS = [
+  { k:"fingerPos",    label:"Finger pos",        min:0,    max:1,    step:0.0001, v:0.2367, f:4 },
+  { k:"fret",         label:"Finger at fret",    min:0,    max:24,   step:1,      v:0,      f:0 },
+  { k:"fingerForce",  label:"Finger force",      min:0,    max:1,    step:0.0001, v:0.4933, f:4 },
+  { k:"out1",         label:"Out 1",             min:0,    max:1,    step:0.0001, v:0.7545, f:4 },
+  { k:"out2",         label:"Out 2",             min:0,    max:1,    step:0.0001, v:0.7200, f:4 },
+  { k:"fbAmt",        label:"Internal feedback", min:0,    max:0.96, step:0.001,  v:0,      f:3 },
+  { k:"fbExt",        label:"External feedback", min:0,    max:0.9,  step:0.001,  v:0,      f:3 },
+  { k:"fbPos",        label:"Feedback pos",      min:0.02, max:0.98, step:0.0001, v:0.2367, f:4 },
+  { k:"fbFilter",     label:"Feedback filter",   min:0,    max:1,    step:0.001,  v:0.02,   f:3 },
+  { k:"pluckForce",   label:"Pluck force",       min:0,    max:1,    step:0.0001, v:0.4933, f:4 },
+  { k:"pluckPos",     label:"Pluck position",    min:0.03, max:0.97, step:0.0001, v:0.8800, f:4 },
+  { k:"tension",      label:"Tension",           min:10,   max:60,   step:0.1,    v:30,     f:2 },
+  { k:"radius",       label:"Radius",            min:0.0005,max:0.02,step:0.00001,v:0.00315,f:5 },
+  { k:"lowDecay",     label:"Low Decay",         min:0.4,  max:14,   step:0.1,    v:4.0,    f:2 },
+  { k:"highDecay",    label:"High Decay",        min:0.1,  max:8,    step:0.1,    v:2.0,    f:2 },
+  { k:"fretHeight",   label:"Fret Height",       min:0,    max:0.006,step:0.00001,v:0.0015, f:5 },
+  { k:"barrierH",     label:"Barrier Height",    min:0.02, max:1,    step:0.0001, v:0.5200, f:4 },
+  { k:"barrierAlpha", label:"Barrier Alpha",     min:0,    max:1,    step:0.0001, v:0.2300, f:4 },
+  { k:"fingerAlpha",  label:"Finger Alpha",      min:0,    max:1,    step:0.0001, v:0.2300, f:4 },
+  { k:"barrierStiff", label:"Barrier Stiffness", min:0.05, max:4,    step:0.01,   v:1.0,    f:2 },
+  { k:"fingerStiff",  label:"Finger Stiffness",  min:0.05, max:4,    step:0.01,   v:1.0,    f:2 },
+  { k:"fingerMass",   label:"Finger Mass (kg)",  min:1,    max:60,   step:0.1,    v:15,     f:1 },
+  { k:"statusActive", label:"Status active",     min:0,    max:1,    step:0.0001, v:0.2113, f:4 },
+  { k:"volume",       label:"Volume",            min:0,    max:1,    step:0.001,  v:0.80,   f:3 },
+  { k:"safety",       label:"Safety Threshold",  min:0.2,  max:1,    step:0.001,  v:0.80,   f:3 }
+];
+
+const P = {};
+PARAMS.forEach(p => P[p.k] = p.v);
+
+const state = {
+  model:"kirchhoff",     // kirchhoff | barrier
+  fingerMode:"frets",    // frets | finger
+  frets:[0,0,0,0,0,0],
+  ring:[0,0,0,0,0,0],
+  phase:[0,0,0,0,0,0],
+  lastTouch:-1,
+  ripples:[],
+  touched:false,
+  audioReady:false
+};
+
+/* ============================================================
+   0.5 双语
+   ============================================================ */
+const I18N = {
+  zh: {
+    "hint.main": "点击弦上任意位置：横向＝激励点，纵向＝品位",
+    "plate.open": "参数", "plate.close": "关闭 ×",
+    "plate.kicker": "物理模型参数 · 25", "plate.title": "物理模型参数",
+    "export.btn": "导出", "export.busy": "导出中…", "export.done": "已导出", "export.fail": "导出失败",
+    "audio.off": "AUDIO OFF", "audio.on": "AUDIO ON", "audio.suspended": "AUDIO SUSPENDED", "audio.failed": "AUDIO FAILED",
+    "intro.kicker": "弦外之音 · OVERTONES",
+    "intro.title": "六弦物理建模，<br>实时合成。",
+    "intro.sub": "无采样、无循环。每个音由数字波导模型逐采样求解：激励、传播、单边非线性边界、环路损耗。",
+    "intro.n1": "一", "intro.n2": "二", "intro.n3": "三",
+    "intro.s1t": "激励", "intro.s1d": "沿弦点击设定激励点，纵向选择品位；拖动改变按弦位置。",
+    "intro.s2t": "预设", "intro.s2d": "四组参数预设，对比同一根弦在不同边界条件下的响应。",
+    "intro.s3t": "参数", "intro.s3d": "打开参数面板，编辑 25 个物理量。",
+    "intro.go": "开始", "intro.tiny": "全部声音由模型实时合成 · 建议使用耳机",
+    "help.title": "信号链与参数",
+    "help.lead": "每根弦为一个数字波导：延迟线长度决定基频，环路低通决定频率相关的衰减，全通级联引入弦刚度造成的非谐性。激励为三角位移与带限噪声的叠加；弦与品丝之间是单边非线性边界，越界时按恢复系数折返，产生打品噪声。",
+    "help.d1": "手指沿弦的归一化位置；Finger 模式下直接映射为有效弦长。",
+    "help.d2": "按弦品位，决定延迟线长度与基频。",
+    "help.d3": "按弦压力，折算为接触阻尼与环路附加损耗。",
+    "help.d4": "激励点位置，决定各次谐波的激励幅度。",
+    "help.d5": "激励强度，同时控制噪声成分的比例。",
+    "help.d6": "张力微调音高与亮度；线径决定弦刚度与非谐性。",
+    "help.d7": "环路总衰减（T60）与高频衰减速度。",
+    "help.d8": "品丝高度与碰撞恢复系数；低于振幅阈值时持续打品。",
+    "help.d9": "把弦上另一点的信号注入环路，形成共振或自激。",
+    "help.close": "关闭"
+  },
+  en: {
+    "hint.main": "Click a string — x sets the excitation point, y sets the fret",
+    "plate.open": "PARAMS", "plate.close": "CLOSE ×",
+    "plate.kicker": "MODEL PARAMETERS · 25", "plate.title": "Physical model parameters",
+    "export.btn": "EXPORT", "export.busy": "RENDERING…", "export.done": "SAVED", "export.fail": "FAILED",
+    "audio.off": "AUDIO OFF", "audio.on": "AUDIO ON", "audio.suspended": "AUDIO SUSPENDED", "audio.failed": "AUDIO FAILED",
+    "intro.kicker": "OVERTONES · FRET & STRING",
+    "intro.title": "Six-string physical modelling,<br>in real time.",
+    "intro.sub": "No samples, no loops. Every note is solved per sample by a digital waveguide: excitation, propagation, a one-sided non-linear boundary, and loop loss.",
+    "intro.n1": "I", "intro.n2": "II", "intro.n3": "III",
+    "intro.s1t": "Excitation", "intro.s1d": "Click along the string to set the excitation point; the vertical position selects the fret. Drag to change the stopped position.",
+    "intro.s2t": "Presets", "intro.s2d": "Four parameter sets: the same string under different boundary conditions.",
+    "intro.s3t": "Parameters", "intro.s3d": "Open the parameter panel and edit 25 physical quantities.",
+    "intro.go": "START", "intro.tiny": "All sound synthesised in real time · headphones recommended",
+    "help.title": "Signal chain & parameters",
+    "help.lead": "Each string is a digital waveguide: delay length sets the fundamental, the loop low-pass sets frequency-dependent decay, and an all-pass cascade adds the inharmonicity of string stiffness. Excitation is a triangular displacement plus band-limited noise. The string–fret contact is a one-sided non-linear boundary: beyond it the wave is folded back with a restitution coefficient — that is the buzz.",
+    "help.d1": "Normalised finger position along the string; in Finger mode it maps directly to the effective length.",
+    "help.d2": "Stopped fret — sets the delay length and therefore the fundamental.",
+    "help.d3": "Finger pressure, converted into contact damping and extra loop loss.",
+    "help.d4": "Excitation point — sets how strongly each harmonic is driven.",
+    "help.d5": "Excitation amplitude, and the proportion of noise in it.",
+    "help.d6": "Tension trims pitch and brightness; gauge sets stiffness and inharmonicity.",
+    "help.d7": "Loop decay time (T60) and the decay rate of the highs.",
+    "help.d8": "Fret height and the restitution coefficient of the contact; below the amplitude threshold the string buzzes continuously.",
+    "help.d9": "Injects a tap of the string back into the loop — resonance or self-oscillation.",
+    "help.close": "CLOSE"
+  }
+};
+
+let lang = "zh";
+try {
+  const saved = localStorage.getItem("xfzy-lang");
+  if (saved === "en" || saved === "zh") lang = saved;
+} catch (e) {}
+
+function t(key){
+  const d = I18N[lang] || I18N.zh;
+  return d[key] !== undefined ? d[key] : (I18N.zh[key] || "");
+}
+
+function setAudio(key){
+  state.audioKey = key;
+  const el = document.getElementById("audioTxt");
+  if (el) el.textContent = t(key);
+}
+
+function applyLang(){
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  document.title = lang === "zh"
+    ? "弦外之音 · 物理建模弦乐器"
+    : "Overtones · Physical Modelling String Instrument";
+
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => {
+    el.innerHTML = t(el.getAttribute("data-i18n-html"));
+  });
+  document.querySelectorAll("#dock .chip").forEach((b, i) => {
+    if (PRESETS[i]) b.textContent = PRESETS[i].name[lang];
+  });
+  const lb = document.getElementById("langBtn");
+  if (lb) lb.textContent = lang === "zh" ? "EN" : "中";
+  if (typeof state.hintPreset === "number" && state.hintPreset >= 0 && PRESETS[state.hintPreset]){
+    const hint = document.getElementById("hint");
+    if (hint && !hint.classList.contains("gone")) hint.textContent = PRESETS[state.hintPreset].desc[lang];
+  }
+  if (state.audioKey) setAudio(state.audioKey);
+  try { localStorage.setItem("xfzy-lang", lang); } catch (e) {}
+}
+
+
+/* ============================================================
+   1. 弦物理模型引擎
+   ============================================================ */
+</script>
+<script id="engine">
+/* 弦物理模型引擎：纯 JS，不依赖 DOM 或 AudioWorklet。
+   浏览器用 ScriptProcessor 驱动，Node 测试直接调 render()。 */
+(function(global){
+  "use strict";
+  const NSTR = 6;
+  const OPEN = [40, 45, 50, 55, 59, 64];
+  const COMP = 3.2;
+  const clamp = (v, a, b) => (v < a ? a : (v > b ? b : v));
+
+  class StringEngine {
+    constructor(fs){
+      this.fs = fs;
+      this.s = [];
+      for (let i = 0; i < NSTR; i++){
+        this.s.push({
+          buf: new Float32Array(8192), len: 8192, w: 0,
+          dl: 900, dlT: 900,
+          lp: 0, dcx: 0, dcp: 0, tap: 0, fb: 0,
+          ax: [0,0,0], ay: [0,0,0],
+          fret: 0, peak: 0, ring: 0, amp: 0, g: 0.999, lpC: 0.2, env: 1
+        });
+      }
+      this.p = {
+        fingerPos:0.2367, fret:0, fingerForce:0.4933,
+        out1:0.7545, out2:0.72, fbAmt:0, fbExt:0, fbPos:0.2367, fbFilter:0.02,
+        pluckForce:0.4933, pluckPos:0.88,
+        tension:30, radius:0.00315, lowDecay:4, highDecay:2,
+        barrierH:0.52, barrierAlpha:0.23, fingerAlpha:0.23,
+        barrierStiff:1, fingerStiff:1, fingerMass:15,
+        statusActive:0.2113, volume:0.8, safety:0.8
+      };
+      this.q = Object.assign({}, this.p);
+      this.model = "kirchhoff";
+      this.fingerMode = "frets";
+      this.peaks = [0,0,0,0,0,0];
+    }
+
+    setParams(v){ Object.assign(this.p, v); }
+    setMode(model, fingerMode){
+      if (model) this.model = model;
+      if (fingerMode) this.fingerMode = fingerMode;
+    }
+    setFret(i, f){
+      if (this.s[i]) this.s[i].fret = clamp(f, 0, 24);
+    }
+    reset(){
+      for (const s of this.s) s.buf.fill(0);
+    }
+
+    freqOf(i){
+      const s = this.s[i], p = this.q;
+      const tens = 1 + (Math.sqrt(clamp(p.tension, 10, 60) / 30) - 1) * 0.14;
+      let semi = OPEN[i];
+      if (this.fingerMode === "finger"){
+        const len = 1 - 0.75 * clamp(p.fingerPos, 0, 0.98);
+        semi += 12 * Math.log2(1 / len) - 3.39;
+      } else {
+        semi += s.fret;
+      }
+      return 440 * Math.pow(2, (semi - 69) / 12) * tens;
+    }
+
+    tune(i){
+      const s = this.s[i];
+      s.dlT = clamp(this.fs / this.freqOf(i) - COMP, 6, 4000);
+      return s.dlT;
+    }
+
+    pluck(i, vel){
+      const s = this.s[i];
+      if (!s) return;
+      const p = this.q;
+      const ringing = s.amp > 0.004;
+      this.tune(i);
+      if (!ringing) s.dl = s.dlT;
+      const n = Math.max(12, Math.floor(s.dl));
+      const pp = clamp(p.pluckPos, 0.04, 0.96);
+      const force = clamp(p.pluckForce, 0, 1);
+      const amp = (0.5 + 1.05 * force) * (0.35 + 0.65 * clamp(vel, 0, 1))
+        * clamp(Math.sqrt(250 / n), 0.6, 1.5);
+      const nz = 0.14 + 0.22 * force;
+
+      // 先在临时数组里做这次拨弦的位移形状
+      if (!this._tmp) this._tmp = new Float32Array(8192);
+      const tmp = this._tmp;
+      let mean = 0;
+      for (let k = 0; k < n; k++){
+        const t = k / Math.max(1, n - 1);
+        const tri = t < pp ? t / pp : (1 - t) / (1 - pp);
+        tmp[k] = (tri * 0.86 + (Math.random() * 2 - 1) * nz) * amp;
+        mean += tmp[k];
+      }
+      mean /= n;
+
+      // 静止起振：去掉直流（否则弦带着一个不衰减的偏置）
+      // 正在振动：不减去均值，保持首尾为零，重拨才不会跳出一个断点
+      if (!ringing){
+        for (let k = 0; k < n; k++) tmp[k] -= mean;
+      }
+      // 轻微平滑，避免拨弦噪声变成“咔哒”
+      let lp = 0;
+      for (let k = 0; k < n; k++){
+        lp += 0.35 * (tmp[k] - lp);
+        tmp[k] = lp;
+      }
+
+      // 叠加到正在振动的弦上（不是覆盖），这样重拨不会产生断点
+      for (let k = 0; k < n; k++){
+        s.buf[(s.w - 1 - k + s.len) % s.len] += tmp[k];
+      }
+      s.ring = 1;
+      // 只有从静止起振才做淡入；重拨时保持连续，否则会掉出一个断点
+      s.env = ringing ? 1 : 0;
+    }
+
+    render(L, R){
+      const n = L.length;
+      const p = this.p, q = this.q;
+      const fs = this.fs;
+
+      for (const key in p) q[key] = q[key] + (p[key] - q[key]) * 0.3;
+
+      const dispA = clamp((q.radius - 0.0005) / 0.02, 0, 1) * 0.40;
+      const h = clamp(q.barrierH, 0.02, 1);
+      const hLoss = clamp(q.barrierAlpha * (0.55 + q.barrierStiff * 0.8), 0, 0.97);
+      const bright = 8 + q.highDecay * 8;
+
+      for (let i = 0; i < NSTR; i++){
+        const s = this.s[i];
+        this.tune(i);
+        if (s.dl < 6) s.dl = s.dlT;
+
+        const f0 = this.freqOf(i);
+        const fc = clamp(f0 * bright, 500, 16000);
+        s.lpC = 1 - Math.exp(-2 * Math.PI * fc / fs);
+
+        const t60 = Math.max(0.25, q.lowDecay / (1 + 3.0 * q.fingerForce * q.fingerStiff));
+        s.g = Math.pow(10, -3 / (t60 * fs));
+        s.og = clamp(Math.sqrt(f0 / 82.41), 1, 1.6);
+      }
+
+      for (let k = 0; k < n; k++){
+        let l = 0, r = 0;
+        for (let i = 0; i < NSTR; i++){
+          const s = this.s[i];
+          s.dl += (s.dlT - s.dl) * 0.0015;
+
+          let ridx = s.w - s.dl;
+          while (ridx < 0) ridx += s.len;
+          const i0 = ridx | 0;
+          const fr = ridx - i0;
+          const i1 = (i0 + 1) % s.len;
+          let y = s.buf[i0] * (1 - fr) + s.buf[i1] * fr;
+
+          // 弦刚度：全通级联，泛音略微偏离整数倍
+          if (dispA > 0.0008){
+            for (let c = 0; c < 3; c++){
+              const yy = dispA * (y - s.ay[c]) + s.ax[c];
+              s.ax[c] = y; s.ay[c] = yy; y = yy;
+            }
+          }
+
+          // 品丝：撞上去折返并损失能量，这就是打品声
+          if (this.model === "barrier"){
+            const ay = y < 0 ? -y : y;
+            if (ay > h){
+              y = (y < 0 ? -1 : 1) * (h - (ay - h) * (1 - hLoss));
+            }
+          }
+
+          // 频率相关的弦损耗
+          s.lp += s.lpC * (y - s.lp);
+          y = s.lp * s.g;
+
+          // 隔直
+          const dcy = y - s.dcx + 0.9993 * s.dcp;
+          s.dcx = y; s.dcp = dcy; y = dcy;
+
+          // 反馈：把弦上另一点的声音送回弦里
+          if (q.fbAmt > 0.001){
+            let fidx = s.w - s.dl * clamp(q.fbPos, 0.02, 0.98);
+            while (fidx < 0) fidx += s.len;
+            const fi0 = fidx | 0, ffr = fidx - fi0;
+            const fv = s.buf[fi0] * (1 - ffr) + s.buf[(fi0 + 1) % s.len] * ffr;
+            s.fb += (0.002 + q.fbFilter * 0.25) * (fv - s.fb);
+            y += s.fb * q.fbAmt * 0.5;
+          }
+
+          const sa = q.safety;
+          if (y > sa) y = sa + (y - sa) * 0.1;
+          else if (y < -sa) y = -sa + (y + sa) * 0.1;
+
+          s.buf[s.w] = y;
+          s.w = (s.w + 1) % s.len;
+
+          const ay2 = y < 0 ? -y : y;
+          s.amp += 0.0008 * (ay2 - s.amp);
+          if (ay2 > s.peak) s.peak = ay2;
+
+          const o1 = y * q.out1;
+          let pidx = s.w - 150;   // 固定的琴体抽头，避免梳状滤波随音高移动
+          while (pidx < 0) pidx += s.len;
+          const pi0 = pidx | 0, pfr = pidx - pi0;
+          s.tap += 0.25 * ((s.buf[pi0] * (1 - pfr) + s.buf[(pi0 + 1) % s.len] * pfr) - s.tap);
+          const o2 = s.tap * q.out2;
+
+          const pan = (i / (NSTR - 1)) * 1.4 - 0.7;
+          s.env += (1 - s.env) * 0.02;
+          const sig = (o1 + o2 * 0.9) * s.og * s.env * (1.0 - Math.abs(pan) * 0.25);
+          l += sig * (1 - pan) * 0.5;
+          r += sig * (1 + pan) * 0.5;
+        }
+        const vg = q.volume * 1.55;
+        L[k] = l * vg;
+        R[k] = r * vg;
+      }
+
+      // 把包络交给画布
+      const pk = this.peaks;
+      for (let i = 0; i < NSTR; i++){
+        const s = this.s[i];
+        pk[i] = Math.min(1, s.peak * 3);
+        s.peak *= 0.55;
+      }
+    }
+  }
+
+  global.StringEngine = StringEngine;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+
+
+/* ============================================================
+   2. 音频链
+   ============================================================ */
+let actx = null, engine = null, master = null, extDelay = null, extGain = null;
+
+async function initAudio(){
+  if (actx) { if (actx.state === "suspended") await actx.resume(); return; }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  actx = new AC({ latencyHint:"interactive" });
+
+  engine = new StringEngine(actx.sampleRate);
+  engine.setParams(P);
+  engine.setMode(state.model, state.fingerMode);
+  for (let i = 0; i < 6; i++) engine.setFret(i, state.frets[i]);
+
+  const hp = actx.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 45; hp.Q.value = 0.6;
+  const pk = actx.createBiquadFilter(); pk.type = "peaking"; pk.frequency.value = 220; pk.Q.value = 1.0; pk.gain.value = 2.6;
+  const lp = actx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 9500; lp.Q.value = 0.5;
+  const comp = actx.createDynamicsCompressor();
+  comp.threshold.value = -12; comp.knee.value = 8; comp.ratio.value = 5;
+  comp.attack.value = 0.004; comp.release.value = 0.22;
+  master = actx.createGain(); master.gain.value = 0.85;
+
+  const an = actx.createAnalyser(); an.fftSize = 1024;
+  window.__an = an;
+
+  // ScriptProcessor 而不是 AudioWorklet：file:// 双击打开时 blob 模块会被同源策略拦住。
+  const silent = actx.createConstantSource(); silent.offset.value = 0; silent.start();
+  const sp = actx.createScriptProcessor(256, 1, 2);
+  sp.onaudioprocess = (e) => {
+    const L = e.outputBuffer.getChannelData(0);
+    const R = e.outputBuffer.getChannelData(1);
+    engine.render(L, R);
+    const pks = engine.peaks;
+    for (let i = 0; i < 6; i++) state.ring[i] = Math.max(state.ring[i], pks[i]);
+  };
+  silent.connect(sp);
+  sp.connect(hp); hp.connect(pk); pk.connect(lp); lp.connect(comp);
+  comp.connect(an); an.connect(master);
+  master.connect(actx.destination);
+
+  // 外部反馈：从总输出分一路，经延时回到压限器
+  extDelay = actx.createDelay(1.0);
+  extDelay.delayTime.value = 0.06;
+  extGain = actx.createGain(); extGain.gain.value = 0;
+  master.connect(extDelay); extDelay.connect(extGain); extGain.connect(comp);
+
+  state.audioReady = true;
+  const dot = document.getElementById("audioDot");
+  const txt = document.getElementById("audioTxt");
+  dot.classList.add("on"); setAudio("audio.on");
+  actx.onstatechange = () => {
+    const on = actx.state === "running";
+    dot.classList.toggle("on", on);
+    setAudio(on ? "audio.on" : "audio.suspended");
+  };
+}
+
+function sendParams(){
+  if (engine) engine.setParams(P);
+}
+function sendMode(){
+  if (engine) engine.setMode(state.model, state.fingerMode);
+}
+
+function pluck(i, vel){
+  initAudio().then(() => {
+    if (actx.state === "suspended") actx.resume();
+    engine.pluck(i, vel === undefined ? 1 : vel);
+    if (geo){
+      state.ripples.push({ s:i, x: geo.nutX + (geo.bridgeX - geo.nutX) * P.pluckPos, t: 0 });
+      if (state.ripples.length > 30) state.ripples.shift();
+    }
+    flash(i);
+    if (!state.touched){ state.touched = true; document.getElementById("hint").classList.add("gone"); }
+  }).catch(err => {
+    console.error(err);
+    setAudio("audio.failed");
+  });
+}
+
+function setFret(i, f, all){
+  f = Math.max(0, Math.min(24, f));
+  if (all){
+    for (let k = 0; k < 6; k++){ state.frets[k] = f; if (engine) engine.setFret(k, f); }
+    P.fret = f; syncRow("fret");
+  } else {
+    state.frets[i] = f;
+    if (engine) engine.setFret(i, f);
+  }
+}
+
+function flash(i){
+  const btns = document.querySelectorAll("footer .str[data-s]");
+  const b = btns[i]; if (!b) return;
+  b.classList.add("hit");
+  setTimeout(() => b.classList.remove("hit"), 120);
+}
+
+/* ============================================================
+   3. 面板
+   ============================================================ */
+const rowsEl = document.getElementById("rows");
+const rowRefs = {};
+
+PARAMS.forEach(p => {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML =
+    '<span class="lab">' + p.label + '</span>' +
+    '<div class="bar"><i></i><input type="range" min="' + p.min + '" max="' + p.max +
+      '" step="' + p.step + '" value="' + p.v + '" aria-label="' + p.label + '"></div>' +
+    '<span class="val"></span>';
+  rowsEl.appendChild(row);
+
+  const input = row.querySelector("input");
+  const fill = row.querySelector("i");
+  const val = row.querySelector(".val");
+  rowRefs[p.k] = { input, fill, val };
+
+  const paint = () => {
+    const v = parseFloat(input.value);
+    const pct = (v - p.min) / (p.max - p.min) * 100;
+    fill.style.width = pct + "%";
+    val.textContent = v.toFixed(p.f);
+  };
+  paint();
+
+  input.addEventListener("input", () => {
+    const v = parseFloat(input.value);
+    P[p.k] = v;
+    paint();
+    if (p.k === "fret"){ setFret(0, v, true); }
+    if (p.k === "fbExt"){ if (extGain) extGain.gain.value = v * 0.85; }
+    sendParams();
+  });
+});
+
+function syncRow(k){
+  const r = rowRefs[k]; if (!r) return;
+  r.input.value = P[k];
+  const p = PARAMS.find(x => x.k === k);
+  r.fill.style.width = ((P[k] - p.min) / (p.max - p.min) * 100) + "%";
+  r.val.textContent = (+P[k]).toFixed(p.f);
+}
+
+/* 模式切换 */
+document.querySelectorAll("#gModel button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.model = b.dataset.v;
+    document.querySelectorAll("#gModel button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    sendMode();
+  });
+});
+document.querySelectorAll("#gFinger button").forEach(b => {
+  b.addEventListener("click", () => {
+    state.fingerMode = b.dataset.v;
+    document.querySelectorAll("#gFinger button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    sendMode();
+    document.getElementById("meta").textContent =
+      state.fingerMode === "frets" ? "OVERTONES · 6 STRINGS" : "OVERTONES · SLIDE";
+  });
+});
+
+/* ============================================================
+   4. 画布
+   ============================================================ */
+const cv = document.getElementById("stage");
+const g = cv.getContext("2d");
+let W = 0, H = 0, DPR = 1, geo = null;
+
+let crackle = null;
+let lastFrame = 0;
+
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = Math.max(300, r.width); H = Math.max(220, r.height);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const narrow = W < 700;
+  const padL = narrow ? 74 : 106, padR = narrow ? 24 : 72;
+  const padT = narrow ? 50 : 64, padB = narrow ? 76 : 132;
+  const nutX = padL, bridgeX = W - padR;
+  const gap = Math.min(narrow ? 46 : 104, (H - padT - padB) / 6.15);
+  const first = padT + (H - padT - padB - gap * 5) / 2;
+  geo = { nutX, bridgeX, gap, first, padT, padB, narrow };
+  crackle = null;
+}
+new ResizeObserver(resize).observe(document.getElementById("stageWrap"));
+
+function fretX(f){
+  return geo.nutX + (geo.bridgeX - geo.nutX) * (1 - Math.pow(2, -f / 12));
+}
+function stringY(i){ return geo.first + geo.gap * i; }
+
+function xToPluck(x){
+  return Math.max(0.03, Math.min(0.97, (x - geo.nutX) / (geo.bridgeX - geo.nutX)));
+}
+function xToFret(x){
+  const t = (x - geo.nutX) / (geo.bridgeX - geo.nutX);
+  if (t <= 0.001) return 0;
+  const f = -12 * Math.log2(1 - Math.min(0.999, t));
+  return Math.max(0, Math.min(24, Math.round(f)));
+}
+
+function buildCrackle(){
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  x.lineWidth = 0.7;
+  x.strokeStyle = "#b78c4c";
+  for (let i = 0; i < 60; i++){
+    x.globalAlpha = 0.018 + Math.random() * 0.03;
+    x.beginPath();
+    const sx = Math.random() * W, sy = Math.random() * H;
+    x.moveTo(sx, sy);
+    let px = sx, py = sy;
+    const dir = Math.random() * Math.PI * 2;
+    for (let k = 0; k < 3; k++){
+      px += Math.cos(dir + (Math.random() - 0.5)) * (60 + Math.random() * 140);
+      py += Math.sin(dir + (Math.random() - 0.5)) * (30 + Math.random() * 60);
+      x.lineTo(px, py);
+    }
+    x.stroke();
+  }
+  crackle = c;
+}
+
+function baseY(i, u){
+  const y0 = stringY(i);
+  const sag = 1.6 + i * 0.45;
+  let y = y0 + sag * Math.sin(Math.PI * u);
+  const fret = state.frets[i];
+  if (fret > 0){
+    const fx = fretX(fret);
+    const uf = (fx - geo.nutX) / (geo.bridgeX - geo.nutX);
+    const dip = Math.min(geo.gap * 0.30, 4 + P.fingerForce * geo.gap * 0.20);
+    if (u <= uf) y += dip * Math.sin(Math.PI * 0.5 * Math.min(1, u / uf));
+    else y += dip * (1 - Math.min(1, (u - uf) / Math.max(0.001, 1 - uf)) * 0.12);
+  }
+  return y;
+}
+
+function draw(){
+  requestAnimationFrame(draw);
+  if (!geo) resize();
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - lastFrame) / 1000 || 0.016);
+  lastFrame = now;
+  const t = now / 1000;
+
+  g.clearRect(0, 0, W, H);
+  if (!crackle) buildCrackle();
+  g.globalAlpha = 0.9;
+  g.drawImage(crackle, 0, 0);
+  g.globalAlpha = 1;
+
+  const top = geo.first - geo.gap * 0.85;
+  const bot = geo.first + geo.gap * 5 + geo.gap * 0.85;
+
+  // 漆面柔光：让弦场底下有一块“琴身”，而不是空黑
+  const cy = (top + bot) / 2;
+  const glow = g.createRadialGradient(geo.bridgeX * 0.66, cy, 8, geo.bridgeX * 0.66, cy, Math.max(W, H) * 0.72);
+  glow.addColorStop(0, "rgba(183,140,76,0.07)");
+  glow.addColorStop(0.55, "rgba(120,80,40,0.025)");
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = glow;
+  g.fillRect(0, 0, W, H);
+
+  // 琴面：一条被压暗的木/漆带，让弦有地方可长
+  const bandTop = top - 8, bandBot = bot + 8;
+  const band = g.createLinearGradient(0, bandTop, 0, bandBot);
+  band.addColorStop(0, "rgba(74,48,28,0)");
+  band.addColorStop(0.42, "rgba(74,48,28,0.26)");
+  band.addColorStop(0.58, "rgba(74,48,28,0.26)");
+  band.addColorStop(1, "rgba(74,48,28,0)");
+  g.fillStyle = band;
+  g.fillRect(geo.nutX - 2, bandTop, geo.bridgeX - geo.nutX + 4, bandBot - bandTop);
+  g.strokeStyle = "rgba(183,140,76,0.14)";
+  g.lineWidth = 1;
+  g.beginPath(); g.moveTo(geo.nutX, bandTop + 0.5); g.lineTo(geo.bridgeX, bandTop + 0.5); g.stroke();
+  g.beginPath(); g.moveTo(geo.nutX, bandBot - 0.5); g.lineTo(geo.bridgeX, bandBot - 0.5); g.stroke();
+
+  // 装裱细线
+  g.strokeStyle = "rgba(183,140,76,0.18)";
+  g.lineWidth = 1;
+  g.strokeRect(15.5, 15.5, W - 31, H - 31);
+
+  // 品丝
+  for (let f = 1; f <= 22; f++){
+    const x = fretX(f);
+    if (x > geo.bridgeX - 2) break;
+    const major = (f % 12 === 0 || f % 12 === 3 || f % 12 === 5 || f % 12 === 7 || f % 12 === 9);
+    if (major){
+      g.beginPath();
+      g.moveTo(x + 1, top);
+      g.lineTo(x + 1, bot);
+      g.strokeStyle = "rgba(0,0,0,0.5)";
+      g.lineWidth = 1.2;
+      g.stroke();
+    }
+    g.beginPath();
+    g.moveTo(x, top);
+    g.lineTo(x, bot);
+    g.strokeStyle = major ? "rgba(206,164,102,0.7)" : "rgba(183,140,76,0.18)";
+    g.lineWidth = major ? 1.1 : 0.8;
+    g.stroke();
+    if (major && !geo.narrow){
+      g.fillStyle = "rgba(141,123,99,0.75)";
+      g.font = "8px ui-monospace, Menlo, monospace";
+      g.textAlign = "center";
+      g.fillText(String(f), x, bot + 15);
+    }
+  }
+
+  // 品记：朱砂点
+  [3, 5, 7, 9, 12, 15].forEach(f => {
+    const xm = (fretX(f - 1) + fretX(f)) / 2;
+    const ym = (stringY(2) + stringY(3)) / 2;
+    g.beginPath();
+    g.arc(xm, ym, f === 12 ? 2.6 : 2, 0, Math.PI * 2);
+    g.fillStyle = "rgba(169,58,43," + (f === 12 ? 0.75 : 0.45) + ")";
+    g.fill();
+  });
+
+  // 琴枕与琴桥
+  g.strokeStyle = "rgba(231,205,151,0.55)";
+  g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(geo.nutX, top - 4); g.lineTo(geo.nutX, bot + 4); g.stroke();
+  const brg = g.createLinearGradient(geo.bridgeX - 4, 0, geo.bridgeX + 4, 0);
+  brg.addColorStop(0, "rgba(96,66,32,0.95)");
+  brg.addColorStop(0.5, "rgba(231,205,151,0.95)");
+  brg.addColorStop(1, "rgba(96,66,32,0.95)");
+  g.fillStyle = brg;
+  g.fillRect(geo.bridgeX - 3.5, top - 8, 7, (bot - top) + 16);
+  g.fillStyle = "rgba(0,0,0,0.35)";
+  g.fillRect(geo.bridgeX + 3.5, top - 8, 2, (bot - top) + 16);
+
+  // 弦
+  for (let i = 0; i < 6; i++){
+    const active = state.lastTouch === i;
+    const ring = state.ring[i];
+    const vib = Math.pow(Math.max(0, ring), 0.8) * geo.gap * 0.13;
+    const uf = fretX(state.frets[i]) === geo.nutX ? 0 :
+      (fretX(state.frets[i]) - geo.nutX) / (geo.bridgeX - geo.nutX);
+
+    const trace = () => {
+      g.beginPath();
+      const steps = 90;
+      for (let k = 0; k <= steps; k++){
+        const u = k / steps;
+        const x = geo.nutX + (geo.bridgeX - geo.nutX) * u;
+        const env = Math.sin(Math.PI * u);
+        let w = vib * Math.sin(u * Math.PI * 5 + t * 21 + i) * env;
+        if (state.frets[i] > 0 && u < uf) w *= 0.55;
+        const y = baseY(i, u) + w;
+        if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+    };
+
+    // 弦影
+    g.save();
+    g.translate(0, 1.2);
+    trace();
+    g.strokeStyle = "rgba(0,0,0,0.55)";
+    g.lineWidth = active ? 2.4 : 1.6;
+    g.stroke();
+    g.restore();
+
+    trace();
+    g.strokeStyle = active ? "#f6e0b2" : "rgba(240,231,214,0.55)";
+    g.lineWidth = active ? 1.7 : (0.85 + (5 - i) * 0.11);
+    if (active){
+      g.shadowColor = "rgba(231,205,151,0.8)";
+      g.shadowBlur = 7;
+    }
+    g.stroke();
+    g.shadowBlur = 0;
+
+    // 手指
+    if (state.frets[i] > 0){
+      const fx = fretX(state.frets[i]);
+      const yf = baseY(i, uf);
+      g.beginPath();
+      g.arc(fx, yf, 4.2 + P.fingerForce * 1.8, 0, Math.PI * 2);
+      g.strokeStyle = active ? "rgba(242,217,168,0.95)" : "rgba(183,140,76,0.7)";
+      g.lineWidth = 1;
+      g.stroke();
+      g.beginPath();
+      g.arc(fx, yf, 1.4, 0, Math.PI * 2);
+      g.fillStyle = "rgba(169,58,43,0.95)";
+      g.fill();
+    }
+
+    // 弦名
+    g.fillStyle = "rgba(141,123,99,0.85)";
+    g.font = "8.5px ui-monospace, Menlo, monospace";
+    g.textAlign = "right";
+    g.fillText(["E2","A2","D3","G3","B3","E4"][i], geo.nutX - 9, stringY(i) + 3);
+  }
+
+  // 拨弦位置
+  const px = geo.nutX + (geo.bridgeX - geo.nutX) * P.pluckPos;
+  g.setLineDash([2, 7]);
+  g.strokeStyle = "rgba(169,58,43,0.35)";
+  g.lineWidth = 1;
+  g.beginPath(); g.moveTo(px, top - 2); g.lineTo(px, bot + 2); g.stroke();
+  g.setLineDash([]);
+
+  // 拨弦涟漪：一颗金点沿弦跑开
+  for (let k = state.ripples.length - 1; k >= 0; k--){
+    const r = state.ripples[k];
+    r.t += dt;
+    const life = 0.62;
+    if (r.t > life){ state.ripples.splice(k, 1); continue; }
+    const a = 1 - r.t / life;
+    const spread = r.t * 620;
+    [1, -1].forEach(s => {
+      const x = r.x + s * spread;
+      if (x < geo.nutX || x > geo.bridgeX) return;
+      const u = (x - geo.nutX) / (geo.bridgeX - geo.nutX);
+      const y = baseY(r.s, u);
+      g.beginPath();
+      g.arc(x, y, 2.4 * a + 0.6, 0, Math.PI * 2);
+      g.fillStyle = "rgba(242,217,168," + (a * 0.85) + ")";
+      g.shadowColor = "rgba(231,205,151,0.9)";
+      g.shadowBlur = 10;
+      g.fill();
+      g.shadowBlur = 0;
+    });
+  }
+
+  for (let i = 0; i < 6; i++) state.ring[i] *= 0.955;
+}
+
+/* 指针交互 */
+let dragging = false, dragString = -1, lastPluck = 0;
+
+function pos(e){
+  const r = cv.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function nearestString(y){
+  let best = 0, bd = 1e9;
+  for (let i = 0; i < 6; i++){
+    const d = Math.abs(y - stringY(i));
+    if (d < bd){ bd = d; best = i; }
+  }
+  return best;
+}
+
+cv.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  stopPhrase();
+  cv.setPointerCapture(e.pointerId);
+  const p = pos(e);
+  const i = nearestString(p.y);
+  const f = xToFret(p.x);
+  dragging = true; dragString = i;
+  state.lastTouch = i;
+  setFret(i, f, false);
+  P.fret = f; syncRow("fret");
+  P.pluckPos = xToPluck(p.x); syncRow("pluckPos");
+  sendParams();
+  pluck(i, 1);
+  lastPluck = performance.now();
+});
+
+cv.addEventListener("pointermove", e => {
+  if (!dragging) return;
+  const p = pos(e);
+  const f = xToFret(p.x);
+  if (f !== state.frets[dragString]){
+    setFret(dragString, f, false);
+    P.fret = f; syncRow("fret");
+  }
+  const now = performance.now();
+  if (now - lastPluck > 90 && p.y > geo.first - geo.gap && p.y < geo.first + geo.gap * 6){
+    P.pluckPos = xToPluck(p.x); syncRow("pluckPos"); sendParams();
+    lastPluck = now;
+  }
+});
+
+cv.addEventListener("pointerup", () => { dragging = false; });
+cv.addEventListener("pointercancel", () => { dragging = false; });
+
+
+/* ============================================================
+   5. 四个奏法与导出
+   ============================================================ */
+const PRESETS = [
+  {
+    name:{zh:"空弦", en:"Open"}, desc:{zh:"空弦 · 高品丝、长 T60、近桥激励", en:"Open · high frets, long T60, excitation near the bridge"},
+    params:{ model:"kirchhoff", fingerMode:"frets", pluckPos:0.86, pluckForce:0.55,
+      fingerForce:0.12, lowDecay:7.0, highDecay:3.4, radius:0.0022, tension:30,
+      barrierH:0.90, barrierAlpha:0.20, fbAmt:0.10, fbPos:0.24, fbFilter:0.03, out2:0.62 },
+    phrase:[[0.00,0,0,0.9],[0.42,3,0,0.5],[0.84,4,0,0.5],[1.26,5,0,0.55],
+            [1.95,2,0,0.7],[2.37,4,3,0.45],[2.79,5,3,0.45],[3.45,0,0,0.8]]
+  },
+  {
+    name:{zh:"吟揉", en:"Slide"}, desc:{zh:"吟揉 · Finger 模式，手指位置映射有效弦长", en:"Slide · Finger mode: position maps to effective length"},
+    params:{ model:"kirchhoff", fingerMode:"finger", fingerPos:0.18, pluckPos:0.72,
+      pluckForce:0.5, fingerForce:0.55, lowDecay:9.0, highDecay:2.6, radius:0.0016,
+      fbAmt:0.16, barrierH:0.90 },
+    phrase:[[0.00,1,2,0.8],[0.90,1,2,0.55],[1.50,4,5,0.6],[2.10,4,5,0.45],
+            [2.80,1,2,0.75],[3.60,3,0,0.5]]
+  },
+  {
+    name:{zh:"打品", en:"Buzz"}, desc:{zh:"打品 · 品丝 0.16，单边非线性边界持续触发", en:"Buzz · fret at 0.16; the non-linear boundary fires every round trip"},
+    params:{ model:"barrier", fingerMode:"frets", barrierH:0.16, barrierAlpha:0.38,
+      barrierStiff:1.4, pluckForce:0.85, pluckPos:0.9, lowDecay:3.2, highDecay:5.4, fbAmt:0.0 },
+    phrase:[[0.00,0,0,1.0],[0.50,0,0,0.9],[1.00,1,0,0.9],[1.50,2,0,0.85],[2.00,3,0,0.85],
+            [2.50,4,0,0.8],[3.00,5,0,0.8],[3.70,0,3,0.95]]
+  },
+  {
+    name:{zh:"泛音", en:"Harmonics"}, desc:{zh:"泛音 · 中点激励，偶次谐波抵消", en:"Harmonics · midpoint excitation; even harmonics cancel"},
+    params:{ model:"kirchhoff", fingerMode:"frets", pluckPos:0.5, pluckForce:0.7,
+      fingerForce:0.08, radius:0.0008, highDecay:5.6, lowDecay:8.0, barrierH:0.95,
+      fbAmt:0.22, fbPos:0.5 },
+    phrase:[[0.00,0,12,0.8],[0.60,1,12,0.6],[1.20,2,7,0.6],[1.80,3,12,0.6],
+            [2.50,4,7,0.55],[3.20,5,12,0.6]]
+  }
+];
+
+let activePreset = 0;
+let phraseTimers = [];
+
+function stopPhrase(){
+  phraseTimers.forEach(clearTimeout);
+  phraseTimers = [];
+}
+
+function playPhrase(pr){
+  initAudio().then(() => {
+    if (actx.state === "suspended") actx.resume();
+    stopPhrase();
+    pr.phrase.forEach(([t, str, fret, vel]) => {
+      phraseTimers.push(setTimeout(() => {
+        state.frets[str] = fret;
+        if (engine) engine.setFret(str, fret);
+        state.lastTouch = str;
+        state.ring[str] = 1;
+        engine.pluck(str, vel);
+      }, t * 1000));
+    });
+  }).catch(() => {});
+}
+
+function applyPreset(i, play){
+  const pr = PRESETS[i];
+  if (!pr) return;
+  activePreset = i;
+  document.querySelectorAll("#dock .chip").forEach((b, k) => { b.classList.toggle("on", k === i); b.textContent = PRESETS[k].name[lang]; });
+  Object.assign(P, pr.params);
+  state.model = pr.params.model || state.model;
+  state.fingerMode = pr.params.fingerMode || state.fingerMode;
+  PARAMS.forEach(pp => syncRow(pp.k));
+  document.querySelectorAll("#gModel button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.v === state.model)));
+  document.querySelectorAll("#gFinger button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.v === state.fingerMode)));
+  document.getElementById("meta").textContent =
+    state.fingerMode === "frets" ? "OVERTONES · 6 STRINGS" : "OVERTONES · SLIDE";
+  sendParams();
+  sendMode();
+  if (play) playPhrase(pr);
+}
+
+function encodeWav(L, R, sr, gain){
+  const n = L.length;
+  const buf = new ArrayBuffer(44 + n * 4);
+  const v = new DataView(buf);
+  const wr = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  wr(0, "RIFF"); v.setUint32(4, 36 + n * 4, true); wr(8, "WAVE"); wr(12, "fmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 2, true);
+  v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true);
+  v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  wr(36, "data"); v.setUint32(40, n * 4, true);
+  let o = 44;
+  for (let i = 0; i < n; i++){
+    const l = Math.max(-1, Math.min(1, L[i] * gain));
+    const r = Math.max(-1, Math.min(1, R[i] * gain));
+    v.setInt16(o, Math.round(l * 32767), true); o += 2;
+    v.setInt16(o, Math.round(r * 32767), true); o += 2;
+  }
+  return buf;
+}
+
+async function exportWav(){
+  const btn = document.getElementById("exportBtn");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = t("export.busy");
+  try {
+    await initAudio();
+    if (actx.state === "suspended") await actx.resume();
+    stopPhrase();
+    const pr = PRESETS[activePreset];
+    const sr = actx.sampleRate;
+    const end = pr.phrase[pr.phrase.length - 1][0] + 4.5;
+    const total = Math.ceil(end * sr);
+    const eng = new StringEngine(sr);
+    eng.setParams(P);
+    eng.setMode(state.model, state.fingerMode);
+    // 预热：让参数平滑先收敛，否则第一个音用的是默认灵敏度
+    const wl = new Float32Array(256), wr = new Float32Array(256);
+    for (let i = 0; i < 12; i++) eng.render(wl, wr);
+
+    const L = new Float32Array(total), R = new Float32Array(total);
+    const bl = new Float32Array(256), br = new Float32Array(256);
+    const ev = pr.phrase.slice().sort((a, b) => a[0] - b[0]);
+    let ei = 0;
+    for (let off = 0; off < total; off += 256){
+      const t = off / sr;
+      while (ei < ev.length && ev[ei][0] <= t){
+        const [, str, fret, vel] = ev[ei++];
+        eng.setFret(str, fret);
+        eng.pluck(str, vel);
+      }
+      bl.fill(0); br.fill(0);
+      eng.render(bl, br);
+      const m = Math.min(256, total - off);
+      for (let i = 0; i < m; i++){ L[off + i] = bl[i]; R[off + i] = br[i]; }
+    }
+
+    let peak = 0;
+    for (let i = 0; i < total; i++){
+      const a = Math.abs(L[i]), b = Math.abs(R[i]);
+      if (a > peak) peak = a;
+      if (b > peak) peak = b;
+    }
+    const gain = peak > 0 ? 0.89 / peak : 1;
+    const blob = new Blob([encodeWav(L, R, sr, gain)], { type: "audio/wav" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (lang === "zh" ? "弦外之音_" : "Overtones_") + pr.name[lang] + ".wav";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    btn.textContent = t("export.done");
+  } catch (err) {
+    console.error(err);
+    btn.textContent = t("export.fail");
+  }
+  setTimeout(() => { btn.disabled = false; btn.textContent = t("export.btn"); }, 1800);
+}
+
+document.querySelectorAll("#dock .chip").forEach((b, i) => {
+  b.addEventListener("click", () => {
+    applyPreset(i, true);
+    const hint = document.getElementById("hint");
+    state.hintPreset = i;
+    hint.textContent = PRESETS[i].desc[lang];
+    hint.classList.remove("gone");
+  });
+});
+document.getElementById("exportBtn").addEventListener("click", exportWav);
+
+const plate = document.getElementById("plate");
+document.getElementById("plateBtn").addEventListener("click", () => {
+  plate.classList.add("open");
+  plate.setAttribute("aria-hidden", "false");
+});
+document.getElementById("plateClose").addEventListener("click", () => {
+  plate.classList.remove("open");
+  plate.setAttribute("aria-hidden", "true");
+});
+plate.addEventListener("click", e => {
+  if (e.target === plate){
+    plate.classList.remove("open");
+    plate.setAttribute("aria-hidden", "true");
+  }
+});
+window.addEventListener("keydown", e => {
+  if (e.key === "Escape" && plate.classList.contains("open")){
+    plate.classList.remove("open");
+    plate.setAttribute("aria-hidden", "true");
+  }
+});
+
+document.getElementById("langBtn").addEventListener("click", () => {
+  lang = lang === "zh" ? "en" : "zh";
+  applyLang();
+});
+
+document.getElementById("introGo").addEventListener("click", () => {
+  document.getElementById("intro").classList.add("hide");
+  initAudio().catch(() => {});
+  applyPreset(0, false);
+  setTimeout(() => { if (!state.touched) document.getElementById("hint").classList.remove("gone"); }, 400);
+});
+
+/* 触控盘 / 键盘 */
+/* 弦按钮已收进画布；键盘 1–6 仍然可用 */
+
+function bumpFret(d){
+  const f = Math.max(0, Math.min(24, P.fret + d));
+  P.fret = f; syncRow("fret");
+  setFret(0, f, true);
+  sendParams();
+}
+/* 品的选择通过点弦完成；键盘 ↑↓ 仍可微调 */
+
+window.addEventListener("keydown", e => {
+  if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
+  if (e.key >= "1" && e.key <= "6"){ pluck(+e.key - 1, 1); e.preventDefault(); }
+  else if (e.key === " "){
+    e.preventDefault();
+    for (let i = 0; i < 6; i++) setTimeout(() => pluck(i, 0.85), i * 34);
+  }
+  else if (e.key === "ArrowUp"){ bumpFret(1); e.preventDefault(); }
+  else if (e.key === "ArrowDown"){ bumpFret(-1); e.preventDefault(); }
+});
+
+/* 帮助 */
+const help = document.getElementById("help");
+document.getElementById("helpBtn").addEventListener("click", () => help.classList.add("open"));
+document.getElementById("helpClose").addEventListener("click", () => help.classList.remove("open"));
+help.addEventListener("click", e => { if (e.target === help) help.classList.remove("open"); });
+
+/* 第一次手势再建音频上下文 */
+window.addEventListener("pointerdown", () => { if (!actx) initAudio().catch(() => {}); }, { once:true });
+window.addEventListener("keydown", () => { if (!actx) initAudio().catch(() => {}); }, { once:true });
+
+resize();
+draw();
+
+/* 调试接口：给无头测试用 */
+applyLang();
+
+window.__fret = {
+  P, state, pluck, setFret, initAudio, applyPreset, exportWav, PRESETS,
+  level(){
+    if (!window.__an) return 0;
+    const a = new Float32Array(window.__an.fftSize);
+    window.__an.getFloatTimeDomainData(a);
+    let m = 0; for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i]));
+    return m;
+  },
+  ready(){ return !!(actx && engine); }
+};
+</script>
+</body>
+</html>

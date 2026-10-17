@@ -586,6 +586,40 @@ function mgStab(dest, freq, gain, dur) {
   });
 }
 
+
+function mgHorn(dest, freq, gain, dur) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var f = ctx.createBiquadFilter(), g = ctx.createGain();
+  f.type = 'lowpass'; f.Q.value = 2; f.frequency.setValueAtTime(1200, now);
+  f.frequency.exponentialRampToValueAtTime(2600, now + dur);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  f.connect(g); g.connect(dest);
+  [1.0, 1.005].forEach(function(m){
+    var o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(freq * m, now);
+    o.connect(f); o.start(now); o.stop(now + dur + 0.02);
+  });
+}
+function mgVibe(dest, freq, gain, dur) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var c = ctx.createOscillator(), m = ctx.createOscillator(), mg = ctx.createGain(), g = ctx.createGain();
+  c.type = 'sine'; c.frequency.setValueAtTime(freq, now);
+  m.type = 'sine'; m.frequency.setValueAtTime(freq * 4.01, now);
+  mg.gain.setValueAtTime(freq * 0.8, now); mg.gain.exponentialRampToValueAtTime(0.1, now + dur);
+  m.connect(mg); mg.connect(c.frequency); c.connect(g); g.connect(dest);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  c.start(now); m.start(now); c.stop(now + dur + 0.02); m.stop(now + dur + 0.02);
+}
+function mgSaw(dest, freq, gain, dur) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var f = ctx.createBiquadFilter(), g = ctx.createGain();
+  f.type = 'lowpass'; f.Q.value = 7; f.frequency.setValueAtTime(3400, now);
+  f.frequency.exponentialRampToValueAtTime(900, now + dur);
+  g.gain.setValueAtTime(gain, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  f.connect(g); g.connect(dest);
+  var o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, now);
+  o.connect(f); o.start(now); o.stop(now + dur + 0.02);
+}
+
 function triggerTileSound(r, c, cell) {
   if (!audioCtx || !cell || cell.color <= 0) return;
   var now = audioCtx.currentTime;
@@ -620,8 +654,11 @@ function triggerTileSound(r, c, cell) {
   // 4 (Green)  -> Clean Jazz Guitar ('s4')
   // 5 (Purple) -> Analog Saw Lead ('s5')
   pan.connect(sidechainGain);
+  if (colId === 1) { mgHorn(pan, freq, 0.30, 0.30); return; }
+  if (colId === 2) { mgVibe(pan, freq, 0.30, 0.45); return; }
   if (colId === 3) { mgBass(pan, freq * 0.5, 0.42, 0.24); return; }
   if (colId === 4) { mgStab(pan, freq, 0.34, 0.18); return; }
+  if (colId === 5) { mgSaw(pan, freq, 0.28, 0.26); return; }
   var dKey = 's' + colId;
 
   // Polygon Shape (shape 0..4) -> Musical Articulation:

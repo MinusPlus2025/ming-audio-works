@@ -585,6 +585,51 @@ function playDlsNote_DLS_W1(ctx, dest, key, targetFreq, gainVal, durSec, attSec,
   return src;
 }
 
+
+function celestialSynthVoice(freq, role, dur, dest) {
+  var ctx = audioCtx, now = ctx.currentTime;
+  var out = ctx.createGain(); out.connect(dest);
+  function env(peak, att, dec) {
+    out.gain.setValueAtTime(0.0001, now);
+    out.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), now + att);
+    out.gain.exponentialRampToValueAtTime(0.0001, now + dec);
+  }
+  function osc(type, hz, gain) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(hz, now);
+    g.gain.value = gain; o.connect(g); g.connect(out);
+    o.start(now); o.stop(now + dur + 0.05);
+    return o;
+  }
+  if (role === 'fmbell' || role === 'shimmer') {
+    var carrier = osc('sine', freq, 1.0);
+    var mod = ctx.createOscillator(), modGain = ctx.createGain();
+    mod.type = 'sine'; mod.frequency.setValueAtTime(freq * (role === 'shimmer' ? 2.01 : 3.5), now);
+    modGain.gain.setValueAtTime(freq * 1.6, now);
+    modGain.gain.exponentialRampToValueAtTime(0.1, now + dur);
+    mod.connect(modGain); modGain.connect(carrier.frequency);
+    mod.start(now); mod.stop(now + dur + 0.05);
+    env(role === 'shimmer' ? 0.10 : 0.22, 0.008, dur);
+  } else if (role === 'choir') {
+    [0.994, 1.0, 1.006].forEach(function(d){ osc('sawtooth', freq * d, 0.055); });
+    env(0.12, 0.22, Math.max(dur, 1.1));
+  } else if (role === 'strings') {
+    [0.996, 1.0, 1.004].forEach(function(d){ osc('sawtooth', freq * d, 0.05); });
+    env(0.10, 0.09, Math.max(dur, 0.9));
+  } else if (role === 'organ') {
+    osc('sine', freq, 0.16); osc('sine', freq * 2, 0.07); osc('sine', freq * 3, 0.035);
+    env(0.12, 0.02, Math.max(dur, 0.9));
+  } else if (role === 'kalimba') {
+    osc('sine', freq, 0.22); osc('sine', freq * 2.01, 0.08);
+    env(0.20, 0.004, 0.45);
+  } else if (role === 'cs80brass') {
+    osc('sawtooth', freq, 0.13); osc('square', freq * 0.998, 0.05);
+    env(0.13, 0.035, Math.max(dur, 0.75));
+  } else {
+    osc('sine', freq, 0.18); env(0.16, 0.01, dur);
+  }
+}
+
 function triggerCelestialVoice(freq, panVal, customRole) {
   if (!audioCtx) return;
   var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
@@ -602,32 +647,8 @@ function triggerCelestialVoice(freq, panVal, customRole) {
   filt.Q.value = 1.6;
   filt.connect(pan); pan.connect(masterGain);
 
-  // Map role to pure single-note real instrument in DLS_W1
-  var dlsKeyMap = {
-    fmbell: 'fmbell',
-    harp: 'kalimba',
-    organ: 'organ',
-    cs80brass: 'strings',
-    solararp: 'kalimba',
-    shimmer: 'fmbell',
-    choir: 'choir',
-    strings: 'strings'
-  };
-  var dKey = dlsKeyMap[bankKey] || (['kalimba','fmbell','organ','choir','strings','kalimba','organ','fmbell'][state.sysIdx % 8]);
-  var dur = (dKey === 'organ' || dKey === 'choir' || dKey === 'strings') ? 0.95 : 0.65;
-  playDlsNote_DLS_W1(audioCtx, filt, dKey, freq, 0.44, dur, 0.012, 1.0);
+  celestialSynthVoice(freq, bankKey, 0.8, filt);
 
-  // Layer synthesized celestial harmonic body from SAMPLE_BANK
-  var item = SAMPLE_BANK[bankKey] || SAMPLE_BANK['fmbell'];
-  if (item) {
-    var src = audioCtx.createBufferSource();
-    src.buffer = item.buf;
-    src.playbackRate.setValueAtTime(freq / item.baseFreq, now);
-    var g = audioCtx.createGain();
-    g.gain.setValueAtTime(0.22, now);
-    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
-    
-  }
 }
 
 // ============================================================================
