@@ -1452,5 +1452,78 @@ setInterval(() => {
 function loop() { drawBoard(); requestAnimationFrame(loop); }
 window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); });
 </script>
+<script>
+
+(function(){
+  var cfg = {"title": "先让赛车跑起来", "sub": "WAVEARCHITECT · KERS-0174", "lede": "一辆赛车就是一个移动的延迟读取磁头。它经过焊盘，才会触发声音。", "steps": [["01", "点 RUN", "左上角 RUN，让赛车沿 PCB 赛道跑起来"], ["02", "听焊盘", "赛车经过六个焊盘站点，触发对应音程"], ["03", "调磁头", "右上档位改速度；右下开盘机改饱和、抖动、偏磁"]], "note": "赛车越多、档位越高，抽头越密。右下角磁带盘可以按住拖动。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
+  if(!modal) return;
+  var card = modal.querySelector('.guide-card') || modal.firstElementChild;
+  if(!card || card.querySelector('.pm-guide')) return;
+  var st = document.createElement('style');
+  st.textContent = `
+  .pm-card{max-width:720px!important;width:100%!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+  .pm-guide{--pm-panel:${cfg.panel};--pm-ink:${cfg.ink};--pm-sub:${cfg.subc};--pm-accent:${cfg.accent};--pm-line:${cfg.line};
+    background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);border-radius:8px;
+    padding:32px 38px 28px;box-shadow:0 26px 80px rgba(0,0,0,.42);text-align:left;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",sans-serif}
+  .pm-kicker{font-size:11px;letter-spacing:.22em;font-weight:800;color:var(--pm-accent);margin-bottom:14px}
+  .pm-guide h2{font-family:"Songti SC","STSong",serif;font-size:34px;line-height:1.2;font-weight:700;margin:0 0 10px;color:var(--pm-ink)}
+  .pm-lede{font-size:14.5px;line-height:1.75;color:var(--pm-sub);margin:0 0 22px}
+  .pm-steps{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px}
+  .pm-steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+  .pm-steps span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:800;color:var(--pm-accent);padding-top:2px}
+  .pm-steps b{display:block;font-size:15.5px;font-weight:700;color:var(--pm-ink);margin-bottom:2px}
+  .pm-steps em{display:block;font-style:normal;font-size:13px;line-height:1.6;color:var(--pm-sub)}
+  .pm-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:4px 0 16px}
+  .pm-actions button{cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;border-radius:4px;padding:11px 18px;transition:.18s;border:1px solid transparent}
+  .pm-primary{background:var(--pm-accent);color:#fff}
+  .pm-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .pm-ghost{background:transparent;color:var(--pm-ink);border-color:var(--pm-line)}
+  .pm-ghost:hover{border-color:var(--pm-accent);color:var(--pm-accent)}
+  .pm-note{font-size:11.5px;line-height:1.7;color:var(--pm-sub);border-top:1px dashed var(--pm-line);padding-top:12px}
+  .pm-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
+  .pm-toast.on{opacity:1}
+  `;
+  document.head.appendChild(st);
+  card.classList.add('pm-card');
+  var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
+  card.innerHTML = '<div class="pm-guide">'
+    + '<div class="pm-kicker">WEB AUDIO · 60 秒上手</div>'
+    + '<h2>'+cfg.title+'</h2>'
+    + '<p class="pm-lede">'+cfg.lede+'</p>'
+    + '<ol class="pm-steps">'+steps+'</ol>'
+    + '<div class="pm-actions">'
+    +   '<button class="pm-primary" type="button">开始</button>'
+    +   '<button class="pm-ghost pm-full" type="button">全屏演示</button>'
+    +   '<button class="pm-ghost pm-save" type="button">保存分享图</button>'
+    + '</div>'
+    + '<div class="pm-note">'+cfg.note+'</div>'
+    + '</div>';
+  function open(){ modal.classList.add('open'); modal.style.display='flex'; }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 按 ? 重新查看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
+  card.querySelector('.pm-primary').addEventListener('click', close);
+  card.querySelector('.pm-full').addEventListener('click', function(){ close(); try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} });
+  card.querySelector('.pm-save').addEventListener('click', function(){
+    var c = document.querySelector('canvas'); if(!c) return;
+    var W=1600,H=1000, out=document.createElement('canvas'); out.width=W; out.height=H;
+    var g=out.getContext('2d');
+    g.fillStyle=cfg.panel; g.fillRect(0,0,W,H);
+    g.fillStyle=cfg.ink; g.font='700 58px "Songti SC","STSong",serif'; g.fillText(cfg.shareTitle, 60, 96);
+    g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
+    var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
+    g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('WEB AUDIO · TOUKEN 2026', 60, H-38);
+    var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') close();
+    if(e.key==='?' ) open();
+    if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
+  });
+  open();
+})();
+
+</script>
 </body>
 </html>
