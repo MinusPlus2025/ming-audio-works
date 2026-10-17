@@ -1,0 +1,2442 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THREADWEAVE · 穿针织音 — 交互式民乐织机（Web）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #1e0f08;
+    font-family: 'Songti SC', 'STSong', 'Kaiti SC', 'PingFang SC', serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    overflow: hidden;
+  }
+  .loom-shell {
+    width: calc(100vw - 12px); max-width: 1200px;
+    height: calc(100vh - 72px); max-height: 860px;
+    background: #f6efe0;
+    border: 4px solid #4a2511;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0,0,0,0.85);
+  }
+  #loomCanvas {
+    width: 100%; height: 100%;
+    display: block;
+    cursor: crosshair;
+  }
+  .hidden-input { display: none; }
+  .guide-modal {
+    position: absolute; inset: 0;
+    background: rgba(28, 16, 10, 0.88);
+    backdrop-filter: blur(14px);
+    z-index: 30;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 28px;
+  }
+  .guide-modal.open { display: flex; }
+  .guide-card {
+    max-width: 780px; width: 100%;
+    background: #fbf6ea;
+    border: 3px solid #a8201a;
+    border-radius: 14px;
+    padding: 28px 34px;
+    color: #2b1810;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.75);
+  }
+  .guide-card h2 { font-size: 19px; color: #a8201a; margin-bottom: 12px; }
+  .guide-card p, .guide-card li { font-size: 13.5px; line-height: 1.72; margin-bottom: 8px; }
+  .guide-card ul { padding-left: 20px; margin-bottom: 16px; }
+  .close-btn {
+    background: #a8201a; color: #fbf6ea; border: 1px solid #d4af37;
+    padding: 9px 26px; border-radius: 999px; font-weight: 800; cursor: pointer;
+  }
+
+  .tw-bar {
+    width: calc(100vw - 12px); max-width: 1200px; min-height: 50px;
+    background: #f6efe0; color: #2b1810; border: 3px solid #4a2511; border-radius: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 0 14px;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  .tw-bar button {
+    background: #a8201a; color: #fbf6ea; border: 1px solid #d4af37; border-radius: 4px;
+    font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer;
+  }
+  .tw-bar button:hover { background: #c0261f; }
+  .tw-bar button.ghost { background: #fbf6ea; color: #7a1c14; border-color: #a8201a; }
+  .tw-bar label { display: inline-flex; align-items: center; gap: 6px; color: #4a2511; }
+  .tw-bar input[type=range] { width: 96px; accent-color: #a8201a; }
+  .tw-bar .tw-status { font-weight: 700; color: #7a1c14; }
+  .tw-bar .tw-sp { margin-left: auto; font-size: 10px; letter-spacing: .12em; color: #8a6a52; }
+  .tw-toast {
+    position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
+    background: #2b1810; color: #fbf6ea; border: 1px solid #d4af37;
+    padding: 8px 14px; border-radius: 999px; font-size: 12px; z-index: 90;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .tw-toast.on { opacity: 1; }
+
+  .tw-tip {
+    position: fixed; z-index: 95; pointer-events: none; display: none;
+    background: #2b1810; color: #fbf6ea; border: 1px solid #d4af37;
+    padding: 7px 11px; border-radius: 5px; font-size: 14px; line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); max-width: 260px;
+  }
+  .tw-tip b { color: #fde68a; font-weight: 700; }
+
+  #upImage, #upAudio4 {
+    position: fixed !important; left: -9999px !important; top: 0 !important;
+    width: 1px !important; height: 1px !important; opacity: 0 !important;
+    display: block !important; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="loom-shell">
+  <canvas id="loomCanvas"></canvas>
+  <input type="file" id="upAudio4" class="hidden-input" accept="audio/*">
+
+  <div class="guide-modal" id="guideModal">
+    <div class="guide-card">
+      <h2>《穿针织音 · 锦瑟八音》v19.0 故宫非遗纹样与八音民乐交响织机</h2>
+      <p><strong>核心设计（左侧 8 款独立造型传统乐器图牌 × 右侧 8 款 1:1 同构非遗纹样 × 四声部江南丝竹/盛唐雅乐编曲引擎）</strong>：</p>
+      <ul>
+        <li><strong>1. 左侧 8 款独立乐器造型（告别圆圈，直接绘制每件中国传统乐器本体）</strong>：
+          <br>· <strong>朱砂·古筝刮奏</strong>（二十一弦桐木雁柱古筝） · <strong>翡翠·琵琶轮指</strong>（曲项梨形四轴琵琶）
+          <br>· <strong>靛青·古琴走手</strong>（仲尼式十三金徽漆琴） · <strong>紫檀·二胡悲吟</strong>（六角蟒皮琴筒与马尾弯弓）
+          <br>· <strong>明黄·昆曲竹笛</strong>（湘妃竹节笛配朱砂中国结穗） · <strong>鎏金·曾侯编钟</strong>（雕龙钟梁配三枚合瓦青铜钟）
+          <br>· <strong>胭脂·凤翼笙簧</strong>（十七簧参差凤翼笙苗配鎏金笙斗） · <strong>墨玉·堂鼓木鱼</strong>（朱漆双环堂鼓配双鼓槌）
+        </li>
+        <li><strong>2. 右侧 8 款非遗纹样徽章与中央绣绷 1:1 完全同构（共享几何生成算法）</strong>：右侧微缩图标直接渲染对应非遗纹样的真实丝线拓扑（敦煌藻井重台莲花、宋锦四合如意云纹、太极阴阳双鱼八卦、吉祥盘长中国结、盛唐联珠宝相牡丹、汝窑开片冰裂金缮、商周青铜云雷回纹、龙凤金剪拆线），点击即可在中央绣绷织出完全一致的传统图案并切换四声部民乐曲牌！</li>
+      </ul>
+      <button class="close-btn" onclick="document.getElementById('guideModal').classList.remove('open')">开始抚弦织锦</button>
+    </div>
+  </div>
+</div>
+
+<div class="tw-bar" id="twBar">
+  <button data-tw="upload" title="也可以把图片直接拖进页面">上传图片</button>
+  <button data-tw="clear" class="ghost">清除图样</button>
+  <button data-tw="invert" class="ghost">反相</button>
+  <label>阈值 <input type="range" id="twThreshold" min="0.25" max="0.85" step="0.01" value="0.55"></label>
+  <label>密度 <input type="range" id="twDensity" min="0" max="0.6" step="0.01" value="0.12"></label>
+  <button data-tw="color" class="ghost">颜色映射 · 开</button>
+  <button data-tw="sound">导出声图</button>
+  <span class="tw-status" id="twStatus">织锦模式</span>
+  <span class="tw-sp">MING · IMAGE LOOM</span>
+</div>
+<input type="file" id="upImage" class="hidden-input" accept="image/*">
+<div id="twTip" class="tw-tip"></div>
+
+<script>
+var userAudioBuffer = null, userAudioSource = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+
+function ensureIOGraph(ctx, masterNode) {
+  if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
+  if (!mediaStreamDest && ctx.createMediaStreamDestination) { mediaStreamDest = ctx.createMediaStreamDestination(); masterNode.connect(mediaStreamDest); }
+}
+
+function handleUserAudioUpload(file, ctx, targetNode) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    ctx.decodeAudioData(evt.target.result, function(decoded) {
+      userAudioBuffer = decoded;
+      if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} }
+      userAudioSource = ctx.createBufferSource();
+      userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
+      var gain = ctx.createGain(); gain.gain.value = 0.75;
+      userAudioSource.connect(gain); gain.connect(targetNode); userAudioSource.start(0);
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportCurrentStateWAV(filenamePrefix, synthCallback) {
+  var sr = 48000, dur = 8.0, numSamples = sr * dur;
+  var left = new Float32Array(numSamples), right = new Float32Array(numSamples);
+  synthCallback(left, right, sr, numSamples);
+  var buffer = new ArrayBuffer(44 + numSamples * 4), view = new DataView(buffer);
+  function writeStr(offset, str) { for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + numSamples * 4, true); writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true);
+  view.setUint32(24, sr, true); view.setUint32(28, sr * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, numSamples * 4, true);
+  var offset = 44;
+  for (var i = 0; i < numSamples; i++) {
+    var sL = Math.max(-1, Math.min(1, left[i])), sR = Math.max(-1, Math.min(1, right[i]));
+    view.setInt16(offset, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+    view.setInt16(offset + 2, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
+    offset += 4;
+  }
+  var blob = new Blob([buffer], { type: 'audio/wav' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filenamePrefix + '_48kHz_Master.wav';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  return blob.size;
+}
+
+function toggleVideoRecording(canvasEl, ctx, masterNode, filenamePrefix) {
+  ensureIOGraph(ctx, masterNode);
+  if (isRecordingVideo && mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop(); isRecordingVideo = false; return 'stopped';
+  }
+  var canvasStream = canvasEl.captureStream ? canvasEl.captureStream(30) : null;
+  if (!canvasStream) return 'unsupported';
+  var combinedTracks = [...canvasStream.getVideoTracks()];
+  if (mediaStreamDest && mediaStreamDest.stream) combinedTracks.push(...mediaStreamDest.stream.getAudioTracks());
+  var combinedStream = new MediaStream(combinedTracks);
+  recordedChunks = [];
+  var mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
+  mediaRecorder = mimeType ? new MediaRecorder(combinedStream, { mimeType: mimeType }) : new MediaRecorder(combinedStream);
+  mediaRecorder.ondataavailable = function(e) { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = function() {
+    var blob = new Blob(recordedChunks, { type: mimeType || 'video/webm' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = filenamePrefix + '_Interactive_AV.webm';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+  mediaRecorder.start(200); isRecordingVideo = true; return 'recording';
+}
+
+var canvas = document.getElementById('loomCanvas');
+var ctx = canvas.getContext('2d');
+
+function resize() {
+  var rect = canvas.getBoundingClientRect();
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+}
+window.addEventListener('resize', resize);
+
+// 8 Authentic Chinese Traditional Instruments (Left Column Free-Standing Silhouettes!)
+var SPOOLS = [
+  { id: 0, icon: 'guzheng',   name: '朱砂·古筝刮奏', sub: 'GUZHENG ZITHER', hex: '#b91c1c', wood: '#78350f', gold: '#f59e0b' },
+  { id: 1, icon: 'pipa',      name: '翡翠·琵琶轮指', sub: 'PIPA LUTE',      hex: '#0f766e', wood: '#9a3412', gold: '#fbbf24' },
+  { id: 2, icon: 'guqin',     name: '靛青·古琴走手', sub: 'GUQIN 7-STRING', hex: '#1e3a8a', wood: '#1c1917', gold: '#fde047' },
+  { id: 3, icon: 'erhu',      name: '紫檀·二胡悲吟', sub: 'ERHU FIDDLE',    hex: '#6b21a8', wood: '#4c1d95', gold: '#f59e0b' },
+  { id: 4, icon: 'dizi',      name: '明黄·昆曲竹笛', sub: 'KUNQU DIZI',     hex: '#b45309', wood: '#ca8a04', gold: '#dc2626' },
+  { id: 5, icon: 'bianzhong', name: '鎏金·曾侯编钟', sub: 'BRONZE BELLS',   hex: '#92400e', wood: '#78350f', gold: '#d97706' },
+  { id: 6, icon: 'sheng',     name: '胭脂·凤翼笙簧', sub: 'SHENG REEDS',    hex: '#be185d', wood: '#831843', gold: '#fbbf24' },
+  { id: 7, icon: 'tanggu',    name: '墨玉·堂鼓木鱼', sub: 'TANGGU DRUM',    hex: '#27272a', wood: '#991b1b', gold: '#fde047' }
+];
+
+// Richer timbre: a second resonance/attack layer per instrument (still the same source samples).
+var TIMBRE_LAYERS = {
+  0: { key: 'guzheng_hi', ratio: 1.0,  gain: 0.16, hp: 1200, dur: 0.55 },
+  1: { key: 'pipa_body',  ratio: 1.0,  gain: 0.18, hp: 220,  dur: 0.80 },
+  2: { key: 'guqin_harm', ratio: 2.0,  gain: 0.10, hp: 800,  dur: 0.75 },
+  3: { key: 'erhu',       ratio: 1.004,gain: 0.10, hp: 320,  dur: 0.95 },
+  4: { key: 'dizi',       ratio: 1.003,gain: 0.08, hp: 650,  dur: 0.90 },
+  5: { key: 'bian_low',   ratio: 0.5,  gain: 0.12, hp: 120,  dur: 1.10 },
+  6: { key: 'sheng',      ratio: 1.006,gain: 0.10, hp: 300,  dur: 0.90 },
+  7: { key: 'muyu',       ratio: 2.0,  gain: 0.08, hp: 400,  dur: 0.35 }
+};
+
+// 8 Classical Chinese Non-Heritage Patterns (Right Column 1:1 Miniature Loom Previews!)
+var PATTERN_HOOPS = [
+  { id: 'dunhuang', y: 0.168, name: '敦煌藻井莲花', sub: 'DUNHUANG LOTUS', col: '#b91c1c' },
+  { id: 'ruyi',     y: 0.268, name: '宋锦四合如意', sub: 'RUYI 4-CLOUD',   col: '#b45309' },
+  { id: 'bagua',    y: 0.368, name: '太极阴阳八卦', sub: 'YIN-YANG TAIJI', col: '#1e3a8a' },
+  { id: 'panchang', y: 0.468, name: '吉祥盘长中国结',sub: 'ENDLESS KNOT',  col: '#be185d' },
+  { id: 'baoxiang', y: 0.568, name: '盛唐宝相牡丹', sub: 'TANG PEONY',     col: '#6b21a8' },
+  { id: 'crackle',  y: 0.668, name: '汝窑冰裂金缮', sub: 'RU-WARE KINTSUGI',col:'#0f766e' },
+  { id: 'leiwen',   y: 0.768, name: '青铜云雷回纹', sub: 'BRONZE LEIWEN',  col: '#78350f' },
+  { id: 'clear',    y: 0.868, name: '龙凤金剪拆线', sub: 'CLEAR LOOM',     col: '#4a2511' }
+];
+
+var TOP_HOOPS = [
+  { id: 'sym',    x: 0.505, y: 0.068, r: 19, label: '对称: 8x',   sub: 'SYMMETRY', col: '#1e3a8a' },
+  { id: 'scale',  x: 0.570, y: 0.068, r: 19, label: '春江雅乐',   sub: 'REPERTOIRE',col:'#0f766e' },
+  { id: 'upload', x: 0.635, y: 0.068, r: 19, label: '📂 传音频',  sub: 'UPLOAD',   col: '#6b21a8' },
+  { id: 'wav',    x: 0.700, y: 0.068, r: 19, label: '🎵 导WAV',   sub: 'EXPORT',   col: '#b45309' },
+  { id: 'video',  x: 0.765, y: 0.068, r: 19, label: '🎥 录视频',  sub: 'VIDEO',    col: '#b91c1c' },
+  { id: 'play',   x: 0.830, y: 0.068, r: 19, label: '■ 抚琴中',   sub: 'RUNNING',  col: '#b91c1c' },
+  { id: 'guide',  x: 0.895, y: 0.068, r: 19, label: '? 雅集',     sub: 'GUIDE',    col: '#4a2511' }
+];
+
+// 4 Famous Chinese Classical Repertoire Modes with Structured Melodic Motifs!
+var SCALES = [
+  {
+    name: '《春江花月夜》江南丝竹',
+    notes: [130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00, 1046.50],
+    leadMotif: [7, 6, 5, 3, 5, 6, 7, 9, 8, 7, 5, 6, 5, 3, 2, 0],
+    bassProg:  [0, 3, 4, 2, 0, 1, 3, 0]
+  },
+  {
+    name: '《姑苏行》昆曲笛韵羽调',
+    notes: [110.00, 130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00],
+    leadMotif: [5, 7, 8, 9, 8, 7, 5, 4, 5, 7, 6, 4, 3, 2, 1, 0],
+    bassProg:  [0, 2, 3, 4, 0, 3, 2, 0]
+  },
+  {
+    name: '《兰陵王》盛唐编钟雅乐',
+    notes: [116.54, 130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23, 392.00, 466.16, 523.25, 622.25, 698.46, 783.99, 932.33],
+    leadMotif: [4, 4, 6, 7, 9, 8, 7, 6, 4, 3, 2, 4, 3, 1, 0, 0],
+    bassProg:  [0, 4, 3, 1, 2, 3, 4, 0]
+  },
+  {
+    name: '《霓裳羽衣曲》敦煌燕乐',
+    notes: [130.81, 146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 369.99, 392.00, 440.00, 523.25, 587.33, 659.25],
+    leadMotif: [7, 9, 10, 11, 10, 9, 7, 6, 7, 8, 6, 4, 3, 4, 2, 0],
+    bassProg:  [0, 3, 4, 1, 2, 4, 3, 0]
+  }
+];
+
+var TWELVE_LULU = ['黄钟·宫', '大吕', '太簇·商', '夹钟', '姑洗·角', '仲吕', '蕤宾·变徵', '林钟·徵', '夷则', '南吕·羽', '无射', '应钟·变宫'];
+
+// 96 Precision Brass Pegs: Outer 36 Lu-Lu Ring + 60 Dynamic Contour Pegs that morph into each Chinese Non-Heritage Pattern!
+var PEGS = [];
+function initBasePegs() {
+  PEGS = [];
+  for (var i = 0; i < 96; i++) {
+    var ang = (i / 36) * Math.PI * 2 - Math.PI * 0.5;
+    var rad = 0.355;
+    PEGS.push({
+      id: i, ring: i < 36 ? 0 : 1, idxInRing: i % 36, countInRing: 36,
+      angle: ang, rx: Math.cos(ang), ry: Math.sin(ang),
+      nx: 0.50 + Math.cos(ang) * rad * (900 / 1200),
+      ny: 0.53 + Math.sin(ang) * rad,
+      glow: 0
+    });
+  }
+}
+initBasePegs();
+
+function setPegNorm(id, rx, ry) {
+  if (!PEGS[id]) return;
+  var rad = 0.355;
+  PEGS[id].rx = rx;
+  PEGS[id].ry = ry;
+  PEGS[id].angle = Math.atan2(ry, rx);
+  PEGS[id].nx = 0.50 + rx * rad * (900 / 1200);
+  PEGS[id].ny = 0.53 + ry * rad;
+}
+
+function ringPegId(ringIdx, idxInRing) {
+  if (ringIdx === 0) return ((Math.round(idxInRing) % 36) + 36) % 36;
+  return 36 + (((Math.round(idxInRing) % 60) + 60) % 60);
+}
+
+// ============================================================================
+// TRUE CONTOUR GEOMETRY FOR ALL 7 CHINESE NON-HERITAGE PATTERNS!
+// Returns { pegs: [{rx, ry}...], stitches: [[p1, p2, col]...] }
+// Used 1:1 by BOTH the Right-Side Pattern Icons AND the Central Embroidery Hoop!
+// ============================================================================
+function buildChinesePatternGeometry(patId) {
+  var pts = [];
+  // 0..35: Outer 36-pin Circle
+  for (var i = 0; i < 36; i++) {
+    var a = (i / 36) * Math.PI * 2 - Math.PI * 0.5;
+    pts.push({ rx: Math.cos(a), ry: Math.sin(a) });
+  }
+  // Fill 36..95 (60 interior contour pins) with default concentric rings first
+  for (var k = 0; k < 60; k++) {
+    var r = k < 28 ? 0.72 : (k < 48 ? 0.46 : 0.22);
+    var a2 = ((k % 20) / 20) * Math.PI * 2 - Math.PI * 0.5;
+    pts.push({ rx: Math.cos(a2) * r, ry: Math.sin(a2) * r });
+  }
+
+  var stitches = [];
+  function link(p1, p2, col) {
+    if (p1 !== p2 && p1 >= 0 && p2 >= 0 && p1 < 96 && p2 < 96) stitches.push([p1, p2, col]);
+  }
+
+  if (patId === 'dunhuang') {
+    // 1. 敦煌藻井八瓣重台莲花: 8 True Pointed Lotus Petals + Inner Lotus Pod + Outer Diamond Caisson!
+    for (var p = 0; p < 8; p++) {
+      var aC = (p / 8) * Math.PI * 2 - Math.PI * 0.5;
+      var aL = aC - 0.24, aR = aC + 0.24;
+      var baseIdx = 36 + p * 7;
+      pts[baseIdx + 0] = { rx: Math.cos(aC) * 0.88, ry: Math.sin(aC) * 0.88 }; // Petal Sharp Tip!
+      pts[baseIdx + 1] = { rx: Math.cos(aL) * 0.64, ry: Math.sin(aL) * 0.64 }; // Left Upper Belly
+      pts[baseIdx + 2] = { rx: Math.cos(aR) * 0.64, ry: Math.sin(aR) * 0.64 }; // Right Upper Belly
+      pts[baseIdx + 3] = { rx: Math.cos(aL * 0.98) * 0.38, ry: Math.sin(aL * 0.98) * 0.38 }; // Left Base
+      pts[baseIdx + 4] = { rx: Math.cos(aR * 0.98) * 0.38, ry: Math.sin(aR * 0.98) * 0.38 }; // Right Base
+      pts[baseIdx + 5] = { rx: Math.cos(aC) * 0.52, ry: Math.sin(aC) * 0.52 }; // Inner Petal Tip
+      pts[baseIdx + 6] = { rx: Math.cos(aC) * 0.18, ry: Math.sin(aC) * 0.18 }; // Central Lotus Seed Pod
+      // Outline & Silk Fan-Weave of Each Lotus Petal!
+      link(baseIdx + 6, baseIdx + 3, 4); link(baseIdx + 3, baseIdx + 1, 0); link(baseIdx + 1, baseIdx + 0, 0);
+      link(baseIdx + 6, baseIdx + 4, 4); link(baseIdx + 4, baseIdx + 2, 0); link(baseIdx + 2, baseIdx + 0, 0);
+      link(baseIdx + 6, baseIdx + 0, 4); link(baseIdx + 5, baseIdx + 1, 6); link(baseIdx + 5, baseIdx + 2, 6);
+      link(baseIdx + 3, baseIdx + 2, 1); link(baseIdx + 4, baseIdx + 1, 1);
+    }
+    // Outer Golden Diamond Caisson (藻井方框)
+    [0, 9, 18, 27].forEach((c0, idx) => {
+      var c1 = (c0 + 9) % 36;
+      link(c0, c1, 4); link((c0 + 1) % 36, (c1 - 1 + 36) % 36, 5);
+    });
+    for (var p = 0; p < 8; p++) link(36 + p * 7 + 6, 36 + ((p + 1) % 8) * 7 + 6, 4);
+
+  } else if (patId === 'ruyi') {
+    // 2. 故宫宋锦四合如意云纹: 4 True Heart-Shaped Ruyi Cloud Heads (N, E, S, W) + Central Diamond Knot!
+    for (var q = 0; q < 4; q++) {
+      var aC = (q / 4) * Math.PI * 2 - Math.PI * 0.5;
+      var ux = Math.cos(aC), uy = Math.sin(aC);
+      var px = -uy, py = ux; // perpendicular vector
+      var b = 36 + q * 14;
+      // 11 Contour Points of a Traditional Heart-Shaped Ruyi Cloud Head (如意云头轮廓)!
+      var cloudLocal = [
+        [0.00, 0.88], [-0.22, 0.84], [-0.40, 0.70], [-0.42, 0.52], [-0.24, 0.42],
+        [-0.14, 0.24], [0.00, 0.16], [0.14, 0.24], [0.24, 0.42], [0.42, 0.52], [0.40, 0.70], [0.22, 0.84],
+        [-0.22, 0.62], [0.22, 0.62] // Left & Right Spiral Volute Eyes (如意双涡心)!
+      ];
+      cloudLocal.forEach(([lx, ly], idx) => {
+        pts[b + idx] = { rx: ux * ly + px * lx, ry: uy * ly + py * lx };
+      });
+      // Outer Ruyi Cloud Contour
+      for (var k = 0; k < 12; k++) link(b + k, b + ((k + 1) % 12), 0);
+      // Silk Fan-Weave radiating from the two spiral volutes (b+12, b+13) and neck (b+6)!
+      for (var k = 0; k <= 5; k++) { link(b + 12, b + k, 4); link(b + 6, b + k, 1); }
+      for (var k = 6; k < 12; k++) { link(b + 13, b + k, 4); link(b + 6, b + k, 1); }
+      link(b + 12, b + 13, 0); link(b + 0, b + 6, 4);
+    }
+    // Link the 4 Ruyi Necks in a Central Song-Brocade Diamond!
+    for (var q = 0; q < 4; q++) {
+      link(36 + q * 14 + 6, 36 + ((q + 1) % 4) * 14 + 6, 4);
+      link(36 + q * 14 + 4, 36 + ((q + 1) % 4) * 14 + 8, 5);
+    }
+
+  } else if (patId === 'bagua') {
+    // 3. 太极阴阳双鱼八卦: True S-Curve Spine + Upper & Lower Fish Eyes + 8 Outer Bagua Trigrams!
+    // 36..50: 15 pins along the S-Curve Yin-Yang Spine!
+    for (var s = 0; s < 15; s++) {
+      var u = s / 14; // 0 (top) to 1 (bottom)
+      var sy = -0.78 + u * 1.56;
+      var sx = (u < 0.5) ? Math.sin(u * Math.PI * 2) * 0.39 : -Math.sin((u - 0.5) * Math.PI * 2) * 0.39;
+      pts[36 + s] = { rx: sx, ry: sy };
+      if (s > 0) link(36 + s - 1, 36 + s, 4);
+    }
+    // 51..66: 16 pins along the Outer Taiji Circle (r = 0.78)
+    for (var c = 0; c < 16; c++) {
+      var a = (c / 16) * Math.PI * 2 - Math.PI * 0.5;
+      pts[51 + c] = { rx: Math.cos(a) * 0.78, ry: Math.sin(a) * 0.78 };
+      link(51 + c, 51 + ((c + 1) % 16), c < 8 ? 0 : 2);
+    }
+    // Weave Yang Fish (Right side: Crimson & Gold) and Yin Fish (Left side: Indigo & Jade)
+    for (var k = 0; k <= 8; k++) {
+      link(51 + k, 36 + Math.min(14, Math.round(k * 14 / 8)), 0);
+      link(51 + k, 36 + Math.min(14, Math.round(k * 14 / 8) + 1), 4);
+    }
+    for (var k = 8; k < 16; k++) {
+      link(51 + k, 36 + Math.max(0, 14 - Math.round((k - 8) * 14 / 8)), 2);
+      link(51 + k, 36 + Math.max(0, 13 - Math.round((k - 8) * 14 / 8)), 1);
+    }
+    // 67..74: Upper Fish Eye (r = 0.14 around (0, -0.39)) & 75..82: Lower Fish Eye (around (0, +0.39))
+    for (var e = 0; e < 8; e++) {
+      var ae = (e / 8) * Math.PI * 2;
+      pts[67 + e] = { rx: Math.cos(ae) * 0.13, ry: -0.39 + Math.sin(ae) * 0.13 };
+      pts[75 + e] = { rx: Math.cos(ae) * 0.13, ry:  0.39 + Math.sin(ae) * 0.13 };
+      link(67 + e, 67 + ((e + 1) % 8), 2); link(67 + e, 67 + ((e + 4) % 8), 2);
+      link(75 + e, 75 + ((e + 1) % 8), 0); link(75 + e, 75 + ((e + 4) % 8), 4);
+    }
+    // Outer 8 Bagua Trigram Bars
+    for (var g = 0; g < 8; g++) {
+      var p0 = Math.round(g * 36 / 8);
+      link((p0 - 1 + 36) % 36, (p0 + 1) % 36, 5);
+    }
+
+  } else if (patId === 'panchang') {
+    // 4. 吉祥盘长中国结: True 45°-Rotated 5x5 Diamond Lattice + 8 Outer Rounded Ear-Loops (中国结)!
+    // 36..60: 5x5 Rotated Diamond Grid (25 pins)
+    var gridIdx = 36;
+    for (var r = -2; r <= 2; r++) {
+      for (var c = -2; c <= 2; c++) {
+        var gx = (c - r) * 0.185;
+        var gy = (c + r) * 0.185;
+        pts[gridIdx++] = { rx: gx, ry: gy };
+      }
+    }
+    // Connect the 5 horizontal & 5 vertical diamond lines in Crimson & Gold!
+    for (var i = 0; i < 5; i++) {
+      for (var j = 0; j < 4; j++) {
+        link(36 + i * 5 + j, 36 + i * 5 + j + 1, 0);
+        link(36 + j * 5 + i, 36 + (j + 1) * 5 + i, 0);
+      }
+      // Diagonal Gold Brocade Cross-Weave
+      if (i < 4) {
+        link(36 + i * 5, 36 + (i + 1) * 5 + 1, 4);
+        link(36 + i * 5 + 4, 36 + (i + 1) * 5 + 3, 4);
+      }
+    }
+    // 61..92: 4 Auspicious Outer Ear-Loops at N, E, S, W corners!
+    for (var d = 0; d < 4; d++) {
+      var aD = (d / 4) * Math.PI * 2 - Math.PI * 0.5;
+      var bE = 61 + d * 7;
+      for (var k = 0; k < 7; k++) {
+        var ak = aD + ((k - 3) / 3) * 0.65;
+        var rk = 0.64 + Math.sin((k / 6) * Math.PI) * 0.24;
+        pts[bE + k] = { rx: Math.cos(ak) * rk, ry: Math.sin(ak) * rk };
+        if (k > 0) link(bE + k - 1, bE + k, 0);
+      }
+      link(bE + 0, bE + 6, 4);
+      link(bE + 1, bE + 5, 6);
+    }
+
+  } else if (patId === 'baoxiang') {
+    // 5. 盛唐宝相牡丹团窠: 8 Large Scalloped Outer Peony Petals + 8 Inner Petals + Golden Stamen!
+    for (var p = 0; p < 8; p++) {
+      var a0 = (p / 8) * Math.PI * 2;
+      var bP = 36 + p * 7;
+      for (var k = 0; k < 5; k++) {
+        var ak = a0 + ((k - 2) / 2) * 0.34;
+        var rk = 0.55 + Math.cos(((k - 2) / 2) * 1.1) * 0.32;
+        pts[bP + k] = { rx: Math.cos(ak) * rk, ry: Math.sin(ak) * rk };
+        if (k > 0) link(bP + k - 1, bP + k, 6);
+      }
+      pts[bP + 5] = { rx: Math.cos(a0) * 0.42, ry: Math.sin(a0) * 0.42 };
+      pts[bP + 6] = { rx: Math.cos(a0 + Math.PI / 8) * 0.22, ry: Math.sin(a0 + Math.PI / 8) * 0.22 };
+      for (var k = 0; k < 5; k++) {
+        link(bP + 5, bP + k, 0);
+        link(bP + 6, bP + k, 4);
+      }
+      link(bP + 6, 36 + ((p + 1) % 8) * 7 + 6, 4);
+    }
+    for (var i = 0; i < 36; i++) link(i, (i + 1) % 36, 4); // Outer Tang Pearl Ring
+
+  } else if (patId === 'crackle') {
+    // 6. 宋代汝窑开片冰裂金缮: Natural Voronoi Ice-Crackle Polygons + Bold Golden Kintsugi Lightning Vein!
+    var crackNodes = [
+      [-0.55,-0.55],[0.05,-0.75],[0.62,-0.48],[0.78,0.08],[0.52,0.65],[-0.08,0.78],[-0.68,0.45],[-0.76,-0.08],
+      [-0.28,-0.32],[0.28,-0.35],[0.42,0.18],[0.12,0.42],[-0.35,0.28],[-0.42,-0.05],[0.02,-0.04],[0.18,-0.12],
+      [-0.65,-0.35],[-0.35,-0.68],[0.38,-0.62],[0.68,-0.22],[0.68,0.38],[0.25,0.68],[-0.42,0.65],[-0.72,0.18]
+    ];
+    crackNodes.forEach(([x, y], idx) => { pts[36 + idx] = { rx: x, ry: y }; });
+    var crackEdges = [
+      [0,8],[1,8],[1,9],[2,9],[2,10],[3,10],[4,10],[4,11],[5,11],[5,12],[6,12],[6,13],[7,13],[0,13],
+      [8,9],[9,10],[10,11],[11,12],[12,13],[13,8],[8,14],[9,15],[10,15],[11,14],[12,14],[13,14],[14,15],
+      [0,16],[0,17],[1,17],[1,18],[2,18],[2,19],[3,19],[3,20],[4,20],[4,21],[5,21],[5,22],[6,22],[6,23],[7,23],[7,16],
+      [16,8],[17,8],[18,9],[19,10],[20,10],[21,11],[22,12],[23,13]
+    ];
+    crackEdges.forEach(([u, v], idx) => link(36 + u, 36 + v, idx % 2 === 0 ? 1 : 2));
+    // Golden Kintsugi Vein (描金金缮主脉)
+    var kPath = [16, 13, 8, 14, 15, 10, 20];
+    for (var k = 0; k < kPath.length - 1; k++) {
+      link(36 + kPath[k], 36 + kPath[k + 1], 4);
+      link(36 + kPath[k], 36 + kPath[k + 1], 5);
+    }
+
+  } else if (patId === 'leiwen') {
+    // 7. 商周青铜云雷回纹: 4 True Squared 90°-Cornered Greek-Key / Chinese Meander Spirals (方形回纹)!
+    var qOffsets = [[-0.42, -0.42], [0.42, -0.42], [0.42, 0.42], [-0.42, 0.42]];
+    var spiralLocal = [
+      [-0.28,-0.28],[0.28,-0.28],[0.28,0.28],[-0.28,0.28],[-0.28,-0.18],[0.18,-0.18],
+      [0.18,0.18],[-0.18,0.18],[-0.18,-0.08],[0.08,-0.08],[0.08,0.08],[-0.08,0.08],[-0.08,0.00],[0.00,0.00]
+    ];
+    qOffsets.forEach(([ox, oy], q) => {
+      var bL = 36 + q * 14;
+      spiralLocal.forEach(([lx, ly], k) => {
+        pts[bL + k] = { rx: ox + lx, ry: oy + ly };
+        if (k > 0) link(bL + k - 1, bL + k, q % 2 === 0 ? 5 : 4);
+      });
+    });
+    // Outer Squared Frame connecting the 4 Meander Spirals
+    link(36, 50 + 1, 5); link(50 + 1, 64 + 2, 5); link(64 + 2, 78 + 3, 5); link(78 + 3, 36, 5);
+  }
+
+  return { pegs: pts, stitches: stitches };
+}
+
+var CURRENT_STENCIL_STITCHES = [];
+function generatePatternStitches(patId) {
+  var geo = buildChinesePatternGeometry(patId);
+  for (var i = 0; i < geo.pegs.length; i++) {
+    setPegNorm(i, geo.pegs[i].rx, geo.pegs[i].ry);
+  }
+  CURRENT_STENCIL_STITCHES = geo.stitches || [];
+  return geo.stitches;
+}
+
+function findStencilPartnerPeg(pegId) {
+  // Find an un-stitched stencil edge connected to pegId first
+  for (var i = 0; i < CURRENT_STENCIL_STITCHES.length; i++) {
+    var u = CURRENT_STENCIL_STITCHES[i][0], v = CURRENT_STENCIL_STITCHES[i][1];
+    if (u === pegId && !hasThreadBetween(u, v)) return v;
+    if (v === pegId && !hasThreadBetween(u, v)) return u;
+  }
+  // Otherwise pick the nearest harmonic neighbor peg at a musical chord distance
+  var p = PEGS[pegId];
+  if (!p) return (pegId + 7) % 36;
+  var bestId = (pegId + 7) % 36, bestScore = 999;
+  for (var j = 0; j < PEGS.length; j++) {
+    if (j === pegId || hasThreadBetween(pegId, j)) continue;
+    var d = Math.hypot(p.nx - PEGS[j].nx, p.ny - PEGS[j].ny);
+    if (d > 0.14 && d < 0.42 && Math.abs(d - 0.24) < bestScore) {
+      bestScore = Math.abs(d - 0.24);
+      bestId = j;
+    }
+  }
+  return bestId;
+}
+var THREADS = [];
+var loomImage = null, loomBackup = null, imageThreshold = 0.55, imageInvert = false;
+var imageColorMap = true, densityThreshold = 0.12;
+var KNOTS = [];
+var SILK_PARTICLES = [];
+
+var state = {
+  activeSpool: 0,
+  symmetry: 8,
+  scaleIdx: 0,
+  isPlaying: true,
+  radarAngle: 0.0,
+  lastPegId: -1,
+  needleX: 0.5,
+  needleY: 0.5,
+  needleAngle: 0.0,
+  activePatternId: 'dunhuang',
+  phraseStep: 0,
+  genStep: 0
+};
+
+var shapeMetrics = {
+  avgLen: 0.42,
+  polygonType: '敦煌藻井莲花 · 盛唐八音交响'
+};
+
+function segmentsIntersectPoint(x1, y1, x2, y2, x3, y3, x4, y4) {
+  var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 1e-6) return null;
+  var t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  var u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  if (t > 0.06 && t < 0.94 && u > 0.06 && u < 0.94) {
+    return { nx: x1 + t * (x2 - x1), ny: y1 + t * (y2 - y1), glow: 0 };
+  }
+  return null;
+}
+
+function recomputeKnotsAndGeometry() {
+  KNOTS = [];
+  for (var i = 0; i < THREADS.length; i++) {
+    var a1 = PEGS[THREADS[i].p1], a2 = PEGS[THREADS[i].p2];
+    if (!a1 || !a2) continue;
+    for (var j = i + 1; j < THREADS.length; j++) {
+      var b1 = PEGS[THREADS[j].p1], b2 = PEGS[THREADS[j].p2];
+      if (!b1 || !b2) continue;
+      var pt = segmentsIntersectPoint(a1.nx, a1.ny, a2.nx, a2.ny, b1.nx, b1.ny, b2.nx, b2.ny);
+      if (pt && KNOTS.length < 220) {
+        pt.colorId = THREADS[i].colorId;
+        pt.colorId2 = THREADS[j].colorId;
+        pt.len = (THREADS[i].len + THREADS[j].len) * 0.5;
+        pt.p1 = THREADS[i].p1;
+        pt.p2 = THREADS[i].p2;
+        KNOTS.push(pt);
+      }
+    }
+  }
+  if (THREADS.length === 0) {
+    shapeMetrics.polygonType = '素帛待绣 (点击针孔或右侧非遗纹样即可织锦抚琴)';
+    return;
+  }
+  var patTitles = {
+    dunhuang: '敦煌莫高窟藻井莲花 · 盛唐八音交响',
+    ruyi:     '故宫宋锦四合如意云纹 · 江南丝竹合奏',
+    bagua:    '太极阴阳双鱼八卦图 · 天地十二律吕交响',
+    panchang: '吉祥盘长中国结 · 丝竹管弦齐鸣',
+    baoxiang: '盛唐联珠宝相牡丹团窠 · 霓裳羽衣曲',
+    crackle:  '宋代汝窑开片冰裂金缮 · 古琴编钟雅集',
+    leiwen:   '商周青铜云雷回纹 · 曾侯乙编钟大乐'
+  };
+  shapeMetrics.polygonType = patTitles[state.activePatternId] || '锦瑟八音自创纹样 · 丝竹合奏';
+}
+
+function addSingleThread(p1Id, p2Id, colorId) {
+  if (p1Id === p2Id || p1Id < 0 || p2Id < 0 || p1Id >= PEGS.length || p2Id >= PEGS.length) return;
+  for (var i = 0; i < THREADS.length; i++) {
+    if ((THREADS[i].p1 === p1Id && THREADS[i].p2 === p2Id) || (THREADS[i].p1 === p2Id && THREADS[i].p2 === p1Id)) {
+      THREADS[i].colorId = colorId;
+      THREADS[i].glow = 1.3;
+      return;
+    }
+  }
+  var a = PEGS[p1Id], b = PEGS[p2Id];
+  var len = Math.hypot(a.nx - b.nx, a.ny - b.ny);
+  var midAng = Math.atan2(((a.ny + b.ny) * 0.5) - 0.53, ((a.nx + b.nx) * 0.5) - 0.50);
+  THREADS.push({ p1: p1Id, p2: p2Id, colorId: colorId, len: len, angle: midAng, glow: 1.35, vibAmp: 11.0 });
+}
+
+function findOrCreatePegAtNorm(nx, ny) {
+  var bestId = -1, bestDist = 999;
+  for (var i = 0; i < PEGS.length; i++) {
+    var d = Math.hypot(nx - PEGS[i].nx, ny - PEGS[i].ny);
+    if (d < bestDist) { bestDist = d; bestId = i; }
+  }
+  if (bestDist < 0.028) return bestId;
+  // Dynamically create a peg at the exact clicked position inside the hoop so ANY click inside the hoop connects a line!
+  var rad = 0.355;
+  var rx = (nx - 0.50) / (rad * (900 / 1200));
+  var ry = (ny - 0.53) / rad;
+  var newId = PEGS.length;
+  var ang = Math.atan2(ry, rx);
+  PEGS.push({
+    id: newId, ring: 2, idxInRing: newId, countInRing: 1,
+    angle: ang, rx: rx, ry: ry, nx: nx, ny: ny, glow: 1.4
+  });
+  return newId;
+}
+
+function findPegNearRxRy(rx, ry) {
+  var rad = 0.355;
+  var nx = 0.50 + rx * rad * (900 / 1200);
+  var ny = 0.53 + ry * rad;
+  return findOrCreatePegAtNorm(nx, ny);
+}
+
+function addSymmetricStitch(p1Id, p2Id, colorId) {
+  var p1 = PEGS[p1Id], p2 = PEGS[p2Id];
+  if (!p1 || !p2) return;
+  var sym = state.symmetry || 1;
+  var useColor = (colorId !== undefined) ? colorId : state.activeSpool;
+  addSingleThread(p1Id, p2Id, useColor);
+  for (var s = 1; s < sym; s++) {
+    var theta = (s / sym) * Math.PI * 2;
+    var cosT = Math.cos(theta), sinT = Math.sin(theta);
+    var r1x = p1.rx * cosT - p1.ry * sinT;
+    var r1y = p1.rx * sinT + p1.ry * cosT;
+    var r2x = p2.rx * cosT - p2.ry * sinT;
+    var r2y = p2.rx * sinT + p2.ry * cosT;
+    var id1 = (p1.ring === 0) ? ringPegId(0, p1.idxInRing + Math.round((s / sym) * 36)) : findPegNearRxRy(r1x, r1y);
+    var id2 = (p2.ring === 0) ? ringPegId(0, p2.idxInRing + Math.round((s / sym) * 36)) : findPegNearRxRy(r2x, r2y);
+    addSingleThread(id1, id2, useColor);
+  }
+  recomputeKnotsAndGeometry();
+  saveLoomState();
+}
+
+// Additively weave a complementary geometric layer for instrument `spoolId` WITHOUT removing existing instruments!
+function hasThreadBetween(p1Id, p2Id) {
+  for (var i = 0; i < THREADS.length; i++) {
+    if ((THREADS[i].p1 === p1Id && THREADS[i].p2 === p2Id) || (THREADS[i].p1 === p2Id && THREADS[i].p2 === p1Id)) return true;
+  }
+  return false;
+}
+
+function addInstrumentLayerToHoop(spoolId) {
+  var added = 0;
+  var stepOuter = 5 + (spoolId % 7) * 2;
+  // 1) Weave 12 symmetric outer-to-outer harmonic chords unique to  without overwriting any existing thread!
+  for (var k = 0; k < 12; k++) {
+    var aId = (k * 3 + spoolId) % 36;
+    var bId = (aId + stepOuter) % 36;
+    if (!hasThreadBetween(aId, bId)) {
+      addSingleThread(aId, bId, spoolId);
+      added++;
+    }
+  }
+  // 2) Weave 8 inner-to-outer silk brocade bridges unique to  without overwriting any existing thread!
+  for (var m = 0; m < 8; m++) {
+    var oId = (m * 4 + spoolId * 3) % 36;
+    var iId = 36 + ((m * 5 + spoolId * 4) % Math.max(1, PEGS.length - 36));
+    if (iId < PEGS.length && !hasThreadBetween(oId, iId)) {
+      addSingleThread(oId, iId, spoolId);
+      added++;
+    }
+  }
+  recomputeKnotsAndGeometry();
+  saveLoomState();
+  return added;
+}
+
+function getActiveInstrumentSet() {
+  var set = [];
+  for (var i = 0; i < THREADS.length; i++) {
+    var c = THREADS[i].colorId % 8;
+    if (set.indexOf(c) === -1) set.push(c);
+  }
+  if (set.length === 0) set.push(state.activeSpool);
+  return set;
+}
+
+function weavePresetPattern(patId) {
+  if (patId === 'clear') {
+    THREADS = []; KNOTS = []; state.lastPegId = -1;
+    state.activePatternId = 'clear';
+    initBasePegs();
+    recomputeKnotsAndGeometry(); saveLoomState(); return;
+  }
+  // Preserve the set of instruments currently active on the hoop (or use state.activeSpool if hoop was empty)!
+  var activeInsts = getActiveInstrumentSet();
+  THREADS = []; KNOTS = []; state.lastPegId = -1;
+  state.activePatternId = patId;
+  var patScaleMap = { dunhuang: 3, ruyi: 0, bagua: 2, panchang: 1, baoxiang: 3, crackle: 0, leiwen: 2 };
+  if (patScaleMap[patId] !== undefined) state.scaleIdx = patScaleMap[patId];
+
+  var stitches = generatePatternStitches(patId);
+  stitches.forEach(([p1, p2, col], idx) => {
+    var chosenCol = activeInsts[idx % activeInsts.length];
+    addSingleThread(p1, p2, chosenCol);
+  });
+  recomputeKnotsAndGeometry();
+  saveLoomState();
+}
+
+function saveLoomState() {
+  var payload = JSON.stringify({ threads: THREADS.slice(-180), scaleIdx: state.scaleIdx, sym: state.symmetry, pat: state.activePatternId });
+  try { localStorage.setItem('ThreadWeave_V21_ContourPattern', payload); } catch(e){}
+}
+
+function loadLoomState() {
+  try {
+    var raw = localStorage.getItem('ThreadWeave_V19_Pattern');
+    if (raw) {
+      var p = JSON.parse(raw);
+      if (p.threads && p.threads.length > 0) {
+        THREADS = p.threads;
+        state.scaleIdx = p.scaleIdx || 0;
+        state.symmetry = p.sym || 8;
+        state.activePatternId = p.pat || 'dunhuang';
+        recomputeKnotsAndGeometry();
+        return true;
+      }
+    }
+  } catch(e){}
+  return false;
+}
+
+// ============================================================================
+// Engine #4: 4-Part Chinese Classical Orchestra ("Jiangnan Sizhu & Court Ensemble")
+// ============================================================================
+
+
+var audioCtx = null, masterGain = null;
+var CHINESE_BANK = {};
+
+function buildChineseTraditionalSamples(ctx) {
+  var sr = ctx.sampleRate, f0 = 261.63;
+
+  // 3: 紫檀·二胡悲吟 (Warm Bowed Erhu with Python-Skin Formant Resonance & Delayed Rolling Vibrato!)
+  var lenEr = Math.floor(sr * 1.65);
+  var bufEr = ctx.createBuffer(2, lenEr, sr);
+  var eL = bufEr.getChannelData(0), eR = bufEr.getChannelData(1);
+  var ph = 0;
+  for (var i = 0; i < lenEr; i++) {
+    var t = i / sr;
+    var env = Math.pow(Math.sin(Math.PI * Math.pow(t / 1.65, 0.55)), 1.15);
+    // Expressive sliding entry (滑音) + delayed rolling vibrato (压揉)
+    var slide = 1.0 - 0.055 * Math.exp(-t * 14.0);
+    var vib = (t > 0.15 ? Math.min(1, (t - 0.15) * 3) : 0) * Math.sin(2 * Math.PI * 5.6 * t) * 0.014;
+    ph += (2 * Math.PI * f0 * slide * (1 + vib)) / sr;
+    var sigL = 0, sigR = 0;
+    var formants = [1.0, 0.85, 0.65, 0.95, 0.45, 0.25, 0.15, 0.08];
+    for (var h = 1; h <= 8; h++) {
+      sigL += formants[h - 1] * Math.sin(ph * h + h * 0.2);
+      sigR += formants[h - 1] * Math.sin(ph * h + h * 0.5);
+    }
+    eL[i] = Math.tanh(sigL * env * 0.26);
+    eR[i] = Math.tanh(sigR * env * 0.26);
+  }
+  CHINESE_BANK['erhu'] = { buf: bufEr, base: f0 };
+
+  // 4: 明黄·昆曲竹笛 (Pure Bamboo Flute with Grace-Note Trill 打音 & Subtle Dimo Shimmer!)
+  var lenDz = Math.floor(sr * 1.35);
+  var bufDz = ctx.createBuffer(2, lenDz, sr);
+  var dL = bufDz.getChannelData(0), dR = bufDz.getChannelData(1), phD = 0;
+  for (var i = 0; i < lenDz; i++) {
+    var t = i / sr;
+    var env = (1 - Math.exp(-t * 45)) * Math.exp(-t * 1.9);
+    var grace = (t < 0.045) ? 1.122 : ((t > 0.09 && t < 0.13) ? 1.122 : 1.0);
+    var vibD = Math.sin(2 * Math.PI * 5.8 * t) * 0.008;
+    phD += (2 * Math.PI * f0 * grace * (1 + vibD)) / sr;
+    var breath = (Math.random() * 2 - 1) * Math.exp(-t * 18) * 0.08;
+    var flute = Math.sin(phD) * 0.65 + Math.sin(phD * 2) * 0.24 + Math.sin(phD * 3) * 0.15 + Math.sin(phD * 4) * 0.06 + breath;
+    dL[i] = Math.tanh(flute * env * 0.38);
+    dR[i] = Math.tanh((flute * 0.96 + Math.sin(phD * 2 + 0.6) * 0.12) * env * 0.38);
+  }
+  CHINESE_BANK['dizi'] = { buf: bufDz, base: f0 };
+
+  // 5: 鎏金·曾侯乙编钟 (6-Partial Sui-County Dual-Tone Bronze Bell Modal Synthesis!)
+  var lenBz = Math.floor(sr * 2.6);
+  var bufBz = ctx.createBuffer(2, lenBz, sr);
+  var bL = bufBz.getChannelData(0), bR = bufBz.getChannelData(1);
+  var ratios = [1.0, 1.1892, 2.24, 2.92, 3.65, 4.82];
+  var amps   = [0.45, 0.35, 0.25, 0.18, 0.12, 0.08];
+  for (var i = 0; i < lenBz; i++) {
+    var t = i / sr;
+    var strike = Math.sin(2 * Math.PI * f0 * 7.5 * t) * Math.exp(-t * 55) * 0.25;
+    var sL = strike, sR = strike;
+    for (var k = 0; k < 6; k++) {
+      var pEnv = (1 - Math.exp(-t * 180)) * Math.exp(-t * (1.1 + k * 0.75));
+      sL += amps[k] * Math.sin(2 * Math.PI * f0 * ratios[k] * 0.9995 * t + k * 0.4) * pEnv;
+      sR += amps[k] * Math.sin(2 * Math.PI * f0 * ratios[k] * 1.0005 * t + k * 0.9) * pEnv;
+    }
+    bL[i] = Math.tanh(sL * 0.42);
+    bR[i] = Math.tanh(sR * 0.42);
+  }
+  CHINESE_BANK['bianzhong'] = { buf: bufBz, base: f0 };
+
+  // 6: 胭脂·凤翼笙簧 (36-Reed Sheng Traditional 5th + Octave Warm Reed Harmony!)
+  var lenSh = Math.floor(sr * 1.5);
+  var bufSh = ctx.createBuffer(2, lenSh, sr);
+  var sL = bufSh.getChannelData(0), sR = bufSh.getChannelData(1);
+  var chordRatios = [1.0, 1.4983, 2.0];
+  for (var i = 0; i < lenSh; i++) {
+    var t = i / sr;
+    var env = Math.sin(Math.PI * Math.pow(t / 1.5, 0.65)) ** 1.2;
+    var vL = 0, vR = 0;
+    chordRatios.forEach((cr, idx) => {
+      var fc = f0 * cr;
+      vL += (Math.sin(2 * Math.PI * fc * 0.999 * t) + 0.35 * Math.sin(2 * Math.PI * fc * 2 * t) + 0.15 * Math.sin(2 * Math.PI * fc * 3 * t)) * (0.28 / (idx * 0.3 + 1));
+      vR += (Math.sin(2 * Math.PI * fc * 1.001 * t + 0.5) + 0.35 * Math.sin(2 * Math.PI * fc * 2 * t + 0.3) + 0.15 * Math.sin(2 * Math.PI * fc * 3 * t)) * (0.28 / (idx * 0.3 + 1));
+    });
+    sL[i] = Math.tanh(vL * env * 0.45);
+    sR[i] = Math.tanh(vR * env * 0.45);
+  }
+  CHINESE_BANK['sheng'] = { buf: bufSh, base: f0 };
+}
+
+function initAudio() {
+  if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AC({ sampleRate: 48000 });
+  buildChineseTraditionalSamples(audioCtx); 
+  var comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.ratio.value = 3.2;
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.88;
+
+  // 100% Dry Close-Mic Acoustic Chamber Chain (Zero Artificial Hall Reverb!)
+  // Natural wooden soundboard & bamboo tube body resonance only!
+  var bodyWarmth = audioCtx.createBiquadFilter();
+  bodyWarmth.type = 'peaking';
+  bodyWarmth.frequency.value = 420;
+  bodyWarmth.Q.value = 1.1;
+  bodyWarmth.gain.value = 2.5;
+  masterGain.connect(bodyWarmth);
+  bodyWarmth.connect(comp);
+
+  // Short wooden-body resonance (0.32 s), parallel and subtle — not a hall reverb.
+  var bodyIRLen = Math.floor(audioCtx.sampleRate * 0.32);
+  var bodyIR = audioCtx.createBuffer(2, bodyIRLen, audioCtx.sampleRate);
+  for (var ch = 0; ch < 2; ch++) {
+    var d = bodyIR.getChannelData(ch);
+    for (var i = 0; i < bodyIRLen; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bodyIRLen, 3.2) * 0.5;
+    }
+  }
+  bodyConv = audioCtx.createConvolver(); bodyConv.buffer = bodyIR;
+  bodySend = audioCtx.createGain(); bodySend.gain.value = 0.09;
+  masterGain.connect(bodyConv); bodyConv.connect(bodySend); bodySend.connect(comp);
+
+  comp.connect(audioCtx.destination);
+  ensureIOGraph(audioCtx, comp);
+}
+
+function createPluckedSilkBuffer(ctx, freq, duration, damping, pickBrightness, bodyResonance) {
+  var sr = ctx.sampleRate;
+  var len = Math.floor(sr * duration);
+  var buf = ctx.createBuffer(1, len, sr);
+  var out = buf.getChannelData(0);
+  var N = Math.max(4, Math.round(sr / freq));
+  var ring = new Float32Array(N);
+  var lp = 0, alpha = pickBrightness || 0.65;
+  for (var i = 0; i < N; i++) {
+    lp = (1 - alpha) * lp + alpha * (Math.random() * 2 - 1);
+    var harm = Math.sin(2 * Math.PI * i / N) * 0.48 + Math.sin(4 * Math.PI * i / N) * 0.26 + Math.sin(6 * Math.PI * i / N) * 0.14;
+    ring[i] = (lp * 0.52 + harm * 0.48) * Math.sin(Math.PI * i / N);
+  }
+  var ptr = 0, d = damping || 0.16, bodyState = 0;
+  for (var i = 0; i < len; i++) {
+    var cur = ring[ptr], nxt = ring[(ptr + 1) % N];
+    bodyState = 0.92 * bodyState + 0.08 * cur;
+    out[i] = cur * 0.82 + bodyState * (bodyResonance || 0.38);
+    ring[ptr] = 0.9984 * ((1 - d) * cur + d * nxt);
+    ptr = (ptr + 1) % N;
+  }
+  return buf;
+}
+
+function spawnSilkParticles(p1, p2, hex) {
+  if (!p1 || !p2) return;
+  for (var k = 0; k < 6; k++) {
+    var t = 0.12 + Math.random() * 0.76;
+    SILK_PARTICLES.push({
+      nx: p1.nx + (p2.nx - p1.nx) * t,
+      ny: p1.ny + (p2.ny - p1.ny) * t,
+      vx: (Math.random() - 0.5) * 0.0045,
+      vy: -0.0012 - Math.random() * 0.0035,
+      life: 1.0,
+      hex: hex
+    });
+  }
+  if (SILK_PARTICLES.length > 100) SILK_PARTICLES.splice(0, SILK_PARTICLES.length - 100);
+}
+
+
+// ============================================================================
+// PURE SINGLE-NOTE REAL CHINESE INSTRUMENT PCM ENGINE (v23.0)
+// 100% Deterministic Visual-to-Audio Mapping · Zero Unmapped Ghost Instruments
+// ============================================================================
+var DLS_W4_DATA = {"guzheng": {"name": "TKOTO67", "sr": 22050, "bits": 8, "unity": 67, "fine": -3, "lstart": 4574, "llen": 337, "b64": "gH59fHx9fX18foOIiIuSh4GPjW1gXldrhYB4k5FsbYCLkpKFhoNqZ36MnKiZmqKSXFhudoqjqpeFZU1eb4V9hJqijHl+gmtlgpl9UktpjpN4ZGiJimhcfpORl6iqknp1h5iOgY6ZoJOCgpGOg4eGdmVUS1eCjYOSrKmNcGVoYWCHsp1eMTllj5Z3dIuHY2J8ho2frKylj36KjHZ5k56ZjH6Im4t1e31uXVFBYY6RgZSmmIRrbX19dIq4qGAgESlXeHqUtamIiJGLh5OcqaaQip+YdG6Cko19b36UhoCIhWtfUEJjkpGGmqKYj4Z6enRmgqyeVyQZMmeDg5axp5KKiHt8g5SsrZiToo9tZ3aAgYJ5hpGGhJGFa11IOWGUmJGboaChlH+CeGWBsKNiMBgnU3F7lJ6QgoeCeXh7ka+zmpyulnVufoeJf3WDiHV2h4NuYUxEbZKcoq6rpaqVhop4Y4Cum2Y8IB06WHeMjH2BioF5eISas66YoqmOcHKCjY+BeIB+cXWHiHZkTFB4maKss6eqr5iHjH5qhqyZaT0ZECZNeI6EdoGEeGxpdJKyqpmmr5J0e4+Yk4J6g4d5coWMe2JLUXWTnq2zrbW2npKVfWSBpplsQiISGT9yiXdue4F4al5pkK+knbK+nHd9k5qTgXV+iXtxhpSCYElWd4uYrLGstbWjmpl+a4SilG1KLxMROnaIcGh3fHNgVWiYsqahs76Xc3mMkZmVgYCMf3F7in9hR1R7lZedoaq1rJebo4dxiaihe1k/GgQpb4VvZ3J/f2tSYZGopKK1u5Vxe4+TmZR+f5CDbHeJgGBGTnOQlpeZo7Gun6OkinqTraJ/YkYfCC1uhXVucnx+aExfjqihnbG4km12ipKZk31+lIZsdIqCYklNbomTlZeeqKaiqamQgJOrpohrUCcRMW+Fem9vdnplSliHpaKhsrmTaGl/j5mXf3+Xi29vhH9jSEtsipSVl5+lop+pp5CFlaenknhYMhczaH94b3J6f2hNWYSbnp+tspJraoCPlpN5eo6NcW+Ch29STGiHk5KSmZ+gpa6mj4aRoqmcflw3HzhmfHZ1eX9+aFFbfZSenKWvlmxifI+bk3t0h456coCFcVdNZYKQkJGampumsKOQiYuYpaOHYTknQG19cm51goFrVFx1kaKgo6eXcGR4i5WSgnWBjH52g4ZzWVBgfI+OkJWWmqmwnpGMiI+hpYtiPCtDbXxzcHqCfWxdX26Mo6ikpZl0ZXeLkpOId32JgnmAgHJgVlx5jY6Oj46SpKqelI2Dh5+pj2E7L0lvfHJwe4F+b2NgbYuosqmlm3hldIaLkYt6foqDf4aFcl9SVXSNjYqLjJCgpp6Wjn9+maiSYzovTHSBdHR/hIByZFxlf6O3saqbemd2h4uPinmAjIeDioVxZVlUboqOh4eIjZqgnJaOfXyYq5loOSxKd4Bxcn6GhnloXWN4nrawo5Z9bXuKi4+Nfn6GhYWPhXFpXlZri5CEhoiMkpmbm5J8dpGpnG48KEd3gnd2fYKFfm1hYXCXubiikHltfIqJi4uEgoeDhpSMc2piV2mNkIGBhYmNlZiblH10jaafdD0kRHSFfXp8gISBbWFfaY65v6ePd2p5iouJi4iHi4KClI50amVabJKVhH2EiI2SlZuWfHKIoZ54Qic9aoKDfnx+hoVyZV9hgrbGrpJ4aXeKiYOFhYiPiIiYkXdtaV1ukZiHf4SHi42RmpR5bYKbnXxJKTdhgIiDf36Hh3VnX1p5s8mxkndpeI6LgYGFjZOGhZeWfnFnW22SnIuAgISKi4+ZlH1xf5WZfVIwNFZ4h4d/fIOGeGtjWnGsy7uZeWVzjY+Ef36JlIqFkpN/dGldbI+ek4aAhIqNkpiTfXR+k5V9VDEvS3KKjIJ8hYx+bWBWaqPKwJ15ZXKLkYV7doSUjoaRlIV3amBtjaCZiX+CiIyRl459eIOTkn1ZOzFFaoaPh36EjYJuX1ZkmcnGonllboiSinxwfpaViY6RhXhsYWaDm5yLf4GJjZOZjX16iJSSfl9BMkBhgI6LfoKQiXJgVl6NwcmmfmpvhJCOfWx1kpmLio2EeG9kZnyZoJCAfoaLl5yLen2Nl5J+Y0c2Plt4jZCCgJGRdmFXXIW5yaqBam1+jJCCbG+NnJGJi4J3cWloeJWilYB8g4mYnIp3fZCalYBmTDpAV3CJkoaAkJV6YlZbfrHGq4Nsb3qIkYZsaoiemY6JgHZxbWpyjqScgnp/iJeciXR7kZ2Yg2hPPEJWbIOQiYKRmIFlVlp4qcGthW5weYOPiXFpgZ6glIh9c3BxbnGHo6KIenyGlZuIdHiPnZmFbFJBRFVnfI2OhpGaiWhWWXShvKyHcXJ5gYyJdWh4lqWci31ycHVzcX+doox6eYSVmop0dIibnYtxVEJFVmZ1iI+KkZuPblhacpy4rYlyc3h/iIl6aXCOp6SQfnFuc3RwepmkkXx4gpGZjHZxgZeekXVYRUZYZ2+BjY6TnZV0W1xzmbSsi3Vyd32Dh39vbYWip5V/b2xzenV4kJ+RfXiBj5aMenJ8kZ2WfVxFRFhnbXyMkZSemHleXHOXs6uLdXJ5f4KDfnJsfp+qm4Jwa3J7dneNnZJ/eX+MlY9+c3mLm5qCYUdEWGZqc4aPlaCcf2Nfc5OxrI10cnp/gH99d296l6mehnJqcn56eImZkYB6foiRj4F3eYeXnIhmR0FUZmpwg5CXoZ6DZWFykK6tjnVzeoCBfXl3cnmSp6KMeGxwfXt4hpWQg31/hY6Ognh4gJKej25MP1BnbW58i5ahn4VoZHKNq62Pd3F4goV9dnd1eY2jo5F8bW98f3uFkIyCgIGEi4yBeXh8jZuSdFNBS2JtbXiJlaCgh21odI2qrJF3bnOAiYF2dXd6ip+ilYNzcHp/fYSNioOCgYKHiYJ7d3mJmJN5W0ZIXm1vdIOToaOMc2t0iqerk3lub32Kg3RyeH6NnqGWh3dxd3x/hYuJg4KCgoWGgH15eISVk31iS0daa29zf4+goo51bnWKpauWe25te4mFdW90fYybnpWKfXV3fYCFioiEg4ODhoV/fXl2f5CRgGdPR1Zob3N8jZ6kknpxd4qjrJp/bWp4h4R0bHB7jJydlYuCenh9gYaJiISEhIOEg398eXZ9i5CDbFNIU2Vtc36Mm6GUfnN4iqCrnoVuZ3SEhHZsbnmMm5yTioR9en2Dh4mJhYODgoODgH17en6IjYRwV0lRYmpwfYyYnZOBdXqLn6mhjHJlcIOFdmxsd4mYmpKIgoB+f4OHiYmHhIKDg4KBfXp7foWJhXVeTlFfaGx5ipeYkYN4e4yfqKKQeGdsf4V4a2l0hpWak4iAf4GBg4aJiYiGg4OEg4J+e3uAhYaDd2NTUV1nbHWHlpaNg3t9i56po5N9bGl4hHxsZ3OFk5mUin99goSDhoiIiIiEgoSEg4B8en+GhoF3Z1hTWmRrcoOVmI2BfX+KnKikk4BybHOBf29mcIKRl5SLgHyChoaFh4iIiISBgoWEgHx5fYWHg3dqXVZZYmtyf5GYjn98gIqaqKaUgXVucXt/dGhugJCWlIyBfH+Gh4SEh4iIhoB/hISAfHl7gomFeW1iWllganJ9jZiRgHp/ipmoqJeCdnFxdnx2a219j5aUjIJ9foaJhoOGiIeEf32Ag4F9enqAiYh6bWVfXWBocn2KlZKCd3uImKeqm4V3dHN0d3ZvbXmMlpWMg31/hYqJhISHhoN+fH2Cg4B8eX2HiX1uZWFfYWdxfIaQk4h5eYaXpqqeiXh1d3Vzc3FudoeVlYyCfn+EiouGhYiJhH98e4CEgXx4eoOIgHBlYWBhZnF9hoyRjH54g5alqqGNeXV4dnBvcXB0g5OVjIJ+gYWKjImHiouFf3x5fIKDfXh5f4aEdGVgYWNncH2GiY6Og3l/k6Spo5B8dHd3b2pucnWAkJWNg3+Ch4qMi4mKjIiBfXp7gIN+eHh8g4R5aWBgY2dve4WIi4yGfHyOoamklYJ2dnhxaGlxdn6Mk46Ef4OIiouMi4qLiYN9enp+g4B6eHuBhH1sX11iZ296hIiJiol/fImeqKWYh3p3eXVqZm12foiQjoR/goiLiYuNjIuJhH17e36Dgnx4eX6BfnBfWl5nb3mCh4eHiIR/hpmnppuMfnd3dm1laXaAh46NhYCBiIuJiY2PjYuHf3p7fYGCfXd3e35+dGNYWmVweYCGh4WGhoOFlaWonpCCeHV1cGdndIKJjYyGgICHi4mJjZGPjIiAeXl8f4J/eXd6fX12Z1hXYnB5f4SGhYSGhoWQoKegk4d8dXVyamZwgIqMioaAgIaKioiLkJGNiIF6eHx/gYB7d3h7fHhsW1Vfbnp/g4aFgoSGh42apKKWi4B3dHNuaGx8iYyIhYGChYqLiYmPk5CKg3x4e3+Af3x3d3p7eXBgVltreX+ChYaDg4aKjZWgopmNg3lzcnFranaHjIiEgoOFiYuKiY2TkouEfXh6fn9+fHh2eXt5cmVZWmh4gIKDhoWDhYuOkpugm5CFe3NwcW5rc4SOioOBg4WIi4qJi5KUjoR9eHl9f357eHZ4fHpyZ1xZZXWBg4OFhoODio+RlpyckoZ9dHBwcG1wf4yMhIGDhYiKjIqLkJWRh314eHx/fXp4dnh7enNpX1phcX+EhIWHhIKHj5OUmZuUiH52cG9xcHF6iI2GgoOHiYuMi4uPlJOJfnh4en5+eXZ2d3p6c2piXWBufYWFhYaFg4WOlJSWmZaLf3dxbnByc3eDjIqEg4eJi4yMjI6TlI2AeXd5fX55dXR2eXp0a2RgYWt6hIaFhYaEhIuUlpWXlo2BeHJubnJ1d3+JjIaDhomLi4yNjpGUj4N6d3l8fnp0c3Z5eXVsZGJjaXWCh4eGhoaEiJGXlZSVj4N6dG9tcXZ4e4WMiYSFiYuLi42PkZKQh3x4eXt9e3RxdXl6dm1lYmRpcX6GiIaGh4aHj5eXlJOQhnx1cW1vdnp6gImKhoSHioqLjY+RkZCKf3l5e3x7dXF0eHl2bmZiZWlveYOIiIeHiIiNlpqWko+Jfndybm50ent8hIqIhIaJi4uMkJKSkIyDe3l7fHt2cnJ3eXZvZ2Jlam51f4eJiIiJiYuTmpmTjoqBeXNvbnF5fHt/h4mFhYiLi4yQkpKQjIZ+ent8endzcXV5dnBoY2Vqb3J7hImJiImKi5CZnJWOiYN6dHFvcHd9fX2DiYeEhoqLjI+Tk5CMiIF8e3x6d3RxdHd2cGlkY2lvcneAiIqJiYuMj5edmI+IhHx1cnFxdXx+fH+GiYaEiIuNj5OUkYyJhH58fHp3dHJydXZwaWRjaG9ydXyFioqJi42PlZybkYiDfndzcnJ0en9+fYOJiIWHio2PkpSSjYiGgX18e3d0cnJ0dXFqZWNmbXN1eYKJi4qKjY+TmZ2ViYJ+eHRzc3R4f4B9gIeJh4WJjI+SlJOOiYaDf3x7d3RycXJ0cmxmY2Vrc3V3foeMi4uNkJKXnJiLgX15dXN0dHd9gYB+hIqJhoiMj5KTlI+KhoWBfXt4dHJycXJybWdkZWlxdnd7hIuNi4yQk5aamY+Ce3l2dHR1dnuBgn+BiIqHh4qPkZOUkYuGhYN+e3h1cnJxcHBuaGVkaG92eHqBiY2NjJCTlZiZk4V7eHZ0dHZ3eoCDgYCFiomHiY6Rk5SSjYeFhIF8eXZzcnFwb25qZWRnbXR5en6GjY6Nj5OWlpiViHt2dnV0dnd5fYOEgIKIioiIjZGTlJKOiISEgn55d3RycXBubWtmZWdrc3l7fYOLjo6Pk5aWl5WMfnV0dXV2eHl8gYWCgIWKioiLkJSUk5CKhYODgHt3dXJxcG1sa2dlZmpweHx9gYiOkJCSlpeWlI6BdXJ0dXZ4enuAhYWBgoiLiYqPlJSTkIyGg4OBfHh1cnBwbWtqaGZmaW92fX+AhYyQkZKVmJaTj4V4cXJ1dnh7fH6DhoOAhYuLio6TlZSRjYiDgoJ+eXZzcG9ta2loZmZpbXR8gIGDio+Sk5WYl5KNhntxb3N2eHt9foKGhYKDiIyMjpKVlJGOiYSBgX97d3Nxbm1raGdnZmltc3qAgoSIjZGUlpiXlI2GfHNvcXV4e31/goWFhIOHi42OkZSUko6JhYGAf3x3dHFvbWtpZ2ZnaGxyeX+ChIeMkJOWl5eVjod+dW9wdHh6fH+ChIWEg4aKjY6QlJWSj4qGgoCAfXh0cm9ta2pnZmdoa3F4foGDh4yQkpWXl5WQiH92cG9zd3p8foGEhYSEhYmNjpCTlZOPi4eCgYB+eXRycG1ramhmZmhqb3d+gYOGi4+SlZeYlZGKgHdxb3J2enx9gYSFhISFiIyOkJOVlJCMh4OBgH56dXJwbmtqaWdmZ2pudX2BgoWKj5KUl5iWkYyDeHFwcnV5fH2Ag4WEg4WIi42QkpSUkY2IhIGAfnp2cnBvbGpoZ2Zmam50e4CChImOkpSWmJeSjIR6cm9ydXh7fX+ChYWDhIiLjY+SlJSRjomEgYB/e3dzcW5ta2hnZmZpbXN6gA=="}, "guzheng_hi": {"name": "KOTO_80", "sr": 22050, "bits": 8, "unity": 80, "fine": -36, "lstart": 1322, "llen": 26, "b64": "gH6AgYGCgYKCg4OGhYOFfV9dcYF0cGtrob3pt2AsbrDUtl5MbklPdJi/qoWSiUZPRlmQjKrFaUNqlsWyTmuVdYR1hqOie593MkVSdKmSkI9ibKS1vJdYiItjTWNpio2cwXAfHTJus72/nWJvvc7BcFKIk15Tb3qLbZO/dygSG2erxdGvX3e42NGLbI2BPVZrd3tjg6lqJRYpaa26xa13k87ixpp3j2IzWXR8dGGClVMUDytxq7PGrY6q5OXVqZ+rYTVLWmFfWISMRxIQJ3GUp72pk8b07eGxtqpaOE5PWVdah4QxDgcpd5amu6GV3/X13rS+q1U+TENQVVyRgDUaCSpti5q1j5/p/PzatsSkTz9HP1BTYZh2NxkNMHaIoauAo+P28M+3y6NZUlRIXFFojWYsEgY3fY2wooGu7PbszcPPkklLQT1PTG2FVyQRCEl9lLGdicD29+jQ1NuRVFM9O0FFaHxKJg4YXYmjsZOGwe3s39De2YRVSDItNT1qeE4tEitrlqyzj4vF5+DX0ejThFtKMCw3P2hqSCMSL3Kcs7iandPl2tPV6cd/WkglKjBBZWZEIxY0dpyztpyt5eze1NzlvXJYQSUsMkRhYDohFDp9pLq3mLPj5tfX4+q4b1g6JSw2RmpgOR4ONXaZu7qfvubi1NTd57BwVTgkNDxTc2I6HxU5cJS5taXE59fJy+Hgp3BdPiIsOF55XTcfFUN4l7Con83kz8TM49ujb2I7Jy04ZH1gORoTQ3WUq52j2OLMwdDi2ZZxaEE2Mztmfl44FhJIepemk6bW4cTC1eLOiHBhRDkyQmp7XzUSGVSAoaGQq9TUuMTY7s6KdFs+OTdMdoJiOBAZVYKgm5Ow1sSsuc/nxo13XEE6Nkt0f2I9GChfiZ2ZlbnXv6+5z+C9jHZYQj47T3V1WTgZL2iKmpeVwNa5rLnM2bWLd1hCPz1Ve3haOBw2a4aWkZvDzrKtvc7Sq4p7XkpEQFyAe1w6HUBug4yKnsbHp6u/0NCpiXhZSENEYoV7XTYcRHGEhISex8CiqsDT0qeKd1pLRUdqiXpfMR9JdIB9fp/GuJ2rvtPQqJB6XU5FRmuDeFotH011e3Z6oMKwoLLF2c+smH9eUUZPcoV3WCkiUXB2cHulvKKas8rax6ighGBNRVd6g3FTKCxXbm5pfKa1l5Syy9fBqaOIZk9KW3+Fck8nMVxuammDq66QlLLM1r6roYdmU01hgoRxSyY1W2dhaIerpoqUss7Vwa+jhWRTT2eGiHJJKz5eYFpniqmfi5q3ztG+saeFZVRSbYqIbUErQ11bVmiMpJaHm7nMzbu1qoZlVFd0j4hpPS5LX1ZSaI+ikYeguszKubisiGdUWXiQhWI3L05eU1JskJ+MhaC6zsq6uKuHZVRbe5CDXzc1U15OUW6RnYmIo73RzL65p4JjVVx9kIJdNzpVV0dRcJGXhYynwdDJvrumgWRVXoCPflc1PllRRVR0kpGDkK7Ez8a9vaeAYlNhg453TjJCWU5GWX2VjoGRr8PMw7++pH1eUGSGjXNKM0pbTkZbgJaMgJKtws7Gwr2gel1SZoWKc0o6UFxNR2GClYuClKu/yMTDupx2W1Nqh4pvSEFTWkpIZYWThoSYr8HFwsK5mnRYVHCKiGhIRlhYR0xriZCBgZavwMG+wLmadlhWcYqFY0hLXFZETm2KjX5/lq++w7/Bt5hzVlh1j4RiSU5dU0NOcIuMgIScsb7AvsG2mHBVV3WLfF1KUl1QQ1JzioyAhp6xvb6+v7WWb1ZaeYx7XUtSXFBDUnM="}, "pipa": {"name": "SHAMI65", "sr": 22050, "bits": 8, "unity": 68, "fine": -36, "lstart": 806, "llen": 52, "b64": "gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIB/f4GCgpKQTZRseYihlYt5mZBwfHI9BEeIxm9t48mMctbCO0JSnGVq1ItveIZoWkVWe2V+7tGdbzl3k1Zdm6TS+qeSgkxbbjZETyE1Ummhr7bu2pVyb4qhgnmopp2MQTgsNW9maJKunpl9fp6Sa2Z9kJSk6OGWb3hpWlU1PCwcZ5aQnsHDn3+ElYd4mKCipqGRYVQ+L151am6CeYqll6GVdWlueoyMrOHGpZmKV0FFQkYqPmh7eIqlwL2usKB4epCOlo6Hem9USk1bY2R8j5OVm5iEen96hI2KmL68ppiJa01RUF9MOU9iXn6ivdGypJ17cYuYmZqXgGNPSkdPYm+SmJuajoF0f4qIfnl9e4/BwbKgmXJOSEFiSjVLaHCSqru9p5uXinqGiY+SkohsV0VNYWNykZmUi4OEgYiVjXdxb3OWvcK4m4tyXk9RWD88Um9+lKKspZmcno+Oi4eLjI18a1hKVGB0hI6RkYqIi4qGfXNoaGuFsMTAtqGGaF9LWVlITGFqc4aWqKmno5eBgImFiJeTfW1jU1VbcYWLj5uaiX+AeHJpa3N4iK3Dvq+jhm9aUWZYRkphZ3eHm6aempqOhYeOk5WbjXRqXlBWZnqKj5GUinp+gXZzbW9ydo+1wL2yooRvVltnUUNTYmh3hJeXlqGgkIuPj4uQl456bFxZX2p6h4WJj4t/fH53dW1ven2XtL+4q5h6b1tfZ1NMVl9rcISTk5qbnJqYkpCQkJCBcGNYWGNxhYmKjpGKenl1cW5vdnaFpLvFt6eIcmJYZWZZUlllb3WFi42UnZ2cmJGOjJGUh3NfUldicYKFjJSTh4J+d2tpcHl+l6y1samVg3JlZ29jVlVaY2h3houUnaKdnJaPjY6SjX1sW1NbZneFho2TkYWBfXZraXF5fg=="}, "pipa_body": {"name": "NYLON70A", "sr": 22050, "bits": 8, "unity": 70, "fine": -1, "lstart": 2820, "llen": 520, "b64": "gICAfn19fHx7e3x9fXx6enp6enl6fH5+fX1+fn+AgoOCgYGBgoKBgICBgoODgX99fXx9fX18fHp5eHp+eXV6c3l1d3p8fX6HlZWYnI2LjYuLmpmhoqOamJyLkJKLkpeOi4mAbmptbF1MTlhFQlFXVlNAPD5ETF9xcYSDeXmAhZSjqq3DyrnCyMHCs6u2t6+dmJCGg395bFJQU1BSXGl1c2tmX1NUZF9qdnJsaGl1gpmhr9TW0+LZ19zHxsW9p4hvWEhJT1RBOT0+RUZLXm5samxnUFZXS05VTk1MW3KHnJuv09PY4dPc39nY0sq2l31kVE9WVUM5PEFJSk5eamphaVtJU11YY2llW1RhdY+iosXk4u/r3ePf3NjTz8CkhnFdWGJiTz82NDUzO0RVUVBYRzhJTUxdbHJlY2t4maGhwtPY6ePg5OLf297azrKXf2ZlbmhWQzc2Ly8sOEM8Q0czMUBFTVtqbF1dXHGVmqrH0+Ds6ujp6uXk5ubZvaWJcG90b2ROR0JAOzlKTURQSjMzOkNJU2ZkWlVNaoiOpr/P4ezt6u7r4uDh4dK5oYBjYGFkV0lCQUE5O09OTFpMOTM1OzpGVFBSRT9hd4SgtsjZ5+jr8O/o4uLfzbafe2RdY2ZbUEVGRTY9UUxWZFhHPkJDP09WWFlDQ2BziKG5ytzo6/L4+vPt7uvWw6eEaV9mZl9SRkhCMDxGRFJeU0E4Pjk8TE1XVT5AVGd9mbHD1+Dm7Pb69fD17d/QspFyaWpqY1NGSj0zPkJDUl1WQj0+N0BJTFtUQEBQYneUqcDT3uPr9vz39/rv59e9m35zc3NvWlJTQjtDQUVTYVlHRDw2P0FKWE89OkdTbIadtcfT2eDs8u3z8uzj1byYe3Ftcm1YVlNEREhHSllpXlFLPDo+PUxZUD47QExie5Wuwc3V2+rr6+/v6eHUvJh+b2p0allZUUZHSklJXWxiW09BQT4+TFlQQDs9R1pzjai8zNDd6uvs8PHs5NvDoIZxcHhrYF5US0pPS0thbWhkVEhGQT9MWVJFPj1FV22JobjGzdzn6+7x8+7p4smrjXR1eWxkXlVLS1BGSFxmaGNSSEU+PEpVT0M8OUBOZX+Ys7/J2OPp7fH07+/o0biVfH59c2xlW1BTVkpOXmhtZ1hPSkA+SlRPRz05O0ddc5CqtsLR3OHl7O3q7OLQuZN9fHpya2VaTlZVS1BcaHBqW1JLPz1JUU9HPjk4Q1Vph6GuvMvX3ODo5+jp39O6lH57eXJsaVpSWlZQU1xqdG5iW1FEQkxSUUlBOjdCUGSEnay6ydbZ4Obl6ejg2L2YgXt4cG9rWlVbWFNVXWx3cmhhVkdFTFRTTkc9O0NMYX+YqrjK1Nni5efs6eXfxKCIgHpydGxcWVxYVVRbanZza2VYSUVLUlFNRjs5PURYdI6fr8PM1N3e5Ojl5+LJpo2EeXN2bV9cXVpYVltrd3Vwa15PSU5UU1JJPz4+Q1RviJmsvsjS2dvi5eTo5M6rk4Z4dXdtYV1cW1dUWGl0dHJtYVJKTlFSUkg/PDo9S2Z9jqO0v8vP0trb3OHhzKqVhHRydGpgXFtaV1NXaHN2dXJnV1BTVFhXTkdDQEBMZXqNorK/y8/V293e5OfRs56JeHd3bmVgXl5bVVppdHh5eG1dVlZWW1lSS0dCQExidYmdrL3IzNPZ2tvj5tK3oop4dXRtZF9cXVlSV2RwdHd4bV5XVFZbWVJLSEI+Sl1vhZenucTK0djY2eTo1r+qkH96eHFpYmBhXFZZZXB1e31xY1tXWVxbVE5MQz5JWGp/j6GzvsTL0tHU4eXWw62TgHl2cGlhX19aVFZibHF5e3FlXFdZXFpTT0xCPUVRZHeHmau3vsfNy8/e4dbGsJWCenRwaWBfX1pUVmFqcXt9dWphXF1hX1dVUUdDR1FjdYWXqra9yM7K0N/i2sy2nIl9d3NrZGJiXVZYYmlyfH95bmReX2NgWllTSkVGUGFygpSmsrvIzMjP3eHb0LqgjX94c2tkYmFcVFZeZG55fXhuZF1eY19aWlNLRUVOXm59kKKuuMbKx87b4N3Uv6eShHx2bmdlZV9XWV9kbnl/e3JnXmFkYF1bVU5HRU1banmLnai1w8XCytbc3dTBq5WFfXZuZmRkXFZXW2BqdXx7c2ZdYWJeXFpUTUZDSFZkcYWWoK++wb/G0djb1MOumIh+d25mZmVdV1hbYGl1fX13aWFkZWJgXVlSSkVKVmNwhJSer77AwMfQ2d7YyrWfjoN7cWlpZ2BaWlxfaHR8gHprZGZmZGJfW1VMRkpVX26BkJqsu76/xM3X3drNuaSShn1xampnYFpZW11mcXmAemxkZGVkYl9bVU1GSVJban2Klai3u73BytXc2s+9qZaLgXRtbWpjXVxcXWZveYF8b2dlZmZkYV1YTkdKUVlpe4aSpbO5ur7H0dna0cCsmo+DdW1samNdW1lbYmp1f3tvZmNkZGNfXFZMREZLUmJ0foqdrbS2ucHM1djRwq2ckYR1bmxqZF9cWlxiaXaBf3RqZ2doZ2NhXFFJSkxTZHR+ipyttbi7wczX29bItKOYinpxcG1nYl5bXmFndYCAd2xnZ2hnZGNdUkpKSlBgb3mGmKixtbi9ydTZ18q2ppqMfHJwbWdjXVtcXmRxfoB4bmdmaGdlZF9UTEpJT15td4OUpa+0t7zH09rbz7ytoZOCeHVwbGdhXl9fZHB9gXtxaWdpaGZmYFVOSkZLWmhyfY6fqrCyt8HM1tjOvK2ik4J4c25rZV9cW1tfa3h+enBnZWZlZWZgVU5IREhVY215iZqnrrC1vsnU2dDAsqeXhnx1cW5oYl9eXWBseYB+dWxpaWdpamRbVExGSVVibHiImKatsLS8x9Ta08O2q5uLf3dzcGpjYF9dX2l2f392bWloZmlqZFxVTUZHUl9pdIOUo6uusrnE0dnUxrqvn4+CeXVybGViYF1eaHR+gHhwbGlnamtmX1hPRkZPW2Zxf5Cgqa6yt8LQ2tbKv7OklYd9eHVvaGViXl5mcn2AenJtaGZpamVfWU9FRExWYWx5i5qkqa2yu8rW1MrAtKaXiH14dG5oZWFdXGJuen95c21nZWhpZWBaUEVCSFJdaHWGlqGoq7C5yNTUzMK3qpuMgHt3cWtoZF9eYm16gHx3cGlnamtoZF5USUVIUVxmc4SUoKerrrbG09XPxbqun4+DfXlzbWllYF5ha3h+fXlyamdpamhlYFZLRUZOWGJvf5Cdpamrs8PQ1NDHvbKjk4d/e3Vwa2dhXmBqdn1+e3RsaGpraWdiWE1GRk1WX2x8jJqkqKqxwM3T0crAtaiYioJ9d3JuaGNfX2h0fH58dW1oaWppZ2NaTkZESVFbZnaHlaClpqy6yNDQysG3qpqMhH54c25pZF9eZnF5fn12bmlpaWloZFxRR0RIT1djcoKSnqOkqrfGz9HLxLqunpGHgHt2cWxmYV9lcHl+f3lwa2pqamlmX1RKRUdNVWBufo+coaOotMLN0MzGvbGilIqCfHhzbmhhX2Rtd31/enJsampqamdhVkxGRktSXGp6i5mgoaWwv8vPzce/tKaYjYV/enZxamNgZGx1fYB8dG5rampqaWNZTkhGSlBZZnaHlp6go627yM7NycG3qZuPh4B7d3NsZWFjanN7f312b2tqamppZFtQSUZITVVhcYOSm56hqbfFzM3Jw7msnpKJgn15dW5mYmJpcXp/fnhxbGpqa2plXVNLR0dLU15tfo6YnaCns8HKzcvFvLCilYuEf3t2cGhjYmdveH5/eXJta2pramdfVk1IR0pQW2h5ipacn6WwvcjNzMe+s6aZjoWAfHhxamRiZWx2fX97dG5ramtraGJYT0lGSU5XZHWGk5qeo626xczNycG2qp2Qh4F9eXNsZmNkanN8f3x2cGxqa2tpZFtSSkZITVVgcIKQmZ2hqrbCy83Kw7mtoJOJgn57dW5nY2NncXp/fnhxbGpqa2plXlRMR0dLUlxrfY2XnKCnsr/JzszFvLGkl4uEgHx2cGlkYmZueH5+enNuampra2dgV05IR0pQWWd4iZWbn6SvvMfNzce/tKiajoaBfXhya2ViZGt1fX98dW9ramtraGJaUElGSU5WY3OFkpqeo6u4xMzNycG3q56RiIJ+eXNtZ2JjaXN7f313cGxqa2tpZFxSSkdITFNfb4CPmJ2hqLTBy87KxLuvoZSKhH96dW9oY2JncHl+fnlybGpra2pmX1VMR0dKUVtqe4uWnKCmsb7JzczGvbKll4yFgHx3cWpkYmVud31/e3Rua2pra2hhWE5IR0lPWGZ3h5Sbn6Otu8fNzMjAtqibj4eBfXhzbGViZGt0fH98dm9ramtraWNaUUpHSE1VYnKDkZqeoaq3xMzNycO5rJ6SiYJ+enVuZ2JjaXJ6f354cWxqa2tqZV1TS0dHS1NebX4="}, "guqin": {"name": "KOTO_57", "sr": 22050, "bits": 8, "unity": 59, "fine": -25, "lstart": 1755, "llen": 88, "b64": "gICAgIGBgYKBgIN9bFxiZ2J5kpSUqK+hnImAiIF2fYaEfXJue4R/fHd8gH18iYp+enuMgmVIMzNWj8LQ2NCzkm1riYFQNkZ1o7ShkHNGOEt2j3pWVYvH2MyvlHJQNWSourOojGBONy1jopx5Z3GTp498iI1+dIurs5FhUGZ/dFZgiJmWjpqgjXmFmppuPh0oaKzL2+TYu4hVX39nLx5EeJ+bi5mXe2htfn9VIy9zsNXKwr6FQDVlk768mIF4X0FKd5qOX0ppkJuHfZSmlYecsrSYYEZqeVxNbpKknZCMkIh9ipKAWSIEJHS+4vTx5suRaoKRYSMRLGB/bmhzeXBndImAVjFDlNvl4ui6eVJGYqjJpop6YVNJS3qghlpTbYyMaWB8i4iUpL7HmmFfeXdYVWmCl5KIipSalpqahlwiCDSKyuXp5OLCiHGFf1AeHUZ+lYBsc3ZmYmpyaTocTJnB2urPo4BWTYrKz7aTb2BSPUp3iWtNUXWWh2lidYWEiqbDv5Bvd4Z8ZFtog5mWg4WYmpWal39SHRJQqtrk5ObduoVzfGgyDRJDgYhuY2pwaFxoeV83O2OZ0u/m0bV/WWOWyMyqhG1iUT5Kb3lZRlh+moxlYnmAfYyswrqbgYWMfWZYZIeci3iGlpWWmZB5RQ8RX6jM2t/k4r2RhYFmMw8fWYmJbGJ3eWRkb2VSQTtfqtnl48+pgGBrosrBoH5raFU9S2dgSkBThJ2AXmd7foaYrcG7m4B/h3xgU2+YpI6Dj5qamJaSdjgMJXGuxcrO2tzDnI2HYi4WKmKGcVhkcW9pYFNZVjw/eLTb59e8nnZdd6zMw5t5dXBaRkpaWkpFZpigfmRmcn2FjqTDw6GGjJV/WE1qkpqJgpCenZaTiWMpDTJ3rMfFxNviwJuNfWA0GkB4gWlbWGl7aU5UXk89TYPE6ebQt5l1Z4S40buSdnR1XEFDVFA+QWmWnX1hX3SHio6rycCXg4qLcE9OdJuYg4OSnZ+ZkoRZJyBFgrrHtsDb3MKdjIFdLChRdX5nSVJ2eF1PU1dKPlSQzObdxK6TcW2PuMaug3F+fV5ISlBJO0JqlZd1WV57jIiSt8+8nZGUkHJPV4SdlIeHlKCeloptRSUiSo65u6+93eLAn492TzAuUn59V0lhe3ddS09QQT1bmNTp2cSvkXp8mr7Ipn58iH9iSUNKST5IdJmRaVNjgYiElLXBs5uQlY1pUWKImpOHipajpZV8ZEInLViVu6+jvtzXv6GFclc0OWmGdlpTa4N6XU1NSD07XZ/T4NC5pI18gJ++upV5fImEZ0lDS0Y5SHaUgl1VbIGKjZu2wrCZlZWGaFdtjZiTioeZraWNeF0/LTVinrChpsLc4cGVgG9IL0JoemtUV3OHfWBOTEQ4Pmel0tnEsqKMgIqmu7KQe4ORh2JEQ01GPViGlHthXnGLkIycsraqm5SQfWBaboiYkYKHoK6fhm9YPS09bZmlnaHD5+C4lYFqSjtPb3dnV115jXxfUUxAOEJurtXPu6qYiYaRqbyvi3yKloVdQ0hPQ0RkgYd2XVp0iYuNnK+1qZmPhndjXXSSm46CjamynINwV0A8THejpZOhyuLWs5B8Z0tEV25zZldhgIx4XU9GPjdFeLTPx7KekIiHj6e2o4aBk5yDWkhMTktSaYSJc15ie42LipepsKqXiYV1Xl55k5qMg5Wuq5aAZVFFPVCEo5qTqc7j06yLeWNOR1VqbV5WaISMdVlLRDs6Uoe90cWunJWQjpius5yDhpaUeFZFS1NSVmyChHBfaYGMioiSp7Gii4N9aVlif5WViImdr6yVd2JVREFijZ+XlKvQ4MylhnZkUElZaWdbWW6Ki3JaS0E6PVmPvsm4o5aSj46br6yUiI6XknVPRE9XVFlrfHlnX2+HlI6Lm7K1oY2FemZbaoSRkImMorOoi3NgTkJJapCck5ax1OLJoYd5ZU5JVWJhVlt1jIhxV0Y9OT9imsHFtKCXl5KTo62ll46SnJRvTUhVWVZcbXt4Z2F0jZOJip+zsJuKgnNhYnCBjoyCjqqyo4pwXE5FT3CPlo6Us9ngwZ2IeWZTTlpjX1hheo2Ib1RFPTlFbaC/vaqclpSTmaOppZWMkpuLZElLV1taXmx5cmFheY2MhY2kta2ai31uZ2dyho6FhZissaGFbF1RS1h2jpCJlbzd2bqZhnhkVFFZX1tXY32OhWtSQjo6S3emurWll5OWl5miqaGSjZechWBMUFtdWV1vem9ia4KNiIWSqLStmYN3bmdpeIWHg4icrrCcfWZaUk9ee4uHhJnB3ta2mod3ZVVQWV9aWGiDj4NoTkA5O1WEq7q1opSVmJeapaqhk5GZmH5bS1JcW1Zdb3dsZHCEioaFkqm2q5SCdm1obHeChIKKnrCwmntlW1JQYXyKhYSbw97UtJmHd2ZWUVpfWlhpg4+DaE5AODtVhKs="}, "guqin_harm": {"name": "HARP_70A", "sr": 22050, "bits": 8, "unity": 70, "fine": -1, "lstart": 2937, "llen": 520, "b64": "gICAgYGCg4KCgoGAfX57d3Ryb2ttdHV0eH2AgH58fHt8gomOj5aipqGbnqOkoqWnopqSiYODg3hpX1dTUEEvMUhXWVhcY2VlZ253fYGDiJSktsPM0d/q3sO1s7OspJ6alo6Denh0aFhKPDIoFQQMJT1GS1NdZ21zd3RycHBxdICQn6ezzN/Zx72+wL63rKKenZqanqKhnJWNiHxiS0ZUYmZiX2JlaW1pX1VOSEE7P0tTV2aFnp6TjJCZoaCZk5WXmJuiqKqqpKCgmIRxbXuOmJmbnaGmqKGThnxyZVVPUlBJT2V2dGVbW2FoZ19bXWFla3F6hIuPlp+hlYiGlaizuLu9wsjLxrmroJWBaltUSDg5SVdWTEVGTlhcWVhbX2ZscXuHkJairrKpm5eisbu/vr2+wL+5qZiMgm9ZTEc7LzFEVVtWT1FbaG9xc3d/iI6RmaCipKqzs6WSh4mTnKCcmZqeoJ2Rg3tzY1JIQzcqKz1SX2BeY3KCjZOTlZqhpKassbGzusXHu6iZk5aamY+FgH+BfG9jXFRENCskFwoIFSs9RUdRZXuPnaWtt8HGzNPZ2dnf6OneybaqqKikmIl9d3VuXlJLQzUnIRwSBgQQJjtER09gdoubpK23v8XJz9LRztPc39bDr6Kfn52Vh3x4d3FlXFhRRjw3MigdFx4yRU1OU2ByhZOcpK61ub3CxcTBxs/Tzr+top6fn5qNgXx7c2dfWlJHPjkzKx8XGyw9RkhLVWZ5iJOeqbG3vMPIx8bK09nWyrmspqWno5aKhYF5bWVgWE5GQDoyJxweKzpERkdOXGx5hZCbo6mxuLy8u7/Hz8/FuKylpainnZSQjod8dW9nXVVPSkI2Kio0Q0xOTlNdanR9ho+Vm6Kprq6tsLnCxL2xpJycoJ+YkY+PiYF7dW1kXFVQSDsvLDVDTlBQU11ocXmCipCXn6esrq6yvMbJxbqupaSnpZ2WlZWQiYJ7c2pgWVNJOiwnLDdBRERIUVxmb3iAho2WnqSnqKy2wsnIwbWtq62rpJ+enZmUjYeBd21mYVdIODAyPEVHR0lRWmJqcnl/hYyUmp2doam0vL64rqWkpqSemZiYlpGLh4F5cGpmXlFCNzc/SEtLTlVdZGx0eoCHjpacnp+iqbO8wLyxqKamo56Zl5eVkYuHgXlwaWVeUUE1MzpDRkdKUVhfaHB4foWMlZyfoaSrtL/FwriwrKumoZuYlpSQi4aCenFrZ2FWRjk0OUBERklQV15ncHh/hY2WnaCho6ixvMTDu7OvrKiinJiWk46JhH94b2lmYVdIOTM1Oz5ARElQV2BpcXmAiZObn6GjqLC8xcfAurazr6qjn52alZCLhn52b2tnXk8/Nzc7PT9CRkxSWWJqcXmBi5OYm52gqLW/wr65tbGuqKKem5mUkIuHgHlzb21mWElAPkBDRUhMUVdeZW50e4KMk5iam5yjrri8urayrqqknpqXlJGMiYWAenRxb2peT0VCQkVHSU1SWF1ka3F3foeOk5aXmJ6os7m6trOwrKagnJmXlJCMiYV/eHV0cGRWS0VERUZIS09UWV9ma3F4gIiOkZKSl6GstLa1s7KvqqSgnZuYlJCNiYR9enp3bV9TTElISUpNUFRYXWNobXR7goiMjIyQmaStsbGxsa+spqKfnZuXk5CNh4F+fnx0Z1tTTkxLS0xPUlZbX2Rpb3Z9hIeIh4qSnKasrq6vr6yopKGfnZmWk4+KhIGBf3htYVhRTUtLTE5QVFldYWZscnqChoeGiI+Zoqmtr7Gxr6unpKKfnJiUkIuEgYF/enBkWlNPS0pLTVBUWFxgZWpweYGGiIiJjpihqa2ws7Syrqmmo6CcmJSQiYN/fn15cGVbVE5KSElKTVFVWV5jaG93gIaIiImOlp+nrbG0trWxrammop6alpGKg39+fXpyaF9WUEtJSElMT1NYXWFmbHV+hIiIiYyTnKSqr7O1tbKtqaainZmVkIqDfn19enVsY1tUT0tKS01RVFhdYWVrcnuCh4iJio+Xn6assLS1tLCsqKSgnJiUj4iCfn18enNrYlpTTktKS05RVVleYmdsdH2EiIiJi5GZoaitsbS1s6+qp6Ofm5eTjYaAfX18eHFoX1hRTUtKTE9TV1tfZGhvd4CGiIiJjZScpKqvsrW0sa2ppaGdmZWQioN/fX17dW1kXFVPTEpLTVFVWV1hZmxzfIOHiImLkJigp6yxtLWzr6qno5+al5KMhoB9fXx4cGdfV1FNS0tNUFNXXGBkaXB5gYaIiIqOlZ6lq6+ztbOwq6ikoJyYlI+Ign59fHlzamFZU05LS0xPUlZaX2NobnZ+hYiIiYyTm6OprrK0tLGtqaWhnZmVkIqDf319e3VtZFxVUExLS05RVVldYmZsc3yDh4iIi5CYoKessLO0sq6qpqKempaSjIWAfX18d3BnXldRTUtLTVBUWFxgZWpxeYGGiIiKjpaepauvs7Szr6uno5+bl5OOh4F+fXx5cmlhWVNOTEtMT1NXW19kaG93f4WIiImNk5ujqa6ytLOwrKikoZyYlJCJg359fHp1bGNbVU9MS0xPUlZaXmJnbXR9hIeIiIuRmaGnrLCztLGtqaWinZmVkYuEf319e3dvZl5WUU1LTE5RVVldYWZrcnqCh4iIio+Wn6Wrr7K0sq6qpqOfmpeSjYaAfX18eHFoYFhSTkxLTVBUWFxgZGlweICGiIiJjZSco6musbOyr6uno6Cbl5SOiIJ+fXx6dGtiW1RPTExNT1NXW19jaG51foSIiIiMkpqhp6yws7OwrKikoZyYlZCKg399fHt2bmVdVlFNTExPUlZaXmJnbHN8g4eIiIqQl5+mq6+ys7GtqaWinpmWkYyFgH19fHhwaF9YUk5MTE5RVVldYWVqcXmBhoiIiY6VnaSprrGzsa6qpqOfmpeTjYeBfX18eXNqYlpUT01MTlFUWFxgZGlvd3+FiIiJjJKaoqissLKyr6uno6CbmJSPiYN+fXx6dW1kXFZRTk1NUFNXW19jaG10fYSHiIiLkJigpquvsrKwrKikoZ2YlZGLhH99fHt3b2dfWFJPTU1PU1ZaXmJma3J6goaIiIqOlZ2kqa6xsrCtqKWhnpqWkoyGgH19fHlyaWFaVFBNTU9SVVldYWVqcHiAhYiIiYyTm6KorLCysa6ppqKfm5eTjoiCfn18enRsY1xWUU5NTlFUWFxgZGludn6Eh4iIi5GZoKarr7Gxr6qmo6CcmJSQioN/fX17dm5mXldST05OUFRXW19jZ2xze4OHiIiKj5aepKmtsLGvq6ekoZ2ZlZGLhYB9fXx4cWhgWVRQTk5QU1ZaXmJma3F5gYaIiImNlJyjqKyvsbCsqKWhnpqWko2HgX59fHpza2NbVVFPTk9SVVldYWVqb3d/hYeIiIuSmaGmq66wsK2ppaKfm5eTj4mDfn18e3VuZV5XUk9OT1FVWFxgZGhudX2Dh4iIipCXn6WprbCwrqqmo5+cmJSQioR/fX18d3BoYFlUUE9PUVRXW19jZ2xzeoKGiIiJjpWco6isr7Cvq6ekoJ2ZlZGMhoB9fXx5cmpiW1VRT09QU1daXmJma3F4gIWHiIiMkpqhpquusK+sqKShnZqWko6Ign59fHp1bWRdV1NQT1BTVlldYWVpb3Z+hIeIiIuQmJ+lqa2vr62ppaKem5eTj4mDf319e3dvZ19ZVFFPUFJVWVxgZGhtdHyChoiIiY6VnaOorK6vrqqmop+cmJSQi4WAfX18eHJpYltWUlBQUVRYW19jZ2xyeYGGh4eIjJOaoaaqrq+uq6ejoJ2ZlZGNh4F+fXx6dGxkXVdTUFBRVFdbXmJmanB3f4SHh4iLkZifpamtr66sqKShnpqWk46Jg359fXt2b2ZfWVRRUFFTVlpdYWVpbnV9g4eHiIqPlp2jqKyur62ppaKem5eTj4qEf319fHhxaWFbVVJQUFJVWVxgZGhtc3qChoeHiY2Um6Knq66vraqmop+cmJSRjIaAfX18eXNrY1xXU1BQUlRYW19jZ2txeICFh4eIjJKZoKWqra+uq6ejoJ2ZlZKNh4J+fX16dW1lXlhUUVBRVFdaXmJmam92foSHh4iKkJeepKmsrq6sqKShnpqWk4+Jg399fXt3b2dgWVVRUFFTVlldYWVpbnR8g4aHh4mOlZ2jp6uur62ppaKfm5eUkIuFgH19fHhxaWJbVlJQUFJVWFxgZGhscnqBhoeHiY2Tm6Gmqq2vrqqmo6CcmJWRjIaBfn18enRsZF1XU1FQUVRXW19iZmtweH+Fh4eIi5GZoKWpra+uq6ekoZ2ZlpKOiIJ+fX17dW5mX1hUUVBRU1daXmFlaW92fYSHh4iKj5eepKisrq+sqKWhnpqXk4+KhH99fXx3cGhgWlVSUFBTVlldYGRobXR7goaHh4mOlZyip6uur62qpqKfm5iUkIuFgH19fHlyamJcVlJQUFJVWFxfY2dscnmAhYeHiIyTmqGmqq2vrquno6CcmZWRjYeBfn18enRsZF1YU1FQUVRXW15iZmpwd3+Eh4eIi5GYn6WprK+urKikoZ2alpKOiIN+fX17dm9mX1lUUVBRU1ZaXWFlaW51fYOHh4g="}, "erhu": {"name": "VIOLN76", "sr": 22050, "bits": 8, "unity": 64, "fine": 3, "lstart": 1330, "llen": 67, "b64": "gICAgICBgYGBgYGAgH+AgYKCgoGAf35+fn+AgICAgH9/fn5+fn9/f39/f35+fn5+f4CBgoKDhISDgoKCgoKDhISEhIWGh4eHh4eFg4GBgYKDg4OCgH5+fX19fn9+fn5/f359fn+BgoF/fX18fX1+f39+fn1+f358end2dnd5ent9fn99e3p7fH6BhIaGhIGAgIGDhYeIiIiGhIKBgYGBg4OCgH58e3p7fH59e3p7fX+BgoOCgX99fX5/gYOEhIOEh4mJio2QkI6MjpGTkIqEgIGJlJybk4mBenVydHh7enl4d3VycG9wcnJxcXFwa2VhYmZqcHd/hYqOj4uFgX9+foOLkpSTkpWYmJaWlZGHf32AhIWFhoWAenVyb25wcXFzeYGEg4WJjY6OjoyIhISHioyMiYaBe3FoZW17g390aWVjY2VtdnlyaGFhZGp1gYiJiIeFgoB/end+kqKfjoGCipCSlpqakYN4dHZ7fn+AhI2ZoaGYiXdnXmN0h5KVkpCOjo+SlJidoqOfmJORkpegqrCwqJqOio2SkYZ3bG11enhzbmJPPjtFUllcXFpVUVFRTkxOVF5pcG5gT0hMVWBufoqPkpaep6yspZyVk5OOh4OIk5ucnJ+hmYuDi5ynpZmLfnJvepKosayejH13e4SJjJOcnpOAb2ViYmNma3FxZVRHSFJdZGltcHR8h4+Tk5GMhYCFjpSRj5eot7u5ubitnJGVoKOajIOCh4+PgW5kaGtjWFZdY2FfYGJhXVxeYGVtc3FnXlpXUVBab4GKjpehoZePlJ2ekoN4c3WDm6ypnJWXk4Fua3aAh4+YmY18cnF1d3Z1dHJubXF0cWpocHuBhYyQhndxeH14cnZ+f3l3f4+fpZl/aWNpcnuMprm3p5eVnKGfmJafsMDFu6ylqauimqGqnntgZHqJh391aFtVUk9OU1I+HQYIGi9CU2V3iY+AaFxibXaDl6OflJGYo6+5u7SsrK2llYd+eHqJn6ulkXliUUpOVl1lbXZ/houMioiFfHFrbnZ+f3ZlVU5SXGVxgZGYkYN7gIqPjpCapaWajYmPnrLDyb6njoCDkqGno5mTk5aXkYd+dW1qbXJyb3F2enyAg3ppXV1iY2NjWUAlGiEsNUNZa3J0fZGkqqSdnJ6Zj4uRmqGpu8/Z2tnXzb+4uLGbiY2grKaXhGpJMCoyODk8QT81LTRDTVFWXmFcVE5AKhkYIio0TnebsL7O3NzMt62xury2rq2xuMPW7Pr78d/GqpeMgHV9oMnay6yNb1NCQ1NlcXRvZVpTU1piY1pMQDs5Ni4gFA8VIzdPaHyIioqIhX98gImQkIuGhIiZud73/PPjy6+alJSUnbvi8+TCnXdTQUhheYiOh3JbT09SVlpXSz8/RUIyIxwZFBYpRmJzfH58fYeZrLnBwbmolYqQp8Xd6/P37dOznZSSk6C3ycavkHFTPTpKYnN+hIN2ZV5iaW5yc2hVSElNRTUoIh0cKklrgo2TlJOSl6CqsbOsnYl5d4ekwtfj6ebWuqCRiYWMpMPSxaWBYUpEUmh6gIF9cV5SVGFtb2hbT0dCOCUSCAYGBxMyWHeJkJKRkZWgrbi7s6GNgoaZtdHl7/Dn0reglIyHj63U6Nu3j2xSSVVqeX+CgXdnXV9pcXRwY1JHRUEzIBQQDQwZN158jZORi4mOm6u4vbWijH5/ka3K3+rs48yvlYiAfISjy+HWtI9sUUdTanqAg4N7a2BibHR3dGhWSUVAMyEVEQwJFDJZeo6VlI2Kjpytu8C5ppCBgZKty+Hs7uXPsJaGfHZ+ncff1bWPbFBFUWh4foKDe2tgYmx0eHVpV0lFQDMhFREMCRMyWXqOlZSNio6c"}, "erhu_low": {"name": "CELLO76", "sr": 22050, "bits": 8, "unity": 76, "fine": -23, "lstart": 453, "llen": 33, "b64": "gIB/gIB+fX+AgoKCgoCAfn9+fn15eXl5fICEhoaBgIGCgH19foOFg4OIi4mHhYN/enZzdXRzdHZ5fIKGiomEhIWDenV3e4aKiYqOkpCMioaBenFlYmZmcXJ5gImKjIyJi46LeW5yeIiVlpmcoZmVjod/fXZfU1pfbHJ3gIiMi4qFiImCcGdpcYCUnJ+cnpiQjYd+dm5YS1BRVmRygI+blIyNk5GNgnNudoWRnKmstbGjlYN7c2tSREZLT1hrgY+XjoKKmJV+cW9qcn+Ei6K3w8Gwl39ydnZnVk9WTkhNZYaqs5mIjo+FgYeIhIB+jaatp5+Wh3lzdHJgUDQkITBNdZezs56UkpCBdXWBk6CRiqPDxry4qZWFdGVLTUo9MTpef5mkoYyGfnNkcIOHh5qin7HN3c+4mX5hRjIeIEBNUlBlfo6hpai2s5JZQGF9j5ueoq62vLOpk4R6Wj4fFyUtLjRWdJG4xcK8p35ORG2Qq7ewr9Di2LqrpZF9XjUVCBIfID5wpLbFtJ6amYZXSGiEptDRxNLq9OHDo29eSi4ZHSEbEzBulZyekICHj4BHM0tkgJmgpMf29sqgjXRiaFo/OC0xKTVjlL3LxKGbnpJWOkxohaOoq8v5/M+ijXVhY1A2NC4wKDRjlA=="}, "dizi": {"name": "FLUTE73A", "sr": 22050, "bits": 8, "unity": 73, "fine": 10, "lstart": 1948, "llen": 80, "b64": "gICAgICAgICAgICAgYCAgH+AgICAgH9+fn5/gICAgH+AgIGBgYKBgYB/f3+AgYB/f4CBgoKCgYGAgICAf39/fn1+f4CAf39/gIGCg4KCgYB/f3+AgH9+fH1+gIKCg4ODg4KBgIGBf35+fn9/f39/gICBgYODgoGAgICCg4KAfXx9foCBgYGAgYGBgYGBgH99fX19fX1+f39/gIGBgYGAgYGBgoOCgH17fH6AgoOEhYaHhoWDgoB9eXl8f39/fX1+fn+AgYKCgH9+gIOFhH97enx7e3yAg4WHiImHhYOCgH9+f359e3p5e31/goKAfn1+f4KEhoWBfXp6enx8foKHi42LiIeFhIB9fHx7eXl7fX5+foCAfn19foCDhoeDfnp7e3p3d3uBiY6PjoyMi4iDfnx7eHV1dnl6e3yAgYB9e3yAhomJhYB8fHl2dXZ5f4WMkJOUk5GMhoB9enl2dHV2eHl6fH59enl6foOIiYWAfn16dnJzdn6Hj5OXmZuYk4qCfnh1cW9wc3Z4e31+fXt6fICGiIaCf4B+enNvb3J7hY+Wm56em5aOh4F8dW5ra29zdnh6eXl4eHp/hYiIhYSEgXpybWxxeoONlZ2kpqSck4qBeHBqaGltcXV5e3t7enh5fYOHhoODg4J7cWtrc3yGjpagp6qnoJaMgXhuZ2RmaWxxdXh5eXl4en6DhoaFhoWBenFsa3F4gYuYpa6wrKOZj4R5bmVgYGRobXN2eHp6enp+goWFhYaGg3t0bm1xeIGMmqawsq6mnJGGeWxiXFxdYWhuc3h7e3t9gIWGhoaHh4N8dG9vc3mBjZyrtLSwqaCVh3lrX1dTVFpjaG1xeH1/gYWIiIiIiIaDfHZxcnZ7g4+erLW3tK2jl4h3Z1pRTU5UW2JqcXl+gIKHioqJiIiHhH95dXZ5f4aToq+2t7KtpJiHdWRWTEZGS1NdZnB5gYaJjI6Ni4mHhoJ9eXd5fYOKl6ayt7azr6aYhnJgUEM8PENOWWRwe4SJi46Qj4yKiIeEgX18fYGHkJyosra1tK+mmIZxXUs9NTU8R1RhbnqFi5CRkpCMiYiHhYKBgoWJjpagqrK1tbOupZWAalVCNS8xOkZUYnF/iY+Sk5KPi4iIiIaEhIaJjZKZo6yxtLOzr6SRe2ROOy4qLThGVWR0go2SlJSRjYmIiImIiIqMkJSZoKasr7GysKqdinRbRDMqKi87SVpreoePkpKQjYqHh4iKi4yOkpaZnKOpra+xsrCnl4FpUTsqIyYwP1BhcoKNk5SRjomGhIaIi42QlJmcnqGmqqyur6+soY95YEcyJCIpNkZYanuHkJORjIiEgoOGio2RlpqeoqOlqKyurq2sp5uIblI5Jx4hLT5QY3WEj5STj4iCfnx+hIqQlZqfpKamp6qtra2tq6SVf2RIMB8bIzJGWWx/jJSVkoqCfHp6foWMkpiepKipqKiqq6ysq6eejHVYPCcbHSo8UWR4iZSYlo6EenV0dn2Gj5edo6irq6qpqaqrq6mjl4RqTTIeFx8xR11xhJObm5SJfnVwcXV9h5CZoKWpq6uqqamqqqqnn5B6X0MqGRklO1Nqfo+boJuQgnZubG92gIuUnaSpq6upqKipqauqpZuKcVU4IRQXKUNdc4eXoaKajHxwaWhtdoGNl6Gnq6ysrKqqqqytqqWYhGpLLhgQGS5JYniMnKWjmIh5bGZmbXiEkJmjqq6urKqqq6yurqyklX5gQSQRDhw0UGqBlKOoo5WBcWVhZW56h5Oep62vrq2rq6yusLCsopB2VzcbCw0fOldxiJypq6KRfWxiYGRue4iUoKiur6+urKyusLKxrJ+Lb08uFAcNI0BdeJCirKufi3ZmXl5lcX6MmaOrr6+urKytr7KzsqudhmlHJg4FEClIZYCWqK+rm4VwYVtdZXKAjZqkrbGxr62trrGztLKqmoFhPx8JBRQvTmuFm6qwqZiBbF5ZXWZzgpCcpq2wr62srK+ytbazqZd8WzgZBgYYNVVxi6CtsKeTe2dbWF1odoWSn6iusK+tra2vsrW2sqaSdlUzFQUIHTpZdpClsbGkjnZiWFZeaniGlKCpr7CvraytsLS2trGkj3FPLREECiFAX3uUqLKwoIlxXlVWX2x6iJaiq6+wr62trrC0trawoYpsSyoPBQ4mRWSAmKuzrp2FbVtUVl9sfIuZpK2xsa6trK6xtLa1rp6GZ0UlDAQQKkpphZ2utKyZgGhYU1Zgbn6Nm6ausbGvrq2vsrW3taybgmNBIgsFEy1NbIifr7Sqln1lVlJWYXB/j52or7Kxr66vsLO1trSqmH5fPR8KBxUxUXCLorCzqJN5YlRRV2NxgZGfqbCysrCvr7GztbayqJV6WzsdCwkZNFRyjaOxsqaQdmBTUVhkc4KSoKqwsrKwsLCxs7W1saaSd1g5HQsLGzdXdY+ksLCjjXNeU1JZZXSEk6GrsbKysbCwsbO1tLCkj3VXOB0NDR46WXaQpLCvoYtyXVNSWmZ1hZShq7GysrCwsLGztbSvoo1zVTcdDg8gO1p3kaSvraCJcF1TU1tndoaVoquwsrKwsLCxs7SzraCMclQ3HhARIj1beJGkrqyeiHBdVFRcaHeGlaKrsLKxsLCwsbO0sqyfi3FUNx8REyM9W3iRo62rnYdwXlVVXWl3hpWiq6+xsbCwsLGztLKsnopwVDggExQkPlx4kQ=="}, "xiao": {"name": "SHAKU70", "sr": 22050, "bits": 8, "unity": 70, "fine": -1, "lstart": 2962, "llen": 1891, "b64": "gH9+gIB9fIB9fICAf4B/gYCAgYCBf4GEgX+Eg4B/goWCgYKBgYSFf39/fYKBfX18gH95enqAgX+DgXuAf3+Bg4GCfoKCgX97fYSLiYGBfYCFg4Z/gISBf3x3fICDgnx+e4GDgXl+hYeBe317foKAfn9+fX6Cf4KCg4OGg32Ag4GCgYCDgHd/goCAgoCDh36CgYSEhIB9gH9/enZ6foB/fHx7fYKCgoF/hIJ+gX+CgIB+gISCf36CgYWIhIWEgoiBf4GEgoCAeHt3fn53eHx/fH55foSCg31/gX9+g4J/f4GCgXyBgYKIhIeKiIGBhIiJhoCAfHyCenh6fX97cnl9e35+fHx+gX+Cfn6Bgnx+fn+Af4aEhoWGiIeMhoeKioiIf359f3d1fHd9fnh2e31/fHx2foJ9eHeAgXyAfHqCgoSDhouNjoqDhIuJjYiIhYJ8d3t3f3l8fXh/d318eX98eXl9e3F1gHmDgHeEg4iMi4KJjIyEgoWFiYyGh4F8f4Z8eH1+fn94enp6f3pyeH56gXx2e3p2foF9gIOOi4yLgn2DhoeJiYiLgoN+goKBh4N8eHV4fHd8fnyCeHJ4d4WDe3lxen99f3qIjoaIhIuDiouKioaChIGAfoSBgYJ6gHx7gHh4eX5+eHiAfnl2e3Z1dHV7iYqLiH+FipSSi4eIhIV/e4KCf4F9fYaCgYKHfnh8enxxcnR0dnlxfHd4fnmAioqOhYiNjo6Mh4WAgIB+gImDhoSAh4eKi4J6dnpvbnFwdHJwc3Z3en2AjIaNh4OChYiEiYKDiIqJgoqIhI6MhIaGg4SDgn50cXFpb21ueXd2eHyAhomCf3eAgYCCf36IiYqLipCRiYqIkIaLjIZ7enhycXZ7eHx7dHiBfnR3eX16dnJ4gHp/foGHh4mMhoiNkZSIi4yNg3uAe316gH1/goR+f399end0eXZzbnF1d3d8hIR/gYSHiJGThomJhIOAeX+FgI+FhIaIiId+hYSAe3d0e29tb3Vyenp0fYB9g4iIiYeAfYCAfoeJhn+FhpCLiIyNjoOCgoiCd3d0eHN3cnV1cXx7enh9gn5+e3d3goOAhIaPkIl+g4uPkZOPjYiAfn+Ag4J+eHR5dnl9eYF1cW1ubG50e355fHuFgomDkJSYk5CMiIyMhX2GkY2FgIWEiIR9f4Z8cXBoaGdsaWhobWpydHV/g5GYl5iUg4eNko6JiYiHhYmMl5abl4uAhIF1gHt3ZGRXVlJUYnFta31/iYiEgouPkIyHg4SLkpCQjo6Sl5aXm6KimpiMf3FzY2ReZFpTVmFiYWp2gHN3f4aEgYOAhYKKi4qMkpKRlp2gp6yhl5qfk4uEfm5scmplXVhVXWNoZGhsbnByd3t5eHWCgo+RmpmSjo2RkJeXnZmhoKidnJWTioh/d3dkYVRVTVJYYV1baWp1d3iCgoeEhoWKho+KiYmFjpeTl5ymrbCtpKekmY+EgWtlUVdQU0tPVmJjZmtxfXl1dnqGhYuHjImAiIaFi5OTmZ6ip6itqamonZmThX10Zl1UT1JUT1NcZmhvZ3B0dH99eIOMjoiOio+NioaJkpGSmZ+hn6ewsqymmo93cGhkYF9VTUhOXWBeYmtydXF0fX+GhIaRko2KkY+Si4qJipGZlZinrrWxsqqfintoYFtWVVFTS1FTW19lbXV3cXh+gX2Djpidlp6VjIiGiYWNjIeToq62sK6uq5qEeHBnVlBGR0lMUlVeYWt4dXRudHyBfYqXpqiioJuVh317fH+JjpGdrLGztrWol457bFlTSUZFS0dNVVxla3B1dHV8dXuNk6Osr6ajo5GEgHV6eHZ/j5+ms7zDv7WljHlfVD5APkRHSk9ZXmZkbHN2d3eAiZeco6yvs6qfkYZ8cmtyc3OJm665wszDuaiMcVlFPzc5QEZQUFZfW2p1dnV3eIGHj5+tucXEt6aNemdjYmFueI2err3Kz8q4qodrUD01ODpAREtPWVtib3J2dHd7eIKYq8DHz87DoI9uXVlVWmByipyxw9TZ1MKrimNCODEvNkFHTVRZWF9jcHZ2dXGAkKi3ydjf072igGNYUUlMWml/m7vJ2N7hzqyNYUAwIiM3RE5UWFlcVlplbm5yeIebsLzN6erjyKB+WUI9P0NQaX6gvc7b5N3Wu5FiPigfIi9GVl1aWE9SVF1kdHZ+h5+yydnr9vLSom1KMSkvPVNqh6G51OPr4dG7mG1BIBQcMUdXYl9TR0tTW2JmdIWPpr/T6PL68cmaaT4pISc+VHGNpLfR4urjzrebdUQjFhgsRFxtalpIQD9PVmp5hJetxtPo+Pzuz5xtPB4XIzpUeJGjucjZ5OTVt5ZxSygeIzdOYGplU0M3NkRXanqMmqvG2u32+O7SpGw7GxQcMFZ2kqq/ytPc29G8mXZVNSglMkpjbGFQPzg3QU5feoycscje6/f16s+ibUEfExs1W3yapbW/xc/Pz8CmgWRGMSssQGJ0aVE/Li80RWF9jp+wxN/u8/Piy6hxRCQVIjZWfJSotLzHys7Kv6SDa1M/MjRDWmpoUj0sKTJCXXqSobHH1Ojs6dvNrYFNLBolNlNylKu4tbnAysvCqo53XEk6OT5TXmJTPy4oKj9ZfJOhsMPW4Obl3MumhVsyJCg9VnSPorC0sLG9y8W0mYNwVUU6O05aVk0+MyYrO1Ryj6OxwdTd5eLZx6uHY0IuKTtVb4mbrq2xsLjBxLWgjXlmWEI7Q1FPSDs1Ly0zTW6KorC90tTe2dfNtZRtTjcyM01ngZemr7WqsrvCuq6VgnZiSDs6R01GPTMtLzZKZ4ifq73H0NPV08u6oYFgQDA2R2B7kKGspqausr/Dt6WPfWhNPzg/SUM+NCwtM01lfpqtuMXO0tPPybajjWdMOzxFWXGJoKWqp6qwvb+7qp2Aa1ZBNTVBRUE5MzA2RGB+lKy6xcfI0M/DuKiWdVxBNURWbYSXoaekpa+5xL6rmox3XkI3MzxBPzc1NDlCW3qVrLe6vsnOz8W+rZh6XEY+RFhnd5GfqKSgprbDwrKfjX5iSTYxOEJAOTc3QERUc4qjsbrAw87Mxr+xoIFlTkZEUWBziJmhoaKksr7BuaeUf2lNOzY6QEA6OzY4Q1huipurucHGycjHwq+ginFbSEJJW2+Aj6CnpKWpt7+3qZ6GcVc9MThCSkA5NDhCUWmCm6uzu8LHx8bEv6eMdVpKR0hZaH+OlZqfpa23v7mvnYh6YEU4Nz5CQDw5O0RNZX+TpbC1wsjJxMG+rZR6YVRFSlFkeYSOmZqjqrW6urKfj31vVT01NkFEQzY3Q01jeYuhrrjBwMfIw72tnIRqWEVFUl9vgY2WmZumr7y9s6GTgnNeSTs7PkE+OjtCTl9wh5ujsbzHyMfFvbCfi3daTUVOWGZ2gpKgn6Krs7y4rJaHemVNQDo+QUI8PUFKXG6AlJ+tvMbFxsW+sKKUhGVOR0hUX3B7jJaeoKqyubmwopF/bFE+OkRHRTw4PUtZaHqNnau4vcfIw8C1qJyCZ1ROR1NcZHKDkJqhqrW7ua6glY18YkU6PUBGQUJERlFecIaWo6+9zMrFubSupY51WElDSFBec4GMmKClrra8t6ygkoFmT0M+Q0hIQz5DTllke4+grLfGx8fCuLSnlHtiSkA/SlpweYaSnaWvuL68sqOThHJcSUNBS0dCP0FLVWNtg5aqusPCycW+tKiah2lNQDxEVWZxgZOgoqy0vsOzpJ2NeWVLQklMSkJAQUNOVm2Ai6Kyv8rHxcG3sp6FclVCPD9NXnF9jZqlq7G6wryuoJGAa1BISk5MRD8+Q0ZRZHiIm629x8fIxL21oI9zXUg5OktbaneEm6aqr7i+vbeklIp0W0lKT1BKPzk8RExbbYSYpbq/ytDKwLGolnlgTD0/RFZlcYKSoquwur6/tKKZkXxnUUlLTUdBPTxET1hleoyktsLLzcrCtKuXhGpRQj5CTF9vgI+eqKy2vb25rJ6PgmpWTU1ISEZCOD1LU2d1iJytwcnOy8S6rZ+IbllKPD1KWm15iZynsLC2v7uyoZKIcFtMSE5NRj07P0hTWnCFmqq5yMrPxrywn5F6YEo8O0hYZHWGnKSnrLjAv7Ojm4x4W0lLUFNGPzk5Rk5abYKTo7PFyszJwbaok3tjT0I+RFJjbYGTpKmutb3AtaedjYBrTkVKTk1EPTs/Slhme46isb/IzsnFuKmZh21SQjxCU1tseouhqK60vL63rJ+VhXBUSUdLTEZCO0BFUWB2h6CxusTMy8S6r6CQcllBO0RNWGh6ipekq7O8wLmwn5eMdFtMSUtMRUE/O0VPX26DlKq7xczLxrqzppJ7YUs/PERSZ3aJlZ2nsLq+u7iomot3YE5NUEtFRDs7Qkxcan6Qo7PCzM3IwbemlYBsUkE5QlJhbYGRoqetsrzBuamekX9oUEtLT0xDOzxBSlRmeI+er7/Iy8nFvK6chGxVRz5BS1xueYicqLCzucG3rZ+Ti3JUSUhNS0VDPT1FUF90h5uuu8XKyca+s6aLcFtNPT1LWWh1gpimsLC6vLyxoZiLe19NREdNTEQ8PENPWW2Al6e4xsnKx7y2qJZ7YkxAO0RVZXV/kaSpr7e8vbepmY9/YU9JTU1JQz09QkpWaH+OorW/x83LwbermIZsUEE7Q1Feb32Rnaartr7AuqidkoFsVUpJTkxFOzc/TlhhdYadrsDIzM7Du6mdinZZRTs+TVtkeY+eoqqwu8K7r6KUh3NXS0pOTUY8PD9FU19zgpOsu8bNycq+raKQfWBHPj9IVWJ1h5ulqK23wb2ypZuOdl9MSktMR0U+O0FNWG6AlKW1xcfJysO2qZN+ZFJAO0ZVYW96k6SsrrW+vbOpnpGBZ1BFSk5LRTxAREVRZXySo7G+xM/Kv7ivoYVnU0E/Q09dbHuMnaast7y/uKydk4hvVkdKTU1BPz0/SVJfdImZrL/HzsnCurCjj3JYST88RFtud4iVpauzu767s6WThndaTEtPS0c9OzxIUV1vgJWmucXNzce+sqSPfmJNQTdGVWV1gZOlra+1v7u2qJqNfGJOR0xPSUM8OUJNXWp3kaazw8rLysG4qpaBaFRBPUNOXW+Ak6KorbS8v7eooJOCZ1FISktPR0A8OkZSaHuNnq3Ax8nJxb2xnYNuVkY7QFBdaneHnKqttbu9vKyhlIZxWk1GS0tHQjw9RlFccoiarrnDy8zLva+jjnZcRz8/SldidoeYpK2xur+8sKKajHtdR0pKUEk9O0BISldrgpaptsLKzca/t6mXe19MQEBEUmNzf5KjqLK2v7+1ppeOgmdSRkhLSkM/PUFLV2R5kJ+1xsnMyL63rJ2GalNAOkFNYW+AjpuosLK7vb2unZOAalRKTE1MRz45PEdUZXaKnLC6xM3NyLyunIh1WEU6P05cZXeKnKmps7vBu6yglot1V0pMTUhGQT89RU5dcIOZqrrFycvJv7GlkXheSD8+SFZmcYObo6mxucK8r6WYkH5bTUpMTUVEPjxCTFtofZSjt8jKyMfBuKqVgGdPPDxEU2NxfZChrK21vMG5pZmPgmtTRUpLS0RAO0NNUWJ2j6O0v8nKycG5raCIblE+PEJPXm16jpylrLa7wbetopKDbVhLSE5NRj06PklRXneImqy7x8vMxruwoo5zWEdBPUlYaXiIlqKttby+ua6mlopzXU1LTUtDQzs/Rk9ebX+Sp73IzcvFvLSmlHlkTz84RVJld4WUoKyttr29uamXjXtlTUhJTkxGOzo+S1lqfZGlssDIzcvBuauYgGdSQDxBU2Jydo2irK2zvMO3p5qTgm1TRkxOSEU9PEFJUmJ4ip+zvMbMzMW6sJmGcVdFPT1NXGt2iZ+nrrK7wLmtn5aIcl1HSEtMRkA9QUZPW2+FnK2+x8rIxbu0qI92XEk7OklcZ3WHlaWpsLjAw7GglYl8YEtLTE1KOjs+SE9aaHuVqLnDzM/FvbGqloBmSj0+Q1RgcoWWn6avub69tKyaj39jTktMTUlBPj1ASlVoeoyks8DLzMnBtqufh2lQQjpDTWBwfJKdoqy2vr+5rJ+Rgm1USkxOTEQ/Nz5HVmR1iZuowMjMzci6rJuLdltEPUFLWWZ3ipypqbK8vrmuoZqMcltHSk9MREM+PkJMXHKFmam5xMzKxr+yp5B4X0w+PkZUaHWEk6Sqsra8wbSkmIt8YlNIRk1JRT08Qk1Yan6Op7rEyMnHwrioloFmVT44QVJlcoCQn6iwsr3BvKmZjYBpVUpKTEpEPDxBSVVnd4uftMLHycrCu66diGtUQjtBUlxqeomfqK6vvMS4qp+Vh25YSUtOS0Q9PEBKT15xjJmqvMjOysW6saKOcV5IQDxFV2p3hZynqrG3vruzppmMd1hHS05QR0E8OEVNXXCDlqi2w8vOx7u3qJN9YEo+PEdXZXKBkqGqsLq+v7Okmo1+ZlFIS01HQT07RE9YZXqM"}, "bianzhong": {"name": "JBELL60", "sr": 22050, "bits": 8, "unity": 85, "fine": 0, "lstart": 0, "llen": 0, "b64": "gICAgICAgICBf4CAgX+AgIF/f4GBf3+CgX2BgYF8g39/gYCAgIB+goF8hYB/gIF+gIR8g4J+f3+CfYGCgoB6hH6Bf4OCfX6AhH19int9f4Z6g4N+g318g4GAf4p1g3qDgIWAfYR8fH+EhnWLfoNxiX2EgIGEfHiCinp9jXp6fop5g3uKfnt+hoB1iIWBdoKHeIGBiXWDgX+CfYCDh3aGfX9+iHiEhHl+i350hoJ9hX2Hd4R1kXWDgIl5eoeAeX6MhHGLeodxjHqKeX9/fIWBhH57hHqEgIp5fYhveIKWeYmFbHd8jouHf3iBYI2PiXSPg2J+gomIiXx/dGqHkYSKhXRqfIyKioGAdnN3gp5+fYl1aXWegJZxinhkhIWXcY+Ff1pzrXeAkYFbhIeBmHp5iW9rjKB2fYZ3eXySeJZveZKBb22xZISAiHV7j2yhZox1j35pmXKLYKhyjYNPjZeHgY1ImKF1V6mKXYqCnF96hqF0UaSOeVHAhlZwlZpmnGiDb3aciYpNmo2Ca3eZeolsm49CfrOQPq18dnKxZHdAuLl0WpB9XIeTpViInGVjZshZq2yQb2V4fbBzi4FwcmydgZtvg4lWf4+NeYuMantyjnqGq2pvdJFWhqiNiXJacJeBppBPjW9ycrd+gXSNZGNtz3ytRINYdHfYq05VdpFimbOZXE+adl960KJZW392VqnKhk1sfHCMkKlqilWQZZaIkYNtjUaveJxVrm1mhp1sdYmyUnh7s0yKjJxAj5mkRXeqZXKjoUx4jGWbcMxacnCLalzaiX9fg245sKu9XHB1QYZz94F7UW1iZcSvhH9DilmbYt6Nal5ifmaku5J2O5pCqXPJi3FYcIxhjrKOclmea31vpp9aXa2cWmmxZ2d7p7dXa3qONqO7mnlfb3ZkfMHBWG9kc16Rt75vOH95a37cn05GmXZdpM+RJHSQZWu131lZO7JeoZ2oXndoZXrCZJl9pjeBhZhkebSrG6l2mB3SmX5dhs4oSKm+bUn8UFNBtaBavIWnEWixdpmH0EVUcmG1eNlybFZmZnLno2OPVnwNvcG6UpidFTSe1bdH23ISCPO3brKgahBE352Ff+oVM4exl2zCfUFLoJ5wzHxWZm+MjZiXhVNrp1V+v5BfU8ZiamfZYEemr29PiqRvWp3SV1CJoEOBrLFccX96cGi/o4JJe3RXpa25WlR3XoKW3nx7Skx4fbTEmFtDgjS6p7l6iEc8m5Cim4SAT3dvuXOKmXBbgZB/kIZtgH9ts3GPaoRVnpd1m29teW6odblKsiyZcqCVi3xUfXl+snyxMqFArGe6fpFSZJ57e8BxW3iaXKOTfXpmbqOGf6F6P4GZgpSSmk5UdrR+mrVbQW+FlJy2e4AhdI+jhb+bRDmDgKKir3lvMFu4oIijmDxJi4mzj5R4WFd5w3KnfoNBepCPmI+GXmiLeJKVo0eHdY9opYqLXXaXh1aksVVZnoRskqt1aFKbmYF+qYMtgY+kaLx8fkZvhJ2dgpV1UGJ/ymi9VqA5i0/Armt8kWM7n7d3pG2SN4dhzYx3hIZeO8KvcHCmeECMjqZ0b3ijYmK6nlxYonCChrVqb2hmkaGadaVWQ5iDoJCwOYJkYLGhnV+aR16ZmaN1n1JVhniyjqw/llVboLx0iX9qR6pkuIiHYYlqdISuZ5xYp0Gud4B6knZuooNeolOkYK9qnnFPmX6MfKtwVo9uhY6cg3RwX4iOiqqHXnFji2vOeJFedG1TuZGkc312OaZmz2eZemtmW8FvkZWKZluXboyQh4ZyeXCQgHyWhmKgYIZpu0ijimd7eph0lYNwlDm8Yqdvm2dviWWkh4mWW3RxlWG3m1eAfnNmqph9dnR5g2qek4hOn3Vvg6SIa4J6d354qnKSZY9dkHmUl3t1d3N5j4iDnWZqi4xrjpZ+eHCEin5rpn56VK14j2apcG5tlYiFeqNmdlq2WqeAsE1ocZ95jJOhVWR5lIGRkZVWcXGYdbR2dH5ycHe8eY5kim1ilKiZUYyEY2qdw1d6dqY7jpunWW+mdW1zvG1eiZKNTsNxfUOjkXShe6I3hm6lc6adVXB2dnK5qWt7S51QmI7aQHR7eludqJhrb3GITrCgkVGjWnpfuYmkXYBtY4icoYB7cVaYbKd9o3FpeGqlbZ6LhWRnk2qalIZ0c4Rtm3OYgnhqmG+Fd5t3k2h8jHyHgYl+a36Lp02UiXdqjKpsiGGfZmmSr4VWkYNRfpzEWZZXikGOoLR+cnhhWJilq2acWmlKtJSWg4Jqam2CtpBuhHVff5uDl4BmdYSHfpJ9kVyCfJl0j3KSaXKOpV+Ej3ZdsHiLapNfkGufmXhckn9fgsR2cnOPUoOQnI57cHlub5mme356ZmuWnHCIgY5Yj4SDcJ2Id2x6f5NkqYaBRbBud4qhdnN/coKDdJ2GjGSOY3mFo4GKdWd1e4WPs2SAcH9lgaaNk1WGb3OHhsFiglGkU4mriYdqeV6Ogoi6YoJih1WkkZWDcWV6e4aOn4lkaYl+dI2md3hji3x1ip2YUIlzhl+poW1jkH5sfZuNiFGNmG1lq4RwcaBvhWyIiXWYcZBvg3N4lmytaoJ/c3F3vF6ggHFhgYp1p45xfV6AgaJunoxbXpl9kX2jYIFcjpSDiYN6bGaieqNdql1wgIqYepNaiX9fpYuSXItpfZxsrnd5TZl5iZ6KcW5qe4efko9hcmuEeKmNmlRyc36Enp1sgmBukI2YcpRghGaQnYV0bZpifZGgcHCDdoB+lJRxa4OLZJqNiWCKdo1sl5F1aI59eI2VfXRhjYGLh51pY4CAiYybgG1oen2MmZdsf2OFb5iciWl4hGV+ooSQXZFwhGOziWKJhGt4kZJ6hmSeZXyTnWB9inxtjYeUa3iIc3+HpW98c3SEeaKCimh3g1qphp9imGBhioebjIV6bGdltoaHj4RfYH6VloeElVVii4aSi5tlel2IkHmalHJZhIxrlIqlXXdyjHGMjpF2eXCCdoaSjXSPaX9pp2SbepJxeHl5ioCLl3h1YpZllJCTcH10dId6lJJ/Y5JycIKehnODfIJmiaJ2fW6mXIF7q3Jao4J2Y6mGbIV6nF6EgJR1daNvd3OZaYagf25+e2uKi5KUcHJzemi6f450gFdyl5yJe495RYeMrmmiZ4hFgJyrb4iNWluPm5OCjGWAUZyFqnGGf1yAc6l7nW1riG6IgaZ2cnl5kWulfIVjhnuKhYmPdGGFj3aJoHloeoN8jnybe3JpkYZ5jYOLW42BkH6Bfm6Wb4iReH14k1ybeZZ+hGiBe4mBnXB+dIxqkY+GbJVpgHSaeJlwgXt6eI2WfXmBfmx6pHmKhnxog3t5p3aPd39hkYB+kZRzc3qRZ5CBlW2IeYp4fHyVb4mMgmqIgn92j4eKaZN9cXyLi3yBgYB6cZ10jYCGenmGcZF+j4BthHuHe5qAdoB6f3uNhoxygXmGapeMhHqAhmmCf5WHc5NqjFyieo+CeY9fkXKadIOVaIVsoG+KineOXph0lnCPgHF/hYGNe49rfnyUdY6He2KZbZp2kXx/dXKbco+McYhdn2iee49+YZthnYGGf3iCZpx3io90hW+FeZCCiH94enx9lXyEjnF7fY9xioV/jG2Ke4RyjI52knKHaYmIg4Z/jWV+hoWOfItygnOHjIV9iHWCa5lxl4eAdnGFc5CXfZZTk1qXfJyRbYtihHWHp3aMapFXg5aGiYR8h2l/fpp2gZpmhmyRg3iZdI9gnHR0m2qcZZlnk3p7mWuQeIZ1hotsjnmRa4yKenSIjXGMgoNugH6VdYiLfmmDk3x6iYp6Z5h1inCbdoZ6fol1g4WCe32UcoR5i3SJhIl6hXd3inuHgJB/cYN2lWuSh4h4ZZl1hHWlf2OSeX18jo1xg2mjZ4aRk2Z4holvkYiOYYKAf4CShYVuhnOKdJeJcYh9fWuVhYKGf4Fwf4SJiHiMc4R2kHuCgoR6hnx8holyh4p+cYmIhXOHhIZrioOOcYaMdm6OkXd8knF+eoeJg3mDkWh3loF6gI96doV7lHOKdY13douOdn+Aim2XbpN7gneJgXOBkYJ8eZRsf36ShX15hItfhpuCaJCSbXKGkX1wlot3ZI6LfHObj2humHtzhpp8dHeAg3yEmnmDZpBtioOPg3eFZIKTfI+ClVSNb42ChJJ8e2SQfYCNj4ZkfoF+eY+Xc31sjHWMe6F3cXeDfXqZg4Nxent8kH6acXxxgIJ4oHaNZ4N1h4l/lXJ8c4SHgYx5hmuHe4uIiXR7dXyRiIR+fGiBjX6Xc5Jng2CbiIOOd3trgIeNlG6SX4F5k4OLhHN5dYSOgYaFeXdzi3+RfYd+bYF/i4KGiGyJaZl2jH6Ne26LfYR2i4x1h3iKaox/jHqJgnxug4qDfI2MbXGLe4Z+lnaQYIWEeoaVhWuKdXKNgo+BgHaAfHiRgYp4f358eIyFgIh9dYKEd46FfoB6fIOEhICNbYtukm+TiX9xhX94hpZwlWSJdZdpl4V4dod7goSLeY1wg3SVcZV3gmqXgn13in91koh2fneKdJ9joG56b5qBcp10eXqJgIGRaI13h3yRd3aUdXqClnyBfHd4f4yOjXhzb4h9kJWHaXh6dI2Yg4d0cW+TdaCPgFuIdHeOpIJ1c3R4joKigHBqkm+EkpBvfH2KdIeLhWiGiIN8i3uAZ4uMi3qZb2N/kXuTk3xgdIKMhoyOf2JwkYd4lZhccoiBd5iOenJxhIt2lIx8XZKBd4KVi2WCh39zhZlxgneRb3qHg4RzmYB0cJN/ZJuVeGuGeXiEhZyGXYCGc4CajmuHbXx8jpN3hXSEcIOYcYxqlmmGg4aHbZRxf4CNg2qPen91koxweYKLc4SLiWh8gZJwi4OCb3qMhIV5g4Fqh36adYlthnh2lI+Bbn57d4aHm3Rwe4hzg5SNa3aCiXKFmHxvc5KEeYiGgF2NjId/gopfeIWXgYyKZGmChpd/kn5uXIySf4+TcWpvk3yTg41vZ4eGiX+Ogmt2iI59hYlzd3mNg4iDe3h/fYOPhnKGdIKGg3uPeGyViHeEhHV0joOUdnt8eHWLnIV4eHh2cpeViXV5dHaAjZaNd2x7fH+Gm4F7dHiAh32PjnVqmHN4hJZygYKIfXd7lHt2iZltcYOLcoiRinZxfoGCf5qHbXh+fn+VjX54boV5jYqMeHp6eoSJiIp2dYOCdJGPeXGQboGJiHyKdXiOe3qZdXaEj2uNh3h9e4eIgIGBf3eAhIqKc4d5fXaRgoeBeXqBfYGOim2Hfn9ymnqAgoCBgH96j3N7lYJ3eJFzeoKafXSDf3V0lJCMbH6CaYGPpHKBcHp1eKeFiHJ9a3yMiZxye3tycpiUeYp0dnWHg5x9coVugn6Zeod6c35+k4KBf3aDbJ16jnCLcX6FiIWBdYh0g4GYboKAfHqQgIR6fXmKeI6GfXeCeIOHint/eoF3i4iBfIN/eoCIg393iH98goqCcIKIg3mIjmx1iIWFeZJ1gG2Jj31/h4Noe5d7hn+MbHmDjIl5hX9xdYyOi3eCdnhxmY98iHdsfYSJiJ1igW+De5KNhH9seoOBiIiTZnt+iHKSjXt2foN8f4uHeHiHgIF6h4d4dZODcoSJdH6Ne4h9gHyAgIWLeICDeX1+lnSCgIN1goeFfoF2h3eLfYp8eH+DgYSLfHSFdYaNf3uJeW2Rin+BhXd9eIeMhHaBgnh6j5B3c4t6dIeXe4F0gX1+gZaJa3yCfHiOlHOCdYN0joSCiHZ+fYN9h4h0hYJ7fox9dI2BdoqNc3x/foGOe419a3yNf4GQh214eYt9jYmBdnZ7g4yDh4VvdoOFg46Dd356e4aOfX+GeXWFiIKBgnyGeXyKiHV+jH10h4Z+d4qAgYB+gYR3g4uBc4x8d4WIgoCAf3iFfop9i3d0in2Chol4fn9xmH16iodvc5V7g4WFfXOEgIp9hIJ8eH+MgXyKgXN7joB9h4hvgIOGe5F2gH94hIx/eo95bZOCfniVeXp9iohxhoWDen+KgXd3lX52iJBydoaIe4OJhXZ6gImAgYSRanqHjHaKiHp6fYOKf4GEgXV+i4aBfYN8d4aIhYF+f3mGeo2EgXt9g3eLhIZ+fH2AiHyHhnp8gYKBiX6GfHp8j3+FgoB2foaFh4CCeX+BgYmDgnuCe4OEgYh/f3uFgX2Gg4R0iYJ/foiAfoGAhYR3g4WAeIuEfH2GfoGCg4OCenuMfn6FiHZ8hYOCgYGAgH5+iYF8gYp3eIqFfYCFe4B+g4eCfICGeX6Kg3x9iHiAg4WAgXx8hoB+h397fIWAgoSCfIB7gYOIfn+EeXmCiYOBhHaAeYaEh31+g3p6h4Z/fod8fIJ+hX+AgId9eId/e4OFgnuFeYR7hIKDgn2AfICCgoV9g3p+gIR/hIF/eYR/goSDfXuBfISFgIN7fniKfoOFfX94hnuIgYCCfIF7hn+Ag3yEe4Z8gn6Af4KCgH+Cen+Dgn6Egnp7g4CGf4R8f3qDiHyCg355foh/g4CEfHeDhIN8hYJ6fICHfn+HgXx4iX2AgYWAfICBgnyAhn+AgIN8gH+CgoOAgX19f4CEgYN9fnx/g4KGfIF9f36Bh36CfYF7f4OEgn9/gH2BgIZ+gIF+fIKDf3+Ge4F/hH9+f4GGfIGCfnx/iH6BgoF8fYSAg4J/gX19f4WDf4V9fX2BgoKGfX9/fX+Ch3yEf398gIKChH2CgHx9g4V7g4OCeYCCgX9/hoF+e4R/fYGEhHx/gIB+gYZ+gX2BfoGAhYJ8foJ/goKCfn5+goSAf4N+f32GgIF+gYF7gIKFfn+DfIF8h3+BfYKAfISBgX5/g32DfoR8f4CBgn6Ef35/gIGAhH6Bf32AgYGCg35+f3+BgoGAgX5+gIJ/goGBfYGAgIGAgYCAgIGBfYJ/gn6DgH9/gYF+goCAgH6CgIJ9g35+gIKBgICBfoB/goCCgIB/foCDf4GAgn2BgIGBgIF/gX+BgoB/f4F/gYGBgH9/gYJ/goCBfYGAgYCAg31/f4OAgIJ/gH2CgYCBgIJ8gYCCf4GBf3+AgYB/goB/f4KAgICCf4B/goCAf4J+f4KAf4CAgH+CfoN+gX+Bf4CCf4GAgICAgX+BgICAgIF/gX+BgICBgIB/gIGAgYCBf4CAgYGAgICAf4CBgICAgYCAgIGAgICAgYCAgIF/gYCAgICBf4CAgYF/gYCAfoGAgYCBgIB/gICCf4F/gH6BgIGAgX+Af4GAgYCBgICAgICAf4GAgICBgICAgICAgIGAgH+AgICBgIB/gICAgYCBgIB/gICAgICAgICAgICAgICAgICAgH+Bf4CAgYCAgICAgICBf4F/gX+AgIGAgICAgIGAgX+Af4F/gYCAgICAgICBgICAgICAgICAgICAgICAgIA="}, "bian_low": {"name": "TUBLR84", "sr": 22050, "bits": 8, "unity": 60, "fine": -5, "lstart": 294, "llen": 872, "b64": "gKWZs0cwbJaHgXCLhYuBh4xrZJmIfj+M/JA5MGCXvcXHhl1RVGVDdsqKSW662pdAPk10r87UfE15VSlivNSUV32rrpBRTC9Iu9WafpB4MQ5sydereYqFdoqDPC14u7KWrrp7IRpqtLSuomNAfJ5nMEyYrp2gzcRpHTJXeMTioUxblpdcSHmkkXerwpNjSSEZbNztnGd4mXlJaJ6PgJSZhn2GbUtKgrW5k4iCVkBOfKC3tKSAUzFAgae0mXp9k5GEblBYhrOwsbSHOAodbLnEsJJ+d4iGYEZng4qessGfVRoubbLZ1KFpc3llTVRofn+JtcmrYDQlR53gzph3aWpYVW+RkYaYvL+tgjEJMYrHyZyBcl1FVYeTlJSRkK2xhTkKMYfMzb+vh1FKWm+Tn5N1dJGrjEATP4Ss0ti0gFY6PV2Ts6Z8bJ68k1hERm2hx8qrgk0rHkWUz619gZajj29IQl6Rt8Wxl3cxFVKt0cCZgHuEf2NKOVKLqajAvYExGUyVy8mlfm5rgXNOVnyWl7LOx4Q5DSx1q8uyeF11eWRdeI2LkaHCw4lAHRxcuubDj4J6aFtkepB8dI+kppBfGRJdwN3Pq4t3UURghomLiYmTtLlyLSBaqM+/sJFZMjVTcJislHuUtbuCNCdYjq/KxJhhTDhFf7XEn3Z6qKFsNi9AZ6vKwqiGVDc5dsPQnXF/kIh3XTtKeqrJyLeYXRgVYrO2noNudYeDaldYhai3t8SuUw8ZWZ3OwJx7dIOEbU9hg4aCrL+fXR4WS5zX4LSAb4RzUl97fXqIpsOxfDkgOoXY36N4dFpJR2WCi4eLqr+6l1oTKYXGzLCVdllCTXGYmZaViZq3mUILH2uox8Gvj1xDV3OOt62FcJKwlFMhL2mivtvDi19CMkWJtah2aoKpmmJJTWOWz9e+mnI2FjqGw7yGdZCUjnlaPlOIqrKypHQ6CDOVz8mulX+EjYBRSVt+nKO0wZQ4FDeAuNO7gWZrcmlSTHSMjaDO1p1VKShhtNLDimNnclxSc46JgaG1vZ5ZGxBCm93HmICBZ1RtipWUiomjqqBvJwU+pNTHtZ5wUkNVeI+OiH6BoreMMiNXmsjZx6Z0QDZEao2tnG95rbeESypJeafDxqRsSDYzYLfPq4SFo62HVDpBYJLGvqSOYiYkY7LSrIJziIV2Y0Y6aaa3xsa1cy0cV6vIr455YXWCZ0tWepeltce2chgNRoe70Kh5cYKHb2Zwi5GKociwZy8OKnXK3baGdHZvWVeBhXV+n7SxkFAfLH/N7cOPgG1EQmN8g4GGi6e5omEjGmu/ybmkhlQ9R2aJp6aUkpi8tGYZIV2TtcO0hWA9PV6Hr72Ra4evn1wzMFKNwNTQpnJTOEF/w7mCZX2PjW5DQVOBuNbBqIZKEyWAuL+bfH+TkIRuTliFsK+yt4o4CBpqucaxlH12iIdiR2WDiZ20w6FUFy1ustrVoWhxeGVNVWh+fom2y6tfMiRJnuHOmHZoallUbpGRhpi8v62CMQkyisfJnIFyXUVVh5SUlJGQrbGFOgoxh8zNv6+H"}, "sheng": {"name": "BANDO64", "sr": 22050, "bits": 8, "unity": 64, "fine": 3, "lstart": 723, "llen": 67, "b64": "gICAgIB/f39/fn5+f39/f4CAgIGBgYGBgYCAf35+fX19fX19fn+AgYKDg4ODg4KAf359fX19fn+AgoOFh4mKi4yLioiFgn58eXd2dXV3eHp8fn+Bg4SFhYWEg4F+fHp4d3d2dnd4e36BhIeJiYmIhoSBfHl3d3h6e36ChYmNkpaanZ+empSMg3hvaWZlZWdrcXZ6fH6Ag4eJi4uKh4J8d3Jvbm5vb3BxdHqCiIyPkZCMiYeEfHRubnJ2eXyAh42Tm6Oqr7S0r6WYiXhpXVhXWFhcZW92eHl8gIaNkZOSjYd/dm1oZmZoaWhoaXB9iY+RlZeTjYqJhXhrZWlyd3l7gYuUm6SutrzAv7epmIZ0YlZSUlNTV2NvdXZ4e4CHkJSVk46HfnVsZmRmZ2hoZ2hwfYiOj5OWk46LioV5bGVpcnd4eoCLlZylrra8wL+3qZiGdGNXUlJTU1dib3V2eHt/h5CVlpSPh392bWZkZWdoaGdocH2IjY6RlJKOjIuFeWtkaHJ3d3mAjJefqLK6wcXDuaqWgnBgU05PUE5SYXB0c3Z7gIqUmZmWj4Z9c2liYWNlZWRiZHKDjY6Nk5iTj4+NhHJhXWl3eHF2hZaiqbPBy9HVzsCqkHtoVEZDRkU+SmVybGt1fIOSn6Gfm5CDeW1dV1pfXV1bV2F7jY6Ljpydk5SWjn1mU1lueW5neZCirbfF1+Lo6tzKq4t1YEY2NDsyK0Zoa19odnuFnKmnp6KPgXpmUVBUWFRXUU1ig46MipGjnpeemYt5XkhXbnVjY3+Yq7nF1Ov1/Pnq1KuIcls7KykyIyFEZmNaaHZ5iaCvrKymj4F7Yk1MUVVQVUxKY4OMiomRoZ6aoZmKe2BIVm50YWGAmKq8xtPs9/z469Srh3NePiooMiIgRGRgWmh1eYmgsa6uqJCCfWNNS1FUUVVLSmWDioeHj52dnaOYiX1iSFZucmBggJeqv8jS7fr79+zUqoZ0YUAqJzEhIUNiXlpodHmJn7Kwr6mQg39kTktSVFFUS0xngYeEhY2YnZ+ll4h+ZElWbXFgYIA="}, "tanggu": {"name": "SURDO60", "sr": 22050, "bits": 8, "unity": 60, "fine": -1, "lstart": 3574, "llen": 1317, "b64": "gH+Ogn2Ti4eGiIOChoqRlJSQlY6SkpqVjZObmp6ilXZcV09Xa3BobG53cVc2LlVgcHlqZVxWXEwvODw7QEhHU045OFNeZ3yDi5CVpqubpLzT8Pzn0snH3PL29/fmyamZnJ6yrpuQhIqhqqSUj5OWjnx8ip6egGZieox4WV5wfYeGgHRqb3V9em9zbmFjcHp5blM5MC8tKScdEBstNkJPVVdXU0pITFVhYmNreX+Dj4uPk52gn5SOgnh9i5iUlp+wvMPHzuHe0M/Qv7fBz8apkJaSh35wdHZtam57gXRlZniIkZSWnJ6dn6art8fPysWzl4yQlJSCbG1rYltTRTo7Pk5XT0hVTEdUX1VQU11paVxPQzMlLktYVE9KQSweKDYzKjRBUGJpb2ZaWF5qgpy2v8K7t8bR1+Laxr26vMLO0M7W3uLl5ung09Hf5tC7sbPEvLS2sKeXgXJvdHp1dWtmZWJYUUZEVmJbWFpjZl1WV2RlZGplWlZTVFxmaWZthpqZjYSHlaGqtrWupp6UhXt1dmtbSkE4MS8pKjQ3P0hTXGNqbnZ8gISKkJuqsqmblpqblYt/d3Fzcm9tcHmDipGNg3lzcHeEkJaaoKSkqKyurq+3ubvAwLuwo5ucnqCnraufkIuHg4KDjY+IiZKWlI6GgIKJj5SLh4eDgoiOlpeQe2JMQDs9QDw6Pjw3LyEVExcbKTtPW1heZmtub3V7f4F/enZ1dXR0b2ZiZm1xcm5xdXFwcnJucXqBhomLjYqNkZicnZ+kqaqusLCsp56dn5ybnqCdmJaboamwsq+xrq+xs7bBxsjKycW7tLS5u7q8wMLAtamclZOVlJCHfHZvYV9gXFdXVlNPSEdCOTxFTFZaXFxYU1BGPDY2NzYxKycmIyUlIykmIyEeHhwgKTM9R09dbHeAhIyZo6y3wMjP1dfV09PV1tXPycjIxsXIysbFyMnLzszNzsvGxMTDydPTy8zS1tPKwbevqZ6TiX92dnh0bGZhYGJfVk5KTFNbWVFJRkdISUdHSUlKRj44MzAuLzE0My8sLjEvMjU1MzQ4O0FNWGFma3N8houMjI6QmqWusK+urKuqqaSdmJKPjYqIiYmJioyQm6KoqaWjoqGlrLS4ub7Eztfb3t3W0c7NyMK9ubm3s62lnpyampeRjImKi4Z/eXNzc25lXVxaVE9PUlVYWlpUTEdEQj46NzIrJBwWEhIWHCYuNT9HTE9QVFZaYWZrb3N0c3N1en6DhIaJi4uHhISHiImLjpCRk5WYnqWttL3HztHS0tHOy8jJzdHR0MzFvLSvq6einpqZmZmWkY2MjY2QlJWWlpiampiWmJyfoZ6ZlpiYkoqDfHZxamdkX1tYV1RRS0M7NTM1ODk3NDU4PT8/Pjw7Ojw+P0RKTU5OTk5NT05OTlFWWVtcXV9fYGRobHB3gIqVn6Okp6yxtbvBxsjJyMjHxcTCv726ube2t7i5uLe3ury+v8DBxcnJxcC+vLy8vb/BwsTFwrqvoZWKgXt1cWxoY1xWU09LSEVCQkFBRUpMS0dBPDg2NTMxMDM2Oj09P0JEREVGSEpLSklHRUVGSEpOUlheZWtvcXR5gISHiImJioyPk5icoKOlp6mrq62urq6wsbK0tLO0tbi8wcfP1drc3+De3N3g4eDc1czDurOrpJ2ZlpSSjomCeXJtaGZlZmZoaGZjYWBgYWFhX11bV1JPTEpHQj87ODUxLionJSIhICEjJisvMzc5PUBESU5UW2BlZ2pvc3Z6fYGEiIyRlZibnqCjpamsr7GysrGysrGwsra6vsLHzdHT0dDR0tHPzMjGw7+7uLa2tbWyr6yoo6GgoaKioZ6bmZeVkpGRkJGSkpKRj4qDe3NsZFxUTUY+NS0oJSIgISMlJycpLTAzNzs/QUNERkhKTVBUV1lbXFxdXV1dXl5dW1lZW15hZGlsb3N4f4WLkJWan6WprbG0tri6u72+vr/AwsTGycvMzc7Q0c/My8nGwb24tLGvra2sq6mnpKOioJ2al5WSj4uHhH96dXFvbWtqZ2VjX1xYVFFPS0dFQ0JBPz08PDw+P0BCREZISEdHR0ZFREJAPTs6OTk5Oz9CRkxSWWBnbHJ3fYKGi4+Tl5yhpairra+xsrOysa+urqysrK6ytri6u7y+v7/Aw8bIycrLy8rJycrLysjDvrixrKejoJ2bm5qZmZeTj4qGg4GAf315dHBsZV5YVFJQTEdDQT89Ozk2NDIwLy4vMDEzNDU3ODo9QERHS01OUFFTU1RWWFpbXV9iZ2tvdHp/g4eLjpCTlZaXl5eZm52goqWnqaywtLi9wsXIyszQ09bY2NjW0s7Lx8TCwL69vLm3s7CsqaWinZqWlJGPjYqHhYOCgoKCgH57d3JuaWRfWVVRTkpFQDw4Nzc3ODg5Ojw9P0BBQkJCQkFAQEFDRUdJSktNTk9PUFJVV1lcX2FkZmpudHl/ho2Ump+hoqOkpqirrrGzs7OysrO1t7q9wMPGyMvMzc3LysjFwb26t7W0s7KysbCvrq2rqqmnpaKfnJqYlI+Lh4J+enh2c29saGRfWldSUE5LSERAPDk3NjU1NDQ1Njk8PkBBQUFBQUJER0pMTEtKSktNT1NXW19jaGxwcnZ6f4KEh4mLjZCSlZaYmp2foqWoqqytr7Gztri6vb/Aw8XHx8jJysvLysrJyMjHxcTCwL66tbGuqqeloqCdmpeVko6Kh4SBfXhya2RgXFhUUU9OTUxLSkhGRENCQUBAPz49PTw8PDs6Ozw+Pj9BQ0dLTU9QUFBQUE9QUVRYXGFma3B1eX6BhYiMjpCRk5SVl5mcn6OorbG1t7i6vL/CxcjKy8zNzczKyMfGxcPBwMC+vbu5t7SysK2rqaejn52bmpeVk5GQkI6MiYWCf3t1cGtmYl1ZVVFOS0lIRUNBPz49PDw6Ojo7Ozo5NzY2NTY2ODo8P0JFSEtPU1ZZXF9iZWdqbXBydXh7foGDhomMj5GTlpiam56ipaiqrK+xs7W4u7/DxsnLzc7Ozs7Ny8nGw8G+vLq4trW0s7KysbCuraqopaKfnJqWko6JhYB6dnJva2ZhXFhVU1JQTkxLSkdEQT49PT0+Pj4/P0BBQkJBQUJCQ0NDQkJDRUZHR0hKTlFUV1pfY2dqbXBydXd6fH5/gYSIi46SlpqeoqiutLi8vsDCxMbHyMnJysvKycnJyMfFw8LCwcC+vLm2s7Guq6moqKiop6empKKgnZqWkYuGgHt2cm1pZmJeW1lYVlRTUlFQT0xKR0VDQj89Ozo6Ojk5ODc3OTs9Pj4+P0FCREVGSEpOU1daXmNobnN2en6ChIaIiYqLjY+RlJeZnJ+ipamsr7K0tri6vb/BwsTGx8bFw8HAwL++vb29vb28vLy7urm4t7Wzr6uopaGdmZaTkI2Ig397eHRwbGhkYV1YVVJQT01MS0pJSEhISEhHRkVEQ0E/PDo5ODg5Ojs9PkFER0pMT1JVWFpbXV9hY2ZqbXF1eHt+gIOGh4iKjI+Rk5WYm56hpamtsra5vMDEx8nKy8zMy8rJyMbEwr+9urm3tbOxsK+trKyrqqilpKKgnZqWk5CNioaDgH16d3RwbWxqaGVhXltYVVJPTElGREJAPjw7Ojs8PT09PT09PT09Pj4/QUJER0pOUldbXmFlZ2prbG5wc3R1dnh6fYCDh4uPlJicn6OmqayvsrS2tra3ubu9vsDBwsPDw8PCwcC+vLq4trWzsbCvrq6vr6+urayrqaekoZ6cmJSPioaCfnp3c3BsaWViX1tYVlRSUE5LSUdGRkRDQkA/Pj4+P0BAQUFBQkNERUZISktNTlBSVFdZW15gY2VnaWxvcnV4e36Ag4aJjI+TlpqdoKOnqq2vsbO1t7m6vL2+v7+/v7/AwMC/v769vby8u7m4t7W0srCtqqekop+dmpiVko+MiYaDgH16dnNwbmtoZWJfXVpZV1dWVVNRT05MSkdFQ0JAPz4+Pj09PT5AQ0RGSEpLTU9QUlRWV1hZW11fYWNmam1wc3d7foGEiIuOkpWYm56go6aprK6xs7S2uLm7vL2+vr+/v769vLu7ubi3t7a2trW1tbW0s7GvraqopaKem5iVko+MiIWCf3x6d3Vzb2xqZ2RhXVlWU1BMSUZEQkFBQUFBQkJCQkNDREREREVHSEhKTE5QU1VXWlxdX2BhYmRlZmhqbG5xdXl9gISHio2QlJicn6Gkp6iqq6ytrrCxs7W2t7i6u7y9vb28vLy7u7q6urq6urq5ubi3tLKvrKikoZ2ZlpKOioeDgX58enh1c3FubGpoZmRhX11bWFVSUE5MSklHRURDQkNDQ0NERENERUZGRkZHSUlKTE5QUlRWWFteYWRnam1wc3Z5fH+ChIeJjI+Tl5qdoKSnqautrrCwsLGxsrOztLW2t7e4uru7u7u7urm4uLe1s7Kwr62qqKWjoZ+cmpiWk5COi4iGg4B+fHt5dnRxb21raWdkYl9bV1NQTUtJRkRBPz49PTw9PT4/QUNFR0lLTU9RU1RUVVdZWltdX2FjZWZoamxvcnR3enx/gYOGiY2RlJeanqGkp6qsr7GytLa4ubq7vLy8vLy9vb28vLu7urm4uLe2tbOxr6yqp6SioJ6bmJaUkpCNioiFgn98eXZzcG1raWdkYV5bWVdVUk9NTEtKSUhHRkZFRUVFRUZHSUtMTU5PUVJTVFRUVVZWVlZXWFpcXmFkZ2tvcnZ6fYGEiIuPkpWYm56ho6Woqq2vsLGysrO0tba3t7i4uLi5ubm4ubm4uLe3t7e2tbSzsbCurKmno6Cdm5iWk4+MiYaCfnt3dXJwbWtpZ2VjYF1bWVdVUlBOTElHRURDQkJCQkJCQkNERUVFRkhJSktMTU5RVFdYWlxfYmRmaGtucHR3en2Ag4aIio2Qk5WYmpudnqCipKanqausrrCytLW2uLq8vb6+vr28u7q5uLe3trW0s7GvrayqqKWin5yZl5SRjoyJhoSCf3x6eHZzcW5saWZjYF1aV1VSUE5NS0lHRURDQkJCQkJDQ0VGR0dISktMTU1OT1BSVFVWWFteYGNmaWxucXN2eHp+gYSGiIuNkJOWmZ2gpamsrrGztLW2t7i5urq6uru8vL28vLu6ubi3tbSzsrCurKqop6ako6Gfnp2cmpiWk5CNi4iEgX16d3VycGxpZWNgXVpXVFFPTUxLSUhGRUVFRERERUVFRkdISElJSkpLTExNTlBSU1VWWVxfYmRnamxvcnV4e32Ag4WHiYyPkpWYmp2go6aoqqyusLGytLW2t7e4ubm6urq6urm4uLi3t7a2tbSzsrCuq6mnpKKgnpyamJWSj4yKh4SBfXp2c29saWZiYF1aWFZUUlBPTU1MS0pJSEhHRkZFRERFRUZGRkdJSkxNTU5QUlNVVVZXWlxfYmVnam1wdHd6fYGEhoiKjI6QkpSWmZyeoaSnqqyvsbO1t7i6u7y8vLy8u7u6ubi3t7a1tbW1tLOxsK6sqqilo6GfnZuZlpSRj4yKh4SBfXt4dXJvbGlmY19cWVZTUVBOTEtKSUhHRkZGRkZGRUVGRkZGRkZHSElJSktNT1BSVFZYW15hY2Vnam5xdXh7foGEhoiLjpGUl5qcn6GjpaaoqqyusLGztba3uLm6u7u8u7q5uLe2trW1tLS0tLOzsrGvrqyrqKakoJ2alpOPi4iFgn98eXd0cW5saWdkYF1aV1VTUU9OTExLS0pJSUlJSEhJSEhISEdGRkZHSEhJSUpLTU5QUlRXW15hY2ZpbG9ydnh7foGEhoiKjY+RlJeZm56go6Wnqaytr7Cys7W3uLm5u7y9vb29vb29vby7urm3tbOxrqypp6SioJ6cmZeVkpCNioiFgn99end1c3BubGlmY2BeXFpYVVJQT01MSkdFREJCQUFAQUFCQkJDRUZHSElJSkxOUFJUVllcYGJkZmlsb3J1d3l8foGChIWIio2Qk5WXmZ2go6aoq66wsrO1t7m6u7y9vb6+vr29vLu7urm4trW0srGvrKqnpaOhn56cmpiWlJKQjoyKh4WDgX57eHRwbGhlYFxZVlRSUE5MS0pJSEdGRUVEQ0NCQkNERERFRkhJS0xNT1FTVFVWV1lbXV5fYGJkZ2pucXR4fH+ChYiLjpKVmJqcn6KlqKmsrrCytLW3uLm6u7u8vLy7u7q5uLe3t7a1tLOzsrGvrq2rqaako6GfnJqXlJKPjYqHhIJ/fHl2c29saGVhXVlXVVNRT01MS0pKSUlISEdHR0ZGR0dHR0dHR0hISUlKS01PUVJTVVdaXF5gYmNmaWxvcnV5fH+ChomMkJOWmZyeoaOlp6iqrK2ur7CxsrS1t7i5uru7u7u7urq6ubi4t7a1tLKxsK6tq6mnpaOhnpqXlJCNioeDgH17eHZzcW5raGZjYFxaV1VSUE5MS0lIR0ZFRURDQ0NEREVFRUVFREVFRkdISkxOUFJUVllcX2JkZmhrbXBzdnl7foGDhYeKjpGUl5mcn6Kkp6mrra+wsbKztba3t7g="}, "muyu": {"name": "WODBK60", "sr": 22050, "bits": 8, "unity": 68, "fine": 45, "lstart": 0, "llen": 0, "b64": "foN4mNuTNE1vam+DYjKJ8r9GeOHBekNDkvzpY0WjtYQ0GCkqSZiHjp2hmaa1tJOCp9W6hJXQ2JMwChtTTCE2Ml2AkIuKoa6FdKLn6dDL1sSZjYdgJREtUmA0KjRBe3tbVHivzsvDzOHs0LSwqYJXVWRfVVQsHikvNUZzfHmUutPUu6Ssx8mtmaW1oXNWU0w0HyApLjpghpmbkYuWqKeVlbHQ2c27q5l1RTE8QjUtOVBpfH50bXKAjJeepKq+2ODGm3ZoZF1RTltsamBfZmpnYWJwh5qenKCoqKCal419dHV9f3lvbnBpXl9ufH55eIaYnY+BfIGKjIqPkYh8entwZGBofY2MipCSjoZ/fHp3cXaDjI6Ie3Z3cmtoa254jaCqqqCTiHx1cXB3gYiHg4B6dm9hW2FudXyIkpmhpKCYi355fIKKjpGNhXhpYmBcW2FtfISDg4mSmJiWlJOQkJKSjoiBfXlxaGFfY2lvdHd6enuBi5WbnZyalJCMh4KBg4N/enVybWVhZ2tscHaBipCXm56akouJh4WFhoeKiX5waWNeXmJteYOIio+Uk4+LioyJh4qJh4iGg3xza2hoaW50fISHiYuIhoaGhoSEiY2LhYCEiIJ2cnN2dnRzeIKHhIGDhYSBgoOChIWGhYSDg4GAfnt8end2eHx+foKIi4iFgX59fHx+f4GChIiKhn98fXx4dnuAg4WFhIeFf3t4eHt8fYCDiImHgX17fH6BgX+AhYmJhYF9fn96dXV7f4F+fYKGhX15fIKEhISGiYmHg4F+fH1+e3Z1e4F/end6gIKCgYKDh4mHh4eEhIWDgH+Afnl3d3l6eHh6fYGCgoCChIaEg4KGjI6LhoJ/e3d4d3Z3eXx7e31+fn9/foCEiImJiYuNiYN+fHp3d3p+gX98enp7e3p5foKEhYeJiIeFhIWDf3x9f4B/fHx8fHp5ent8foCEh4aCgIKFhYKCg4KBgYGAfnx7ent+fn5+f39/gIGCg4GBg4WGhYKCgH17fX19f4GAf4KBfXx9fX5/gYSGhoOCgoF+fHt+gIGBgoOBf39/fX19fX+Cg4OEhYN+fXx7fH1/gYSDgICDg4B+f4CBgICBg4SBgH9/f3x6fH5/fn+BgoKAf3+AgYGBg4ODhIOCgYB+fn+AgH58e3x+fn5/f35/gIKDgoOEhYWEgoCDg4ODgX5+fHp5enp7fH5+fX+BgYKChIaGhIWIiYaCgH59fn17eXx8fHp6fH+Bf31+gYWIh4SDhYaGg4B/gIF/fXx8fn58fH1/fn9+fn6Bg4KAf4KFh4aDgIGEgn98fX+Af35+f4B+fHt7foCBgH+BhIaCgIKFhIB/gIGCgX9/gIB/gIB+e3t/gX99f4KDgH5+gIKBgIGDgoOEg4GAgYOBf35/gIB8eXp/gX57e36AgYGDhIaGhYSEgoGBgoF/gIB8eXl5enx9fX5+f4CDg4SGiIeGhYWGhYOBf358e3h2d3p7enl8f4CAgIOGiIqLioiGhYOAgIB/fXt5d3d5eXl4enx/gYKDhYeIiYiHhYWEhIKAgIB+enh5eXl5eXp8fX6AgoODhYaEhIaHhoWEg4KBf3x7e3x7eXp9fn19fn5/gIGDhISDhIWFhYOBgICBgH+Af318fHx+fXt7fX+AgYGCgoKCgoKCgoSEhISCgX9+fXx8fn9+fX1+fn59fX5/gICChISEhIODgoGAgIGBgYGAgH99fHx8fHt8fn9/gIKDg4OBgYGBgoSFhYOCgoF/fHx9fnx8fH1/fnx9gIKBgICBhIWFhISDg4SDgH59fn9+fXx8fHt7e31/gYGAgYKEhIOEhISFhIOCgYCAfn17e3t8fHx8fX+BgICAgYKDhISGiIaEgoGAf359fXx8fH1+fXx8fH6AgICChIWGhYWGhYOAfn+Af35+fn19fXt6e3x+gIGCgoODhISDg4KDg4GAgICAf319fX18e3x/gICAgYGCgoKBg4SEg4OBgX9+fn5+fn9+fn1+f4CAgICBgYKDgoKCgoF/f39/f35+f4CAf39+f4CAgYGBgoODgoGAf4CAf35/f39/fn9/gH9+fn+Bg4OCgoKDgoB/f4CAgH9/fn5/f39+fX5/gH9/gYSEg4CAgoKBgYGBgYF/fn5+fn5+fn5/f4CBgYGBgYGBgoKCg4KBgYB/f35+f39/f35+f39/f4CBgYKCgoKDg4KBgH9/gICAf39/f359fX5+f4CBgoKCgoGCgoGBgICAgYCAgIB/f39+fX1+gICAgYGBgYGBgYGAgICBgYGAgICAgH9/f39/f4CAgICAgYCA"}};
+var DLS_W4_BUFS = {};
+
+
+function mixDlsNoteIntoFloatArrays(L, R, outSr, dataDict, key, startSec, durSec, targetHz, gain, pan, slideRatio) {
+  var d = dataDict ? dataDict[key] : null;
+  if (!d || !d.b64) return;
+  var bin = (typeof atob !== 'undefined') ? atob(d.b64) : '';
+  var nSamps = bin.length;
+  if (nSamps < 16) return;
+  var inSr = d.sr || 22050;
+  var rootHz = 440.0 * Math.pow(2.0, ((d.unity || 60) - 69.0) / 12.0);
+  var lstart = d.lstart || 0, llen = d.llen || 0;
+  var hasLoop = (llen > 8 && (lstart + llen) <= nSamps);
+
+  var startIdx = Math.floor(startSec * outSr);
+  var durFrames = Math.floor(durSec * outSr);
+  var total = L.length;
+  var baseStep = Math.max(0.2, Math.min(4.0, targetHz / rootHz)) * (inSr / outSr);
+  var p = Math.max(-0.9, Math.min(0.9, pan || 0));
+  var gL = gain * Math.sqrt(0.5 * (1.0 - p));
+  var gR = gain * Math.sqrt(0.5 * (1.0 + p));
+  var att = Math.max(1, Math.floor(0.012 * outSr));
+  var rel = Math.max(1, Math.floor(Math.min(0.18, durSec * 0.35) * outSr));
+  var pos = 0.0;
+
+  for (var i = 0; i < durFrames; i++) {
+    var idx = startIdx + i;
+    if (idx >= total) break;
+    var cur = Math.floor(pos);
+    var frac = pos - cur;
+    var nxt = cur + 1;
+    if (hasLoop && cur >= lstart + llen - 1) {
+      cur = lstart + ((cur - lstart) % llen);
+      nxt = lstart + ((cur - lstart + 1) % llen);
+    } else if (cur >= nSamps - 1) {
+      break;
+    }
+    var s0 = (bin.charCodeAt(cur) - 128.0) / 128.0;
+    var s1 = (bin.charCodeAt(nxt) - 128.0) / 128.0;
+    var val = s0 + frac * (s1 - s0);
+    var env = 1.0;
+    if (i < att) env = i / att;
+    else if (!hasLoop) env = Math.exp(-(i / outSr) * 3.5);
+    if (i > durFrames - rel) {
+      var u = (i - (durFrames - rel)) / rel;
+      env *= 0.5 * (1.0 + Math.cos(Math.PI * u));
+    }
+    L[idx] = Math.max(-0.98, Math.min(0.98, L[idx] + val * env * gL));
+    R[idx] = Math.max(-0.98, Math.min(0.98, R[idx] + val * env * gR));
+    var sMul = (slideRatio && slideRatio !== 1.0 && i < outSr * 0.10) ? (slideRatio + (1.0 - slideRatio) * (i / (outSr * 0.10))) : 1.0;
+    pos += baseStep * sMul;
+  }
+}
+
+function getDlsSingleNoteBuf(ctx, key) {
+  if (!ctx || !DLS_W4_DATA[key]) return null;
+  if (DLS_W4_BUFS[key]) return DLS_W4_BUFS[key];
+  var d = DLS_W4_DATA[key];
+  var bin = (typeof atob !== 'undefined') ? atob(d.b64) : '';
+  var len = bin.length;
+  if (len < 16) return null;
+  var buf = ctx.createBuffer(1, len, d.sr || 22050);
+  var ch = buf.getChannelData(0);
+  for (var i = 0; i < len; i++) {
+    ch[i] = (bin.charCodeAt(i) - 128.0) / 128.0;
+  }
+  var rootHz = 440.0 * Math.pow(2.0, ((d.unity || 60) - 69.0) / 12.0);
+  DLS_W4_BUFS[key] = {
+    buf: buf,
+    sr: d.sr || 22050,
+    rootHz: rootHz,
+    loopStart: (d.lstart || 0) / (d.sr || 22050),
+    loopEnd: ((d.lstart || 0) + (d.llen || 0)) / (d.sr || 22050),
+    hasLoop: (d.llen || 0) > 8
+  };
+  return DLS_W4_BUFS[key];
+}
+
+function triggerDlsVoice4(ctx, dest, key, targetFreq, gainVal, durSec, attSec, vibratoHz, vibratoCents, slideFromRatio) {
+  var item = getDlsSingleNoteBuf(ctx, key);
+  if (!item) return null;
+  var now = ctx.currentTime;
+  var src = ctx.createBufferSource();
+  src.buffer = item.buf;
+  if (item.hasLoop) {
+    src.loop = true;
+    src.loopStart = item.loopStart;
+    src.loopEnd = item.loopEnd;
+  }
+  var baseRate = Math.max(0.18, Math.min(4.0, targetFreq / item.rootHz));
+  if (slideFromRatio && slideFromRatio !== 1.0) {
+    src.playbackRate.setValueAtTime(baseRate * slideFromRatio, now);
+    src.playbackRate.exponentialRampToValueAtTime(baseRate, now + Math.min(0.14, durSec * 0.35));
+  } else {
+    src.playbackRate.setValueAtTime(baseRate, now);
+  }
+  if (vibratoHz > 0 && vibratoCents > 0) {
+    var lfo = ctx.createOscillator();
+    var lfoGain = ctx.createGain();
+    lfo.frequency.value = vibratoHz;
+    lfoGain.gain.setValueAtTime(0.001, now);
+    lfoGain.gain.linearRampToValueAtTime(vibratoCents, now + Math.min(0.18, durSec * 0.4));
+    lfo.connect(lfoGain);
+    lfoGain.connect(src.detune);
+    lfo.start(now);
+    lfo.stop(now + durSec + 0.05);
+  }
+  var g = ctx.createGain();
+  var att = attSec || 0.012;
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(gainVal, now + att);
+  if (item.hasLoop) {
+    g.gain.setValueAtTime(gainVal * 0.85, now + Math.max(att + 0.01, durSec * 0.45));
+  }
+  g.gain.exponentialRampToValueAtTime(0.0002, now + durSec);
+  src.connect(g);
+  g.connect(dest);
+  src.start(now);
+  src.stop(now + durSec + 0.03);
+  return src;
+}
+
+function playSilkThreadSegment(th, isUserStrum, forcedFreq) {
+  if (!audioCtx || !th) return;
+  th.glow = isUserStrum ? 1.75 : 1.45;
+  th.vibAmp = isUserStrum ? 16.0 : 11.5;
+  var now = audioCtx.currentTime;
+  var p1 = PEGS[th.p1], p2 = PEGS[th.p2];
+  if (p1) p1.glow = 1.25;
+  if (p2) p2.glow = 1.25;
+
+  var cid = (th.colorId !== undefined ? th.colorId : state.activeSpool) % 8;
+  var spool = SPOOLS[cid];
+  if (isUserStrum && p1 && p2) spawnSilkParticles(p1, p2, spool.hex);
+
+  // ==========================================================================
+  // STRICT PHYSICAL & MUSICAL LAW MAPPING (Thread Geometry -> Acoustic Sound)
+  // 1. Thread Length (th.len: 0.12 short .. 0.72 long) -> Pitch (f ~ 1/L)
+  //    Shorter silk thread = higher pentatonic pitch; Longer thread = lower pitch!
+  // 2. Thread Midpoint X -> Stereo Pan (-0.80 Left .. +0.80 Right)
+  // 3. Thread Distance from Hoop Center -> Articulation & Timbral Brightness
+  //    Inner center threads = warm sustained fundamental + vibrato (吟揉/腹震音)
+  //    Outer rim threads    = crisp ornamental grace-note/roll (竹笛叠音/琵琶轮指/古琴泛音)
+  // ==========================================================================
+  var scObj = SCALES[state.scaleIdx % SCALES.length];
+  var scale = scObj.notes;
+  var tLen = th.len || 0.35;
+  var normLen = Math.max(0.0, Math.min(1.0, (tLen - 0.12) / 0.58));
+  var scaleDeg = Math.round((1.0 - normLen) * (scale.length - 1));
+  scaleDeg = Math.max(0, Math.min(scale.length - 1, scaleDeg));
+  var freq = forcedFreq || scale[scaleDeg];
+
+  var midX = (p1 && p2) ? ((p1.nx + p2.nx) * 0.5) : 0.50;
+  var midY = (p1 && p2) ? ((p1.ny + p2.ny) * 0.5) : 0.53;
+  var centerDist = Math.hypot(midX - 0.50, midY - 0.53); // 0.0 center .. 0.35 rim
+  var isOuterRim = (th.rim !== undefined) ? th.rim : (centerDist > 0.18);
+
+  // Duration scales naturally with physical thread length (long threads sustain longer)
+  var dur = (0.42 + normLen * 0.75) * (isUserStrum ? 1.25 : 1.0);
+  var vel = th.vel || (isUserStrum ? 0.46 : 0.34);
+
+  var pan = audioCtx.createStereoPanner();
+  pan.pan.value = (th.panOverride !== undefined) ? Math.max(-0.85, Math.min(0.85, th.panOverride)) : Math.max(-0.82, Math.min(0.82, (midX - 0.50) * 2.2));
+  pan.connect(masterGain);
+
+  // Timbre enrichment layer: second attack/body/resonance sample per instrument.
+  var layer = TIMBRE_LAYERS[cid];
+  if (layer) {
+    var lf = audioCtx.createBiquadFilter();
+    lf.type = 'highpass'; lf.frequency.value = layer.hp; lf.Q.value = 0.6;
+    lf.connect(pan);
+    var lgain = Math.max(0.03, Math.min(0.22, (th.vel || 0.34) * layer.gain * 1.6));
+    triggerDlsVoice4(audioCtx, lf, layer.key, freq * layer.ratio, lgain, dur * layer.dur, 0.006, 0, 0, 1.0);
+  }
+
+  if (cid === 0) {
+    // 0: 朱砂·古筝 (Guzheng) — Real Plucked Guzheng/Koto String + Left-Hand Pressing Bend (吟揉) on inner threads, Grace-note 花指 on outer threads
+    var filt0 = audioCtx.createBiquadFilter();
+    filt0.type = 'lowpass';
+    filt0.frequency.value = isOuterRim ? 6800 : 4200;
+    filt0.connect(pan);
+    triggerDlsVoice4(audioCtx, filt0, 'guzheng', freq, vel, dur * 1.15, 0.006, isOuterRim ? 0 : 5.2, isOuterRim ? 0 : 18, 1.0);
+    // Warm wooden soundboard body layer
+    var ks0 = createPluckedSilkBuffer(audioCtx, freq, dur, 0.12, 0.82, 0.45);
+    var s0 = audioCtx.createBufferSource(); s0.buffer = ks0;
+    var g0 = audioCtx.createGain(); g0.gain.value = vel * 0.45;
+    
+    if (isOuterRim && scaleDeg + 1 < scale.length) {
+      // Ornamental 花指 grace note 45ms later
+      setTimeout(function() {
+        if (audioCtx) triggerDlsVoice4(audioCtx, filt0, 'guzheng_hi', scale[scaleDeg + 1], vel * 0.65, dur * 0.85, 0.006, 4.8, 12, 1.0);
+      }, 45);
+    }
+  } else if (cid === 1) {
+    // 1: 琥珀·琵琶 (Pipa) — Crisp Real Plectrum Pluck (弹挑) + Authentic Tremolo Roll (轮指) on outer/short threads
+    var filt1 = audioCtx.createBiquadFilter();
+    filt1.type = 'peaking'; filt1.frequency.value = 2100; filt1.Q.value = 1.8; filt1.gain.value = 4.5;
+    filt1.connect(pan);
+    var rollCount = isOuterRim ? 3 : (isUserStrum ? 4 : 1);
+    for (var r = 0; r < rollCount; r++) {
+      (function(idx) {
+        setTimeout(function() {
+          if (!audioCtx) return;
+          var rVel = vel * (idx === 0 ? 1.0 : 0.72);
+          triggerDlsVoice4(audioCtx, filt1, 'pipa', freq, rVel, dur * 0.75, 0.004, 0, 0, 1.0);
+          
+        }, idx * 42);
+      })(r);
+    }
+  } else if (cid === 2) {
+    // 2: 群青·古琴 (Guqin) — Deep Seven-String Silk Bass (散音/按音绰注滑音) on inner threads, Clear Harmonic (泛音) on outer threads
+    var qinFreq = isOuterRim ? freq : Math.max(65.41, freq * 0.5);
+    var filt2 = audioCtx.createBiquadFilter();
+    filt2.type = 'lowpass'; filt2.frequency.value = isOuterRim ? 5400 : 2200;
+    filt2.connect(pan);
+    if (isOuterRim) {
+      // 泛音 (Crisp Bell-Like Guqin Harmonic Overtone)
+      triggerDlsVoice4(audioCtx, filt2, 'guqin_harm', qinFreq * 2.0, vel * 0.95, dur * 1.25, 0.008, 0, 0, 1.0);
+    } else {
+      // 按音绰注 (Deep Guqin Silk String with Upward Glissando Slide)
+      triggerDlsVoice4(audioCtx, filt2, 'guqin', qinFreq, vel * 1.05, dur * 1.35, 0.010, 4.2, 14, 0.94);
+      var ks2 = createPluckedSilkBuffer(audioCtx, qinFreq, dur * 1.3, 0.25, 0.45, 0.65);
+      var s2 = audioCtx.createBufferSource(); s2.buffer = ks2;
+      var g2 = audioCtx.createGain(); g2.gain.value = vel * 0.55;
+      
+    }
+  } else if (cid === 3) {
+    // 3: 紫檀·二胡 (Erhu) — Real Bowed String sculpted through Python-Skin Resonator (1150Hz & 2450Hz) + Expressive Portamento (滑音) & Vibrato (压揉)
+    var fBody1 = audioCtx.createBiquadFilter();
+    fBody1.type = 'peaking'; fBody1.frequency.value = 1150; fBody1.Q.value = 3.2; fBody1.gain.value = 7.5;
+    var fBody2 = audioCtx.createBiquadFilter();
+    fBody2.type = 'peaking'; fBody2.frequency.value = 2450; fBody2.Q.value = 2.8; fBody2.gain.value = 5.0;
+    var fWarm = audioCtx.createBiquadFilter();
+    fWarm.type = 'lowpass'; fWarm.frequency.value = isOuterRim ? 4800 : 3400;
+    fBody1.connect(fBody2); fBody2.connect(fWarm); fWarm.connect(pan);
+    var slideRatio = isOuterRim ? 0.91 : 0.96;
+    triggerDlsVoice4(audioCtx, fBody1, 'erhu', freq, vel * 0.95, dur * 1.25, 0.045, 5.6, 26, slideRatio);
+    
+  } else if (cid === 4) {
+    // 4: 明黄·昆曲竹笛 (Kunqu Bamboo Dizi) — 100% Pure Single-Note Bamboo Flute with Dimo Membrane Buzz (2850Hz), Breath Chiff & Grace-Note (打音/叠音)
+    var dimo = audioCtx.createBiquadFilter();
+    dimo.type = 'peaking'; dimo.frequency.value = 2850; dimo.Q.value = 3.6; dimo.gain.value = isOuterRim ? 6.5 : 4.0;
+    var lpDizi = audioCtx.createBiquadFilter();
+    lpDizi.type = 'lowpass'; lpDizi.frequency.value = isOuterRim ? 7500 : 4800;
+    dimo.connect(lpDizi); lpDizi.connect(pan);
+
+    var diziFreq = Math.max(261.63, Math.min(1567.98, freq * 1.0));
+    if (isOuterRim && scaleDeg + 1 < scale.length) {
+      // 叠音/打音: Quick ornamental grace note 1 pentatonic step above before landing on main note
+      var graceFreq = Math.max(261.63, Math.min(1760.0, scale[scaleDeg + 1]));
+      triggerDlsVoice4(audioCtx, dimo, 'dizi', graceFreq, vel * 0.78, 0.055, 0.006, 0, 0, 1.0);
+      setTimeout(function() {
+        if (!audioCtx) return;
+        triggerDlsVoice4(audioCtx, dimo, 'dizi', diziFreq, vel * 1.05, dur * 1.15, 0.015, 5.8, 16, 1.0);
+        
+      }, 42);
+    } else {
+      // 腹震音: Warm lyrical sustained bamboo flute note with breathy attack
+      triggerDlsVoice4(audioCtx, dimo, 'dizi', diziFreq, vel * 1.05, dur * 1.20, 0.024, 5.5, 18, 0.985);
+      
+    }
+  } else if (cid === 5) {
+    // 5: 鎏金·曾侯乙编钟 (Bianzhong Bronze Bells) — Authentic Dual-Tone Bronze Strike (一钟双音: 隧音 + 鼓音小三度共鸣)
+    var lpBell = audioCtx.createBiquadFilter();
+    lpBell.type = 'lowpass'; lpBell.frequency.value = isOuterRim ? 8200 : 5200;
+    lpBell.connect(pan);
+    triggerDlsVoice4(audioCtx, lpBell, 'bianzhong', freq, vel * 0.90, dur * 1.35, 0.003, 0, 0, 1.0);
+    triggerDlsVoice4(audioCtx, lpBell, 'bian_low', freq * 0.5, vel * 0.70, dur * 1.45, 0.004, 0, 0, 1.0);
+    if (isOuterRim) {
+      // 鼓音 (Minor-third overtone resonance characteristic of oval Zeng Hou Yi bronze bells)
+      triggerDlsVoice4(audioCtx, lpBell, 'bianzhong', freq * 1.1892, vel * 0.42, dur * 0.95, 0.008, 0, 0, 1.0);
+    }
+  } else if (cid === 6) {
+    // 6: 翠竹·三十六簧笙 (36-Reed Sheng) — Authentic Free-Reed Mouth Organ playing Traditional Parallel Fifth Harmony (传统五度和音)
+    var lpSheng = audioCtx.createBiquadFilter();
+    lpSheng.type = 'lowpass'; lpSheng.frequency.value = isOuterRim ? 6200 : 3800;
+    lpSheng.connect(pan);
+    triggerDlsVoice4(audioCtx, lpSheng, 'sheng', freq, vel * 0.82, dur * 1.20, 0.030, 4.5, 8, 1.0);
+    // Traditional Sheng fifth harmony (和音: 1.498x fifth above, plus octave on outer rim)
+    triggerDlsVoice4(audioCtx, lpSheng, 'sheng', freq * 1.4983, vel * 0.56, dur * 1.15, 0.035, 4.5, 8, 1.0);
+    if (isOuterRim) {
+      triggerDlsVoice4(audioCtx, lpSheng, 'sheng', freq * 2.0, vel * 0.35, dur * 1.0, 0.040, 4.5, 8, 1.0);
+    }
+  } else if (cid === 7) {
+    // 7: 黛墨·堂鼓与木鱼 (Tanggu Hall Drum & Temple Muyu Woodblock) — Long/Inner threads = Deep Tanggu Drum; Short/Outer threads = Crisp Muyu Woodblock
+    if (isOuterRim || tLen < 0.36) {
+      // Crisp Temple Muyu Woodblock (木鱼/梆子) pitched by thread length
+      var muyuPitch = 320.0 + (1.0 - normLen) * 520.0;
+      triggerDlsVoice4(audioCtx, pan, 'muyu', muyuPitch, vel * 1.10, 0.28, 0.002, 0, 0, 1.0);
+    } else {
+      // Deep Resonant Tanggu Leather Hall Drum (堂鼓)
+      var drumPitch = 85.0 + (1.0 - normLen) * 75.0;
+      triggerDlsVoice4(audioCtx, pan, 'tanggu', drumPitch, vel * 1.15, 0.55, 0.003, 0, 0, 1.0);
+    }
+  }
+}
+
+// ============================================================================
+// 100% VISUAL-TO-AUDIO SHUTTLE SCANNER (Zero Ghost/Unmapped Instruments!)
+// Sound is generated ONLY when the rotating shuttle crosses an actual thread
+// or knot on the embroidery hoop!
+// ============================================================================
+setInterval(() => {
+  if (!state.isPlaying) return;
+  state.phraseStep = ((state.phraseStep || 0) + 1) % 256;
+  var stepSpeed = 0.088;
+  var oldA = state.radarAngle;
+  state.radarAngle = (state.radarAngle + stepSpeed) % (Math.PI * 2);
+  if (!audioCtx || THREADS.length === 0) return;
+
+  var normOld = (oldA + Math.PI * 2) % (Math.PI * 2);
+  var normNew = (state.radarAngle + Math.PI * 2) % (Math.PI * 2);
+
+  function angleCrossed(targetA, a0, a1) {
+    if (a0 <= a1) return (targetA >= a0 && targetA < a1);
+    return (targetA >= a0 || targetA < a1);
+  }
+
+  // Find all threads on the hoop whose angular position is crossed by the shuttle in this step
+  var crossedThreads = [];
+  for (var i = 0; i < THREADS.length; i++) {
+    var th = THREADS[i];
+    if (th.active === false) continue;
+    var ta = ((th.angle || 0) + Math.PI * 2) % (Math.PI * 2);
+    if (angleCrossed(ta, normOld, normNew)) {
+      th.glow = 1.45;
+      th.vibAmp = 12.0;
+      crossedThreads.push(th);
+    }
+  }
+
+  // Trigger up to 2 crossed threads (e.g., 1 short melody thread + 1 long bass thread, strictly using their own th.colorId!)
+  if (crossedThreads.length > 0) {
+    crossedThreads.sort(function(a, b) { return (a.len || 0.3) - (b.len || 0.3); });
+    playSilkThreadSegment(crossedThreads[0], false);
+    if (crossedThreads.length > 1) {
+      var lastTh = crossedThreads[crossedThreads.length - 1];
+      if (Math.abs((lastTh.len || 0.3) - (crossedThreads[0].len || 0.3)) > 0.12) {
+        setTimeout(function() {
+          playSilkThreadSegment(lastTh, false);
+        }, 45);
+      }
+    }
+  }
+
+  // Check Golden Intersection Knots crossed by the shuttle
+  var knotTriggered = 0;
+  for (var k = 0; k < KNOTS.length; k++) {
+    var kn = KNOTS[k];
+    var ka = (Math.atan2(kn.ny - 0.53, kn.nx - 0.50) + Math.PI * 2) % (Math.PI * 2);
+    if (angleCrossed(ka, normOld, normNew)) {
+      kn.glow = 1.35;
+      if (crossedThreads.length === 0 && knotTriggered < 1) {
+        knotTriggered++;
+        var knColor1 = (kn.colorId !== undefined) ? kn.colorId : state.activeSpool;
+        playSilkThreadSegment({
+          p1: kn.p1 || 0,
+          p2: kn.p2 || 18,
+          colorId: knColor1,
+          len: kn.len || 0.22,
+          angle: ka
+        }, false);
+        if (kn.colorId2 !== undefined && kn.colorId2 !== knColor1) {
+          setTimeout(function() {
+            playSilkThreadSegment({
+              p1: kn.p1 || 0,
+              p2: kn.p2 || 18,
+              colorId: kn.colorId2,
+              len: (kn.len || 0.22) * 0.75,
+              angle: ka
+            }, false);
+          }, 35);
+        }
+      }
+    }
+  }
+}, 135);
+function findClosestPegGuaranteed(mx, my) {
+  var bestId = -1, bestDist = 999;
+  for (var i = 0; i < PEGS.length; i++) {
+    var d = Math.hypot(mx - PEGS[i].nx, my - PEGS[i].ny);
+    if (d < bestDist) { bestDist = d; bestId = i; }
+  }
+  return bestDist < 0.18 ? bestId : -1;
+}
+
+var isThreading = false, dragCurrentX = 0.5, dragCurrentY = 0.5, prevMouseX = -1, prevMouseY = -1;
+
+function segmentsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+  function ccw(p1x, p1y, p2x, p2y, p3x, p3y) {
+    return (p3y - p1y) * (p2x - p1x) > (p2y - p1y) * (p3x - p1x);
+  }
+  return (ccw(ax, ay, cx, cy, dx, dy) !== ccw(bx, by, cx, cy, dx, dy)) &&
+         (ccw(ax, ay, bx, by, cx, cy) !== ccw(ax, ay, bx, by, dx, dy));
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  initAudio();
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) / rect.width;
+  var my = (e.clientY - rect.top) / rect.height;
+  dragCurrentX = mx; dragCurrentY = my;
+
+  for (var tb of TOP_HOOPS) {
+    if (Math.hypot(mx - tb.x, my - tb.y) < 0.042) {
+      if (tb.id === 'sym') {
+        var syms = [1, 2, 4, 6, 8, 12];
+        state.symmetry = syms[(syms.indexOf(state.symmetry) + 1) % syms.length];
+        tb.label = '对称: ' + state.symmetry + 'x';
+      } else if (tb.id === 'scale') {
+        state.scaleIdx = (state.scaleIdx + 1) % SCALES.length;
+        tb.label = SCALES[state.scaleIdx].name.slice(1, 5);
+        if (THREADS.length > 0) playSilkThreadSegment(THREADS[0], true);
+      } else if (tb.id === 'play') {
+        state.isPlaying = !state.isPlaying;
+        tb.label = state.isPlaying ? '■ 抚琴中' : '▶ 已暂停';
+      } else if (tb.id === 'upload') document.getElementById('upAudio4').click();
+      else if (tb.id === 'wav') {
+        exportCurrentStateWAV('ThreadWeave_MultiInstrument_Loom', function(L, R, sr, N) {
+          var sc = SCALES[state.scaleIdx % SCALES.length].notes;
+          var keyMap4 = ['guzheng', 'pipa', 'guqin', 'erhu', 'dizi', 'bianzhong', 'sheng', 'tanggu'];
+          if (THREADS.length === 0) return;
+          for (var i = 0; i < THREADS.length; i++) {
+            var th = THREADS[i];
+            var angNorm = (((th.angle || 0) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
+            var normLen = Math.max(0.0, Math.min(1.0, ((th.len || 0.35) - 0.12) / 0.58));
+            var deg = Math.round((1.0 - normLen) * (sc.length - 1));
+            var f = sc[Math.max(0, Math.min(sc.length - 1, deg))];
+            var kName = keyMap4[(th.colorId || 0) % 8];
+            var pan = Math.cos(th.angle || 0) * 0.75;
+            // Render 2 full 360-degree shuttle rotations (0..4s and 4..8s)
+            mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, angNorm * 3.8, 0.55 + normLen * 0.45, f, 0.38, pan, 1.0);
+            mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, 4.0 + angNorm * 3.8, 0.55 + normLen * 0.45, f, 0.38, pan, 1.0);
+          }
+        });
+      }
+      else if (tb.id === 'video') toggleVideoRecording(canvas, audioCtx, masterGain, 'ThreadWeave_Loom');
+      else if (tb.id === 'guide') document.getElementById('guideModal').classList.add('open');
+      return;
+    }
+  }
+
+  for (var s = 0; s < SPOOLS.length; s++) {
+    if (mx >= 0.015 && mx <= 0.168 && Math.abs(my - (0.168 + s * 0.100)) < 0.046) {
+      // Check if user clicked the small [✕] remove button on the right edge of the plaque (mx >= 0.142)
+      var existingCount = THREADS.filter(t => (t.colorId % 8) === s).length;
+      if (mx >= 0.142 && existingCount > 0) {
+        THREADS = THREADS.filter(t => (t.colorId % 8) !== s);
+        if ( state.activeSpool === s && THREADS.length > 0 ) {
+          state.activeSpool = THREADS[THREADS.length - 1].colorId % 8;
+        }
+        recomputeKnotsAndGeometry();
+        saveLoomState();
+        return;
+      }
+      // Check if user clicked [独] solo button on the plaque (mx >= 0.118 && mx < 0.142)
+      if (mx >= 0.118 && mx < 0.142) {
+        state.activeSpool = s;
+        if (THREADS.length === 0) {
+          addInstrumentLayerToHoop(s);
+        } else {
+          for (var ti = 0; ti < THREADS.length; ti++) {
+            THREADS[ti].colorId = s;
+            THREADS[ti].glow = 1.45;
+          }
+        }
+        recomputeKnotsAndGeometry();
+        saveLoomState();
+        playSilkThreadSegment({ p1: 0, p2: 18, colorId: s, len: 0.35, angle: 0 }, true);
+        return;
+      }
+      // Standard Click on Left Instrument Plaque `s`:
+      // ONLY selects Instrument `s` onto the embroidery needle (`state.activeSpool = s`),
+      // PRESERVES all previously stitched instruments on the hoop ("前一个乐器保留"),
+      // and DOES NOT add any threads or sound until the user clicks on the hoop with the needle ("画面用针点击才会出现这种乐器的音色")!
+      state.activeSpool = s;
+      state.lastPegId = -1;
+      return;
+    }
+  }
+
+  for (var ph of PATTERN_HOOPS) {
+    if (mx >= 0.83 && Math.hypot(mx - 0.912, my - ph.y) < 0.052) {
+      weavePresetPattern(ph.id);
+      return;
+    }
+  }
+
+  // Check if click is inside the Embroidery Hoop:
+  // ONLY when the user clicks inside the hoop with the needle does the selected instrument (`state.activeSpool`)
+  // stitch a silk thread onto the hoop and play its sound!
+  var distFromHoopCenter = Math.hypot((mx - 0.50) * (1200 / 900), my - 0.53);
+  if (distFromHoopCenter <= 0.385) {
+    var hitPeg = findOrCreatePegAtNorm(mx, my);
+    if (hitPeg >= 0) {
+      isThreading = true;
+      if (state.lastPegId >= 0 && state.lastPegId !== hitPeg) {
+        // Point-to-Point Click-to-Connect (点击连线): stitch from `state.lastPegId` to `hitPeg` in `state.activeSpool`!
+        addSymmetricStitch(state.lastPegId, hitPeg, state.activeSpool);
+        if (THREADS.length > 0) playSilkThreadSegment(THREADS[THREADS.length - 1], true);
+        state.lastPegId = hitPeg;
+        PEGS[hitPeg].glow = 1.6;
+      } else if (state.lastPegId === hitPeg) {
+        // Clicking the same peg again finishes the current polyline chain
+        state.lastPegId = -1;
+        isThreading = false;
+      } else {
+        // First needle click on the hoop (`state.lastPegId < 0`):
+        // Immediately stitch a thread from `hitPeg` to its stencil partner peg in `state.activeSpool`
+        // so that the very first needle click immediately creates this instrument's thread & sound on the hoop,
+        // AND sets `state.lastPegId = hitPeg` so the next click connects `hitPeg -> hitPeg2`!
+        var partnerPeg = findStencilPartnerPeg(hitPeg);
+        addSymmetricStitch(hitPeg, partnerPeg, state.activeSpool);
+        if (THREADS.length > 0) playSilkThreadSegment(THREADS[THREADS.length - 1], true);
+        state.lastPegId = hitPeg;
+        PEGS[hitPeg].glow = 1.6;
+      }
+      state.needleX = PEGS[hitPeg].nx;
+      state.needleY = PEGS[hitPeg].ny;
+    }
+  } else {
+    // Clicking outside the hoop ends the active click-to-connect chain
+    state.lastPegId = -1;
+    isThreading = false;
+  }
+});
+
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  state.lastPegId = -1;
+  isThreading = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) / rect.width;
+  var my = (e.clientY - rect.top) / rect.height;
+  dragCurrentX = mx; dragCurrentY = my;
+
+  // Always update needle position when state.lastPegId >= 0 so point-and-click (点击连线) shows a live preview line!
+  if (state.lastPegId >= 0 && PEGS[state.lastPegId]) {
+    state.needleX = mx;
+    state.needleY = my;
+    state.needleAngle = Math.atan2(my - PEGS[state.lastPegId].ny, mx - PEGS[state.lastPegId].nx);
+  }
+
+  if (state.lastPegId >= 0 && PEGS[state.lastPegId]) {
+    for (var i = 0; i < PEGS.length; i++) {
+      if (i !== state.lastPegId && Math.hypot(mx - PEGS[i].nx, my - PEGS[i].ny) < 0.022) {
+        addSymmetricStitch(state.lastPegId, i, state.activeSpool);
+        if (THREADS.length > 0) playSilkThreadSegment(THREADS[THREADS.length - 1], true);
+        state.lastPegId = i;
+        PEGS[i].glow = 1.45;
+        break;
+      }
+    }
+  } else if (prevMouseX >= 0 && Math.hypot(mx - prevMouseX, my - prevMouseY) > 0.003) {
+    initAudio();
+    var plucked = 0;
+    for (var i = 0; i < THREADS.length; i++) {
+      var th = THREADS[i];
+      if (th.glow > 0.65) continue;
+      var p1 = PEGS[th.p1], p2 = PEGS[th.p2];
+      if (p1 && p2 && segmentsCross(prevMouseX, prevMouseY, mx, my, p1.nx, p1.ny, p2.nx, p2.ny)) {
+        th.vibAmp = 16.0;
+        playSilkThreadSegment(th, true);
+        plucked++;
+        if (plucked >= 2) break;
+      }
+    }
+  }
+  prevMouseX = mx; prevMouseY = my;
+});
+
+
+window.addEventListener('keydown', (e) => {
+  var keys = 'asdfghjkl';
+  var kIdx = keys.indexOf((e.key || '').toLowerCase());
+  if (kIdx >= 0) {
+    initAudio();
+    var sc = SCALES[state.scaleIdx % SCALES.length].notes;
+    var f = sc[Math.min(sc.length - 1, kIdx + 3)];
+    var lenMap = Math.max(0.14, 0.68 - kIdx * 0.06);
+    playSilkThreadSegment({ p1: 0, p2: 18, colorId: state.activeSpool, len: lenMap, angle: (kIdx - 4) * 0.3 }, true, f);
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  isThreading = false;
+});
+
+function drawChineseCornerFretwork(ctx, x, y, dirX, dirY, size, dpr) {
+  ctx.save();
+  ctx.strokeStyle = '#6b2d14';
+  ctx.lineWidth = 2.4 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(x, y + dirY * size);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x + dirX * size, y);
+  ctx.moveTo(x + dirX * 8 * dpr, y + dirY * size * 0.72);
+  ctx.lineTo(x + dirX * 8 * dpr, y + dirY * 8 * dpr);
+  ctx.lineTo(x + dirX * size * 0.72, y + dirY * 8 * dpr);
+  ctx.lineTo(x + dirX * size * 0.72, y + dirY * 18 * dpr);
+  ctx.lineTo(x + dirX * 18 * dpr, y + dirY * 18 * dpr);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawChineseInstrumentSilhouette(ctx, cx, cy, s, sp, isSel, dpr) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.fillStyle = isSel ? 'rgba(185, 28, 28, 0.12)' : 'rgba(253, 248, 238, 0.65)';
+  ctx.strokeStyle = isSel ? sp.hex : 'rgba(107, 45, 20, 0.25)';
+  ctx.lineWidth = (isSel ? 2.4 : 1.1) * dpr;
+  ctx.beginPath();
+  ctx.roundRect(-48 * dpr, -24 * dpr, 96 * dpr, 46 * dpr, 6 * dpr);
+  ctx.fill(); ctx.stroke();
+
+  if (isSel) {
+    ctx.fillStyle = sp.hex;
+    ctx.fillRect(-48 * dpr, -24 * dpr, 5 * dpr, 46 * dpr);
+  }
+
+  ctx.save();
+  ctx.translate(0, -3 * dpr);
+
+  if (sp.icon === 'guzheng') {
+    ctx.fillStyle = '#78350f';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.6 * dpr;
+    ctx.beginPath();
+    ctx.roundRect(-34 * dpr, -11 * dpr, 68 * dpr, 20 * dpr, 4 * dpr);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#d97706';
+    ctx.fillRect(-32 * dpr, -10 * dpr, 6 * dpr, 18 * dpr);
+    ctx.fillRect(26 * dpr, -10 * dpr, 6 * dpr, 18 * dpr);
+    for (var i = -2; i <= 2; i++) {
+      var sy = (i * 3.5 - 1) * dpr;
+      ctx.strokeStyle = '#fef3c7'; ctx.lineWidth = 1.0 * dpr;
+      ctx.beginPath(); ctx.moveTo(-26 * dpr, sy); ctx.lineTo(26 * dpr, sy); ctx.stroke();
+      var bx = i * 8.5 * dpr;
+      ctx.fillStyle = '#fde047';
+      ctx.beginPath();
+      ctx.moveTo(bx, sy - 2.5 * dpr);
+      ctx.lineTo(bx - 2.8 * dpr, sy + 2.5 * dpr);
+      ctx.lineTo(bx + 2.8 * dpr, sy + 2.5 * dpr);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else if (sp.icon === 'pipa') {
+    ctx.rotate(-0.32);
+    ctx.fillStyle = '#fef3c7';
+    ctx.strokeStyle = '#9a3412';
+    ctx.lineWidth = 2.2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-24 * dpr, 0);
+    ctx.bezierCurveTo(-10 * dpr, -4 * dpr, 6 * dpr, -15 * dpr, 20 * dpr, -12 * dpr);
+    ctx.bezierCurveTo(32 * dpr, -8 * dpr, 32 * dpr, 8 * dpr, 20 * dpr, 12 * dpr);
+    ctx.bezierCurveTo(6 * dpr, 15 * dpr, -10 * dpr, 4 * dpr, -24 * dpr, 0);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#78350f'; ctx.lineWidth = 1.8 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-22 * dpr, -7 * dpr); ctx.lineTo(-22 * dpr, 7 * dpr);
+    ctx.moveTo(-17 * dpr, -6 * dpr); ctx.lineTo(-17 * dpr, 6 * dpr);
+    ctx.stroke();
+    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 0.9 * dpr;
+    for (var k = -1.5; k <= 1.5; k += 1) {
+      ctx.beginPath(); ctx.moveTo(-20 * dpr, k * 1.5 * dpr); ctx.lineTo(18 * dpr, k * 2.5 * dpr); ctx.stroke();
+    }
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(17 * dpr, -6 * dpr, 4 * dpr, 12 * dpr);
+  } else if (sp.icon === 'guqin') {
+    ctx.fillStyle = '#1c1917';
+    ctx.strokeStyle = '#b91c1c';
+    ctx.lineWidth = 1.8 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-35 * dpr, -8 * dpr);
+    ctx.lineTo(6 * dpr, -8 * dpr);
+    ctx.quadraticCurveTo(12 * dpr, -4 * dpr, 18 * dpr, -7 * dpr);
+    ctx.lineTo(35 * dpr, -6 * dpr);
+    ctx.lineTo(35 * dpr, 6 * dpr);
+    ctx.lineTo(18 * dpr, 7 * dpr);
+    ctx.quadraticCurveTo(12 * dpr, 4 * dpr, 6 * dpr, 8 * dpr);
+    ctx.lineTo(-35 * dpr, 8 * dpr);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#d6d3d1'; ctx.lineWidth = 0.8 * dpr;
+    for (var s = -2; s <= 2; s++) {
+      ctx.beginPath(); ctx.moveTo(-31 * dpr, s * 2.2 * dpr); ctx.lineTo(31 * dpr, s * 1.8 * dpr); ctx.stroke();
+    }
+    ctx.fillStyle = '#fde047';
+    for (var h = -4; h <= 4; h++) {
+      ctx.beginPath(); ctx.arc(h * 6.5 * dpr, -5.2 * dpr, 1.4 * dpr, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (sp.icon === 'erhu') {
+    ctx.strokeStyle = '#4c1d95'; ctx.lineWidth = 2.6 * dpr;
+    ctx.beginPath(); ctx.moveTo(-8 * dpr, -16 * dpr); ctx.lineTo(-8 * dpr, 14 * dpr); ctx.stroke();
+    ctx.lineWidth = 1.8 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-8 * dpr, -12 * dpr); ctx.lineTo(6 * dpr, -12 * dpr);
+    ctx.moveTo(-8 * dpr, -7 * dpr);  ctx.lineTo(6 * dpr, -7 * dpr);
+    ctx.stroke();
+    ctx.fillStyle = '#581c87'; ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.4 * dpr;
+    ctx.beginPath();
+    ctx.roundRect(-16 * dpr, 3 * dpr, 18 * dpr, 11 * dpr, 2 * dpr);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#d97706'; ctx.lineWidth = 1.6 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-30 * dpr, 7 * dpr);
+    ctx.quadraticCurveTo(4 * dpr, -4 * dpr, 30 * dpr, 5 * dpr);
+    ctx.stroke();
+    ctx.strokeStyle = '#fef3c7'; ctx.lineWidth = 0.9 * dpr;
+    ctx.beginPath(); ctx.moveTo(-30 * dpr, 7 * dpr); ctx.lineTo(30 * dpr, 5 * dpr); ctx.stroke();
+  } else if (sp.icon === 'dizi') {
+    ctx.fillStyle = '#eab308'; ctx.strokeStyle = '#78350f'; ctx.lineWidth = 1.6 * dpr;
+    ctx.beginPath();
+    ctx.roundRect(-34 * dpr, -6 * dpr, 68 * dpr, 9 * dpr, 4 * dpr);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2b1810';
+    for (var h = -3; h <= 3; h++) {
+      ctx.beginPath(); ctx.arc(h * 7.5 * dpr, -1.5 * dpr, 1.8 * dpr, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 1.6 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-28 * dpr, 3 * dpr); ctx.lineTo(-28 * dpr, 14 * dpr);
+    ctx.moveTo(-28 * dpr, 9 * dpr); ctx.lineTo(-32 * dpr, 14 * dpr);
+    ctx.moveTo(-28 * dpr, 9 * dpr); ctx.lineTo(-24 * dpr, 14 * dpr);
+    ctx.stroke();
+    ctx.fillStyle = '#dc2626';
+    ctx.beginPath(); ctx.arc(-28 * dpr, 7 * dpr, 2.6 * dpr, 0, Math.PI * 2); ctx.fill();
+  } else if (sp.icon === 'bianzhong') {
+    ctx.fillStyle = '#78350f'; ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2.0 * dpr;
+    ctx.fillRect(-32 * dpr, -14 * dpr, 64 * dpr, 4 * dpr);
+    [-20, 0, 20].forEach((bx, idx) => {
+      var x = bx * dpr, bw = (idx === 1 ? 14 : 12) * dpr, bh = (idx === 1 ? 20 : 17) * dpr;
+      ctx.strokeStyle = '#d97706'; ctx.lineWidth = 1.3 * dpr;
+      ctx.beginPath(); ctx.moveTo(x, -10 * dpr); ctx.lineTo(x, -6 * dpr); ctx.stroke();
+      ctx.fillStyle = '#b45309'; ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.2 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(x - bw * 0.38, -6 * dpr);
+      ctx.lineTo(x + bw * 0.38, -6 * dpr);
+      ctx.lineTo(x + bw * 0.52, -6 * dpr + bh);
+      ctx.quadraticCurveTo(x, -6 * dpr + bh * 0.80, x - bw * 0.52, -6 * dpr + bh);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+    });
+  } else if (sp.icon === 'sheng') {
+    var pipeH = [8, 14, 20, 25, 17, 25, 20, 14, 8];
+    pipeH.forEach((ph, idx) => {
+      var px = (idx - 4) * 5.2 * dpr;
+      ctx.fillStyle = idx % 2 === 0 ? '#d97706' : '#fef08a';
+      ctx.fillRect(px - 1.6 * dpr, 4 * dpr - ph * dpr, 3.2 * dpr, ph * dpr);
+    });
+    ctx.fillStyle = '#be185d'; ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.5 * dpr;
+    ctx.beginPath();
+    ctx.arc(0, 4 * dpr, 15 * dpr, 0, Math.PI, false);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2.2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(13 * dpr, 9 * dpr);
+    ctx.quadraticCurveTo(26 * dpr, 8 * dpr, 28 * dpr, 0);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = '#b91c1c'; ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.8 * dpr;
+    ctx.beginPath(); ctx.ellipse(0, 1 * dpr, 18 * dpr, 12 * dpr, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fef3c7';
+    ctx.beginPath(); ctx.ellipse(0, 1 * dpr, 12 * dpr, 8 * dpr, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#78350f'; ctx.lineWidth = 2.0 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(-24 * dpr, -11 * dpr); ctx.lineTo(18 * dpr, 10 * dpr);
+    ctx.moveTo(24 * dpr, -11 * dpr);  ctx.lineTo(-18 * dpr, 10 * dpr);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+}
+
+
+function drawPatternMotifOverlay(ctx, r, patId, dpr) {
+  ctx.save();
+  ctx.lineWidth = 1.6 * dpr;
+  if (patId === 'dunhuang') {
+    // 8 Golden Dunhuang Lotus Petal Arcs & Center Dharma Wheel
+    ctx.strokeStyle = 'rgba(185, 28, 28, 0.38)';
+    for (var k = 0; k < 8; k++) {
+      ctx.save(); ctx.rotate((k / 8) * Math.PI * 2);
+      ctx.beginPath(); ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(r * 0.25, -r * 0.45, 0, -r * 0.86);
+      ctx.quadraticCurveTo(-r * 0.25, -r * 0.45, 0, 0);
+      ctx.stroke(); ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(217, 119, 6, 0.35)';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.14, 0, Math.PI * 2); ctx.fill();
+  } else if (patId === 'ruyi') {
+    // 4 Symmetrical Ruyi Cloud Scroll Heads (四合如意云头)
+    ctx.strokeStyle = 'rgba(180, 83, 9, 0.45)';
+    for (var q = 0; q < 4; q++) {
+      ctx.save(); ctx.rotate((q / 4) * Math.PI * 2);
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.22);
+      ctx.bezierCurveTo(r * 0.42, -r * 0.22, r * 0.46, -r * 0.78, 0, -r * 0.78);
+      ctx.bezierCurveTo(-r * 0.46, -r * 0.78, -r * 0.42, -r * 0.22, 0, -r * 0.22);
+      ctx.stroke(); ctx.restore();
+    }
+  } else if (patId === 'bagua') {
+    // Authentic S-Curve Yin-Yang Spine & Dual Fish Eyes (太极阴阳鱼眼)
+    var tr = r * 0.74;
+    ctx.strokeStyle = 'rgba(30, 58, 138, 0.45)';
+    ctx.beginPath();
+    ctx.arc(0, -tr * 0.5, tr * 0.5, -Math.PI * 0.5, Math.PI * 0.5, false);
+    ctx.arc(0, tr * 0.5, tr * 0.5, -Math.PI * 0.5, Math.PI * 0.5, true);
+    ctx.stroke();
+    ctx.fillStyle = '#b91c1c';
+    ctx.beginPath(); ctx.arc(0, -tr * 0.5, tr * 0.13, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1e3a8a';
+    ctx.beginPath(); ctx.arc(0, tr * 0.5, tr * 0.13, 0, Math.PI * 2); ctx.fill();
+  } else if (patId === 'panchang') {
+    // 45° Rotated Endless Chinese Knot Loops (吉祥盘长结耳翼)
+    ctx.save(); ctx.rotate(Math.PI * 0.25);
+    ctx.strokeStyle = 'rgba(190, 24, 93, 0.42)';
+    var s = r * 0.48;
+    ctx.strokeRect(-s, -s, s * 2, s * 2);
+    [[-s,-s],[s,-s],[s,s],[-s,s]].forEach(([cx0, cy0]) => {
+      ctx.beginPath(); ctx.arc(cx0, cy0, r * 0.16, 0, Math.PI * 2); ctx.stroke();
+    });
+    ctx.restore();
+  } else if (patId === 'baoxiang') {
+    // Tang Peony Scalloped Petals & Pearl Ring
+    ctx.strokeStyle = 'rgba(107, 33, 168, 0.38)';
+    for (var p = 0; p < 8; p++) {
+      ctx.save(); ctx.rotate((p / 8) * Math.PI * 2);
+      ctx.beginPath(); ctx.arc(0, -r * 0.42, r * 0.26, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+var MINI_PATTERN_CACHE = {};
+function getMiniPatternGeo(patId) {
+  if (!MINI_PATTERN_CACHE[patId]) {
+    MINI_PATTERN_CACHE[patId] = buildChinesePatternGeometry(patId);
+  }
+  return MINI_PATTERN_CACHE[patId];
+}
+
+function drawChinesePatternIcon(ctx, cx, cy, r, ph, isSel, dpr) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  if (isSel) {
+    ctx.shadowColor = ph.col;
+    ctx.shadowBlur = 14 * dpr;
+  }
+
+  ctx.fillStyle = '#fffdf7';
+  ctx.strokeStyle = isSel ? ph.col : '#4a2511';
+  ctx.lineWidth = (isSel ? 3.2 : 2.2) * dpr;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.0 * dpr;
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.90, 0, Math.PI * 2); ctx.stroke();
+
+  if (ph.id === 'clear') {
+    ctx.strokeStyle = '#b91c1c'; ctx.lineWidth = 2.0 * dpr;
+    ctx.beginPath();
+    ctx.arc(-r * 0.28, r * 0.32, r * 0.22, 0, Math.PI * 2);
+    ctx.moveTo(-r * 0.12, r * 0.18); ctx.lineTo(r * 0.45, -r * 0.52);
+    ctx.stroke();
+    ctx.strokeStyle = '#b45309';
+    ctx.beginPath();
+    ctx.arc(r * 0.28, r * 0.32, r * 0.22, 0, Math.PI * 2);
+    ctx.moveTo(r * 0.12, r * 0.18); ctx.lineTo(-r * 0.45, -r * 0.52);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  drawPatternMotifOverlay(ctx, r * 0.85, ph.id, dpr * 0.7);
+  var geo = getMiniPatternGeo(ph.id);
+  var stitches = geo.stitches;
+  var innerR = r * 0.86;
+  ctx.lineWidth = 1.35 * dpr;
+  for (var i = 0; i < stitches.length; i++) {
+    var st = stitches[i];
+    var a = geo.pegs[st[0]], b = geo.pegs[st[1]];
+    if (!a || !b) continue;
+    ctx.strokeStyle = SPOOLS[st[2] % SPOOLS.length].hex;
+    ctx.beginPath();
+    ctx.moveTo(a.rx * innerR, a.ry * innerR);
+    ctx.lineTo(b.rx * innerR, b.ry * innerR);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+
+function twToast(msg) {
+  var t = document.querySelector('.tw-toast'); if (t) t.remove();
+  t = document.createElement('div'); t.className = 'tw-toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add('on'); });
+  setTimeout(function(){ t.classList.remove('on'); setTimeout(function(){ t.remove(); }, 250); }, 1800);
+}
+function twUpdateStatus() {
+  var el = document.getElementById('twStatus');
+  if (el) {
+    var active = THREADS.filter(function(t){ return t.active !== false; }).length;
+    el.textContent = loomImage ? ('图样模式 · ' + active + '/' + THREADS.length + ' 根发声') : '织锦模式';
+  }
+}
+
+function twRgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  var h = 0;
+  if (d > 0.00001) {
+    if (mx === r) h = ((g - b) / d) % 6;
+    else if (mx === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, mx > 0 ? d / mx : 0, mx];
+}
+function twHueDist(a, b) { var d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); }
+function twHexHue(hex) {
+  var v = parseInt(hex.slice(1), 16);
+  return twRgbToHsv((v >> 16) & 255, (v >> 8) & 255, v & 255)[0];
+}
+var TW_SPOOL_HUES = SPOOLS.map(function(sp){ return twHexHue(sp.hex); });
+function twNearestSpool(hue, sat) {
+  if (sat < 0.10) return state.activeSpool;
+  var best = 0, bd = 999;
+  for (var i = 0; i < TW_SPOOL_HUES.length; i++) {
+    var d = twHueDist(hue, TW_SPOOL_HUES[i]);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+function twApplyImage() {
+  if (!loomImage || THREADS.length === 0) return;
+  if (!loomBackup) loomBackup = THREADS.map(function(t){ return Object.assign({}, t); });
+  var s = 512, g = loomImage.getContext('2d');
+  var data = g.getImageData(0, 0, s, s).data;
+  var threshold = imageThreshold;
+  THREADS.forEach(function(t) {
+    var a = t.angle || 0, dx = Math.cos(a), dy = Math.sin(a);
+    var best = 0, peak = 0, edges = 0, wasOn = false;
+    var hueSum = 0, hueW = 0, fx = 256, fy = 256;
+    for (var r = 0.12; r <= 0.96; r += 0.012) {
+      var x = Math.round(256 + dx * r * 256), y = Math.round(256 + dy * r * 256);
+      if (x < 0 || x >= s || y < 0 || y >= s) continue;
+      var i = (y * s + x) * 4;
+      var rr = data[i], gg = data[i + 1], bb = data[i + 2];
+      var lum = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255;
+      var hsv = twRgbToHsv(rr, gg, bb);
+      var signal = Math.max(lum, hsv[1] * 0.65, hsv[2] * 0.5);
+      if (imageInvert) signal = 1 - signal;
+      if (signal > peak) peak = signal;
+      var on = signal > threshold;
+      if (on && !wasOn) edges++;
+      wasOn = on;
+      if (on) {
+        best = r; fx = x; fy = y;
+        hueSum += hsv[0] * signal * hsv[1];
+        hueW += signal * hsv[1];
+      }
+    }
+    var density = Math.min(1, edges / 6);
+    t.len = best > 0 ? Math.max(0.12, Math.min(0.72, 0.12 + 0.60 * best)) : 0.30;
+    t.vel = Math.max(0.16, Math.min(0.64, 0.16 + 0.48 * peak));
+    t.density = density;
+    t.active = best > 0 && density >= densityThreshold;
+    t.panOverride = Math.max(-0.85, Math.min(0.85, (fx / 512 - 0.5) * 1.7));
+    t.rim = best > 0.62;
+    t.img = true;
+    if (imageColorMap && hueW > 0.02) {
+      t.colorId = twNearestSpool(hueSum / hueW, 1.0);
+    }
+  });
+  twUpdateStatus();
+  var active = THREADS.filter(function(t){ return t.active !== false; }).length;
+  twToast('图片已映射：' + active + '/' + THREADS.length + ' 根丝线触发 · 颜色/位置/密度');
+}
+function twLoadImage(file) {
+  if (!file) return;
+  var img = new Image(), url = URL.createObjectURL(file);
+  img.onload = function() {
+    var c = document.createElement('canvas'); c.width = 512; c.height = 512;
+    var g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 512, 512);
+    var scale = Math.max(512 / img.width, 512 / img.height);
+    var w = img.width * scale, h = img.height * scale;
+    g.drawImage(img, (512 - w) / 2, (512 - h) / 2, w, h);
+    loomImage = c;
+    URL.revokeObjectURL(url);
+    twApplyImage();
+  };
+  img.onerror = function(){ twToast('图片读取失败'); URL.revokeObjectURL(url); };
+  img.src = url;
+}
+function twClearImage() {
+  if (loomBackup) {
+    THREADS = loomBackup.map(function(t){ return Object.assign({}, t); });
+    loomBackup = null;
+  }
+  loomImage = null;
+  twUpdateStatus();
+  twToast('已回到织锦模式');
+}
+
+function twArrayBufferToBase64(buf) {
+  var bytes = new Uint8Array(buf), bin = '', chunk = 0x8000;
+  for (var i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+function twRenderWav(seconds) {
+  var sr = 48000, N = Math.floor(sr * seconds);
+  var L = new Float32Array(N), R = new Float32Array(N);
+  if (THREADS.length > 0) {
+    var sc = SCALES[state.scaleIdx % SCALES.length].notes;
+    var keyMap4 = ['guzheng', 'pipa', 'guqin', 'erhu', 'dizi', 'bianzhong', 'sheng', 'tanggu'];
+    for (var i = 0; i < THREADS.length; i++) {
+      var th = THREADS[i];
+      if (th.active === false) continue;
+      var angNorm = (((th.angle || 0) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI * 2);
+      var normLen = Math.max(0.0, Math.min(1.0, ((th.len || 0.35) - 0.12) / 0.58));
+      var deg = Math.round((1.0 - normLen) * (sc.length - 1));
+      var f = sc[Math.max(0, Math.min(sc.length - 1, deg))];
+      var kName = keyMap4[(th.colorId || 0) % 8];
+      var pan = (th.panOverride !== undefined) ? th.panOverride : Math.cos(th.angle || 0) * 0.75;
+      var gain = Math.max(0.14, Math.min(0.75, (th.vel || 0.38) * 1.35));
+      mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, angNorm * 3.9, 0.45 + normLen * 0.45, f, gain, pan, 1.0);
+      mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W4_DATA, kName, 4.0 + angNorm * 3.9, 0.45 + normLen * 0.45, f, gain, pan, 1.0);
+    }
+  }
+  var buffer = new ArrayBuffer(44 + N * 4), view = new DataView(buffer);
+  function writeStr(o, str) { for (var i = 0; i < str.length; i++) view.setUint8(o + i, str.charCodeAt(i)); }
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + N * 4, true); writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true);
+  view.setUint32(24, sr, true); view.setUint32(28, sr * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, N * 4, true);
+  var off = 44;
+  for (var j = 0; j < N; j++) {
+    var sL = Math.max(-1, Math.min(1, L[j])), sR = Math.max(-1, Math.min(1, R[j]));
+    view.setInt16(off, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+    view.setInt16(off + 2, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
+    off += 4;
+  }
+  return buffer;
+}
+function twExportSoundPattern() {
+  twToast('正在渲染 8 秒音频…');
+  var png = canvas.toDataURL('image/png');
+  var wav = twRenderWav(8.0);
+  var b64 = twArrayBufferToBase64(wav);
+  var html = '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>穿针织音 · 有声图案</title>'
+    + '<style>body{margin:0;background:#f6efe2;color:#2b1810;font-family:"Songti SC","STSong",serif;text-align:center;padding:30px}'
+    + 'h1{font-size:28px;margin:6px 0 4px}p{font-size:13px;color:#6d5f4e;line-height:1.7}'
+    + 'img{max-width:92vw;max-height:66vh;border:3px solid #4a2511;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.25)}'
+    + 'audio{width:min(720px,92vw);margin:18px auto;display:block}.tag{letter-spacing:.18em;font-size:11px;color:#a8342a}</style></head><body>'
+    + '<div class="tag">MING · SOUNDING PATTERN</div><h1>穿针织音 · 有声图案</h1>'
+    + '<p>颜色 → 乐器 · 半径 → 音高/奏法 · 横向 → 声像 · 密度 → 触发</p>'
+    + '<img src="' + png + '">'
+    + '<audio controls autoplay loop src="data:audio/wav;base64,' + b64 + '"></audio>'
+    + '<p>8 秒离线渲染 · 48kHz / 16-bit · 由穿针织音生成</p></body></html>';
+  var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ThreadWeave_SoundingPattern.html'; a.click();
+  twToast('有声图案已导出：单文件，含图案与 8 秒音频');
+}
+function twBindTips() {
+  var tip = document.getElementById('twTip'); if (!tip) return;
+  function hide(){ tip.style.display = 'none'; }
+  canvas.addEventListener('mousemove', function(e){
+    var r = canvas.getBoundingClientRect();
+    var mx = (e.clientX - r.left) / r.width, my = (e.clientY - r.top) / r.height;
+    var html = '';
+    if (mx < 0.17) {
+      for (var s = 0; s < SPOOLS.length; s++) {
+        if (Math.abs(my - (0.168 + s * 0.100)) < 0.046) {
+          html = '<b>' + SPOOLS[s].name + '</b><br>' + SPOOLS[s].sub;
+          break;
+        }
+      }
+    } else if (mx > 0.83) {
+      for (var p = 0; p < PATTERN_HOOPS.length; p++) {
+        if (Math.abs(my - PATTERN_HOOPS[p].y) < 0.050) {
+          html = '<b>' + PATTERN_HOOPS[p].name + '</b><br>' + PATTERN_HOOPS[p].sub;
+          break;
+        }
+      }
+    }
+    if (!html) { hide(); return; }
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    tip.style.left = Math.min(window.innerWidth - 270, e.clientX + 16) + 'px';
+    tip.style.top = Math.min(window.innerHeight - 70, e.clientY + 16) + 'px';
+  });
+  canvas.addEventListener('mouseleave', hide);
+}
+function twBindBar() {
+  var up = document.getElementById('upImage');
+  if (up) up.addEventListener('change', function(e){ twLoadImage(e.target.files[0]); });
+  var bar = document.getElementById('twBar'); if (!bar) return;
+  document.addEventListener('dragover', function(e){ e.preventDefault(); });
+  document.addEventListener('drop', function(e){
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && f.type && f.type.indexOf('image/') === 0) twLoadImage(f);
+  });
+  bar.querySelectorAll('[data-tw]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var a = btn.getAttribute('data-tw');
+      if (a === 'upload') { var u = document.getElementById('upImage'); if (u) u.click(); }
+      else if (a === 'clear') twClearImage();
+      else if (a === 'invert') { imageInvert = !imageInvert; btn.textContent = imageInvert ? '反相 · 开' : '反相'; if (loomImage) twApplyImage(); }
+      else if (a === 'color') { imageColorMap = !imageColorMap; btn.textContent = imageColorMap ? '颜色映射 · 开' : '颜色映射 · 关'; if (loomImage) twApplyImage(); }
+      else if (a === 'sound') twExportSoundPattern();
+    });
+  });
+  var th = document.getElementById('twThreshold');
+  if (th) th.addEventListener('input', function(){ imageThreshold = parseFloat(th.value) || 0.55; if (loomImage) twApplyImage(); });
+  var den = document.getElementById('twDensity');
+  if (den) den.addEventListener('input', function(){ densityThreshold = parseFloat(den.value) || 0.12; if (loomImage) twApplyImage(); });
+  twUpdateStatus();
+}
+function drawLoom() {
+  var w = canvas.width, h = canvas.height, dpr = Math.min(w / 1200, h / 900);
+  ctx.clearRect(0, 0, w, h);
+
+  var bg = ctx.createRadialGradient(w * 0.50, h * 0.53, 20 * dpr, w * 0.50, h * 0.53, w * 0.68);
+  bg.addColorStop(0, '#fdfaf2'); bg.addColorStop(0.65, '#f2e8d5'); bg.addColorStop(1, '#dfd1b8');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = 'rgba(107, 45, 20, 0.045)'; ctx.lineWidth = 1 * dpr;
+  for (var gx = 0; gx < w; gx += 28 * dpr) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
+  for (var gy = 0; gy < h; gy += 28 * dpr) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
+
+  var padB = 10 * dpr;
+  ctx.strokeStyle = '#4a2511'; ctx.lineWidth = 3 * dpr;
+  ctx.strokeRect(padB, padB, w - padB * 2, h - padB * 2);
+  drawChineseCornerFretwork(ctx, padB + 4*dpr, padB + 4*dpr, 1, 1, 44 * dpr, dpr);
+  drawChineseCornerFretwork(ctx, w - padB - 4*dpr, padB + 4*dpr, -1, 1, 44 * dpr, dpr);
+  drawChineseCornerFretwork(ctx, padB + 4*dpr, h - padB - 4*dpr, 1, -1, 44 * dpr, dpr);
+  drawChineseCornerFretwork(ctx, w - padB - 4*dpr, h - padB - 4*dpr, -1, -1, 44 * dpr, dpr);
+
+  ctx.save();
+  var sealX = w * 0.038, sealY = h * 0.038, sealS = 36 * dpr;
+  ctx.fillStyle = '#b91c1c';
+  ctx.fillRect(sealX, sealY, sealS, sealS);
+  ctx.strokeStyle = '#fdfaf2'; ctx.lineWidth = 1.5 * dpr;
+  ctx.strokeRect(sealX + 3*dpr, sealY + 3*dpr, sealS - 6*dpr, sealS - 6*dpr);
+  ctx.fillStyle = '#fdfaf2'; ctx.font = '900 ' + (10 * dpr) + 'px serif';
+  ctx.fillText('八音', sealX + 7*dpr, sealY + 15*dpr);
+  ctx.fillText('织锦', sealX + 7*dpr, sealY + 29*dpr);
+
+  ctx.fillStyle = '#2b1810'; ctx.font = '900 ' + (15.5 * dpr) + 'px serif';
+  ctx.fillText('穿针织音 · 锦瑟八音 [故宫非遗纹样与八音民乐织机]', sealX + sealS + 14 * dpr, h * 0.060);
+  ctx.fillStyle = '#b91c1c'; ctx.font = '800 ' + (9.8 * dpr) + 'px monospace';
+  ctx.fillText(shapeMetrics.polygonType + ' · 丝弦:' + THREADS.length + ' · 金结:' + KNOTS.length, sealX + sealS + 14 * dpr, h * 0.088);
+  ctx.restore();
+
+  TOP_HOOPS.forEach(tb => {
+    var bx = tb.x * w, by = tb.y * h, br = tb.r * dpr;
+    ctx.save();
+    ctx.fillStyle = '#fdfaf2'; ctx.strokeStyle = tb.col; ctx.lineWidth = 2.4 * dpr;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2b1810'; ctx.textAlign = 'center';
+    ctx.font = '800 ' + (8.0 * dpr) + 'px serif'; ctx.fillText(tb.label, bx, by + 1 * dpr);
+    ctx.fillStyle = tb.col; ctx.font = '700 ' + (6.0 * dpr) + 'px monospace'; ctx.fillText(tb.sub, bx, by + 10 * dpr);
+    ctx.restore();
+  });
+
+  SPOOLS.forEach((sp, sIdx) => {
+    var sx = w * 0.088, sy = h * (0.168 + sIdx * 0.100);
+    var instCount = 0;
+    for (var ti = 0; ti < THREADS.length; ti++) {
+      if ((THREADS[ti].colorId % 8) === sIdx) instCount++;
+    }
+    var isSel = (state.activeSpool === sIdx);
+    drawChineseInstrumentSilhouette(ctx, sx, sy, 1.0, sp, isSel || instCount > 0, dpr);
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isSel ? sp.hex : '#2b1810';
+    ctx.font = '900 ' + (8.6 * dpr) + 'px serif';
+    ctx.fillText(sp.name, sx, sy + 32 * dpr);
+    ctx.fillStyle = instCount > 0 ? sp.hex : '#5c4033';
+    ctx.font = '700 ' + (6.2 * dpr) + 'px sans-serif';
+    var badgeStr = instCount > 0 ? ('●已织' + instCount + '弦 [独奏|✕]') : ('+点击添织 · ' + sp.sub.slice(0, 10));
+    ctx.fillText(badgeStr, sx, sy + 40 * dpr);
+    ctx.restore();
+  });
+
+  PATTERN_HOOPS.forEach(ph => {
+    var px = w * 0.912, py = ph.y * h;
+    var isSel = (state.activePatternId === ph.id);
+    var r = (isSel ? 23.5 : 21.0) * dpr;
+    drawChinesePatternIcon(ctx, px, py, r, ph, isSel, dpr);
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isSel ? ph.col : '#2b1810';
+    ctx.font = '900 ' + (8.4 * dpr) + 'px serif';
+    ctx.fillText(ph.name, px, py + r + 10 * dpr);
+    ctx.fillStyle = ph.col;
+    ctx.font = '700 ' + (5.8 * dpr) + 'px monospace';
+    ctx.fillText(ph.sub, px, py + r + 17.5 * dpr);
+    ctx.restore();
+  });
+
+  var cx = w * 0.50, cy = h * 0.53;
+  var outerR = h * 0.375;
+
+  ctx.save();
+  ctx.fillStyle = '#b45309'; ctx.strokeStyle = '#2b1810'; ctx.lineWidth = 2 * dpr;
+  ctx.fillRect(cx - 16 * dpr, cy - outerR - 27 * dpr, 32 * dpr, 11 * dpr);
+  ctx.strokeRect(cx - 16 * dpr, cy - outerR - 27 * dpr, 32 * dpr, 11 * dpr);
+
+  ctx.beginPath(); ctx.arc(cx, cy, outerR + 8 * dpr, 0, Math.PI * 2);
+  ctx.strokeStyle = '#4a2511'; ctx.lineWidth = 14 * dpr; ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+  ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 2.5 * dpr; ctx.stroke();
+
+  var silkGrad = ctx.createRadialGradient(cx, cy, 8 * dpr, cx, cy, outerR);
+  silkGrad.addColorStop(0, '#fffdf9'); silkGrad.addColorStop(0.82, '#f9f2e2'); silkGrad.addColorStop(1, '#efe2c8');
+  ctx.fillStyle = silkGrad;
+  ctx.beginPath(); ctx.arc(cx, cy, outerR - 2 * dpr, 0, Math.PI * 2); ctx.fill();
+
+  if (loomImage) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, outerR - 5 * dpr, 0, Math.PI * 2); ctx.clip();
+    ctx.globalAlpha = 0.22;
+    ctx.drawImage(loomImage, cx - outerR, cy - outerR, outerR * 2, outerR * 2);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  [0.265, 0.175, 0.088].forEach(rad => {
+    ctx.strokeStyle = 'rgba(180, 83, 9, 0.14)'; ctx.lineWidth = 1.0 * dpr;
+    ctx.setLineDash([4 * dpr, 4 * dpr]);
+    ctx.beginPath(); ctx.arc(cx, cy, h * rad, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  TWELVE_LULU.forEach((luName, idx) => {
+    var ang = (idx / 12) * Math.PI * 2 - Math.PI * 0.5;
+    var lx = cx + Math.cos(ang) * (outerR + 7 * dpr);
+    var ly = cy + Math.sin(ang) * (outerR + 7 * dpr);
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(ang + Math.PI * 0.5);
+    ctx.fillStyle = '#fde68a';
+    ctx.font = '800 ' + (7.5 * dpr) + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(luName, 0, 2.5 * dpr);
+    ctx.restore();
+  });
+
+  var rx = cx + Math.cos(state.radarAngle) * (outerR - 6 * dpr);
+  var ry = cy + Math.sin(state.radarAngle) * (outerR - 6 * dpr);
+  var radGrad = ctx.createLinearGradient(cx, cy, rx, ry);
+  radGrad.addColorStop(0, 'rgba(185, 28, 28, 0.05)');
+  radGrad.addColorStop(1, 'rgba(185, 28, 28, 0.48)');
+  ctx.strokeStyle = radGrad; ctx.lineWidth = 2.4 * dpr;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(rx, ry); ctx.stroke();
+
+  // Draw Faint Golden Embroidery Pattern Stencil Guide Lines (描金刺绣底稿虚线) so user can stitch along them!
+  if (CURRENT_STENCIL_STITCHES && CURRENT_STENCIL_STITCHES.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180, 83, 9, 0.16)';
+    ctx.lineWidth = 1.0 * dpr;
+    ctx.setLineDash([3 * dpr, 3 * dpr]);
+    ctx.beginPath();
+    for (var si = 0; si < CURRENT_STENCIL_STITCHES.length; si++) {
+      var sa = PEGS[CURRENT_STENCIL_STITCHES[si][0]], sb = PEGS[CURRENT_STENCIL_STITCHES[si][1]];
+      if (sa && sb) {
+        ctx.moveTo(sa.nx * w, sa.ny * h);
+        ctx.lineTo(sb.nx * w, sb.ny * h);
+      }
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  THREADS.forEach(th => {
+    var a = PEGS[th.p1], b = PEGS[th.p2];
+    if (!a || !b) return;
+    var x1 = a.nx * w, y1 = a.ny * h, x2 = b.nx * w, y2 = b.ny * h;
+    var sp = SPOOLS[th.colorId % SPOOLS.length];
+    ctx.save();
+    ctx.strokeStyle = sp.hex;
+    ctx.lineWidth = (1.65 + (th.glow || 0) * 1.8) * dpr;
+    if (th.glow > 0.1) {
+      ctx.shadowColor = sp.hex;
+      ctx.shadowBlur = th.glow * 10 * dpr;
+      th.glow *= 0.92;
+    }
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    if (th.vibAmp && th.vibAmp > 0.2) {
+      var mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
+      var nx = -(y2 - y1), ny = (x2 - x1);
+      var nl = Math.hypot(nx, ny) || 1;
+      var disp = Math.sin(performance.now() * 0.055) * th.vibAmp * dpr;
+      ctx.quadraticCurveTo(mx + (nx / nl) * disp, my + (ny / nl) * disp, x2, y2);
+      th.vibAmp *= 0.89;
+    } else {
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  KNOTS.forEach(kn => {
+    var kx = kn.nx * w, ky = kn.ny * h;
+    var gr = (2.6 + (kn.glow || 0) * 2.8) * dpr;
+    ctx.fillStyle = kn.glow > 0.15 ? '#fde047' : '#d97706';
+    ctx.beginPath(); ctx.arc(kx, ky, gr, 0, Math.PI * 2); ctx.fill();
+    if (kn.glow > 0.05) kn.glow *= 0.90;
+  });
+
+  for (var i = SILK_PARTICLES.length - 1; i >= 0; i--) {
+    var pt = SILK_PARTICLES[i];
+    pt.nx += pt.vx; pt.ny += pt.vy; pt.life *= 0.92;
+    if (pt.life < 0.08) { SILK_PARTICLES.splice(i, 1); continue; }
+    ctx.save();
+    ctx.globalAlpha = pt.life;
+    ctx.fillStyle = pt.hex;
+    ctx.beginPath(); ctx.arc(pt.nx * w, pt.ny * h, 3.2 * dpr * pt.life, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  PEGS.forEach((p, idx) => {
+    var px = p.nx * w, py = p.ny * h;
+    var isLast = (idx === state.lastPegId);
+    var r = (isLast ? 4.8 : 2.8) * dpr;
+    ctx.fillStyle = isLast ? '#b91c1c' : (p.glow > 0.2 ? '#fde047' : '#fdfaf2');
+    ctx.strokeStyle = isLast ? '#b91c1c' : '#4a2511';
+    ctx.lineWidth = (isLast ? 2.2 : 1.3) * dpr;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (p.glow > 0.05) p.glow *= 0.90;
+  });
+  ctx.restore();
+
+  if (isThreading && state.lastPegId >= 0) {
+    var startPeg = PEGS[state.lastPegId];
+    var nx = state.needleX * w, ny = state.needleY * h;
+    var activeHex = SPOOLS[state.activeSpool].hex;
+    ctx.save();
+    ctx.strokeStyle = activeHex; ctx.lineWidth = 2.4 * dpr;
+    ctx.setLineDash([5 * dpr, 3 * dpr]);
+    ctx.beginPath(); ctx.moveTo(startPeg.nx * w, startPeg.ny * h); ctx.lineTo(nx, ny); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.translate(nx, ny); ctx.rotate(state.needleAngle + Math.PI * 0.25);
+    ctx.fillStyle = '#d4af37';
+    ctx.beginPath(); ctx.moveTo(-22 * dpr, 0); ctx.quadraticCurveTo(0, -3.5 * dpr, 18 * dpr, 0); ctx.quadraticCurveTo(0, 3.5 * dpr, -22 * dpr, 0); ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = '#4a2511'; ctx.font = '800 ' + (9.5 * dpr) + 'px serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('◀ 穿针织音：① 点左侧选乐器线轴（保留已有乐器） ② 用针在绣绷内点击/连线才织入该乐器音色 ③ 点[独奏|✕]可单留或拆线 ▶', w * 0.50, h * 0.966);
+  ctx.restore();
+}
+
+function loop() { drawLoom(); requestAnimationFrame(loop); }
+document.getElementById('upAudio4').addEventListener('change', function(e) { initAudio(); handleUserAudioUpload(e.target.files[0], audioCtx, masterGain); });
+window.addEventListener('DOMContentLoaded', () => {
+  resize();
+  if (!loadLoomState()) weavePresetPattern('dunhuang');
+  drawLoom();
+  requestAnimationFrame(loop);
+  twBindBar();
+  twBindTips();
+});
+</script>
+<script>
+
+(function(){
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停左侧乐器或右侧纹样可看大字提示。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
+  if(!modal) return;
+  var card = modal.querySelector('.guide-card') || modal.firstElementChild;
+  if(!card || card.querySelector('.pm-guide')) return;
+  var st = document.createElement('style');
+  st.textContent = `
+  .pm-card{max-width:720px!important;width:100%!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+  .pm-guide{--pm-panel:${cfg.panel};--pm-ink:${cfg.ink};--pm-sub:${cfg.subc};--pm-accent:${cfg.accent};--pm-line:${cfg.line};
+    background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);border-radius:8px;
+    padding:32px 38px 28px;box-shadow:0 26px 80px rgba(0,0,0,.42);text-align:left;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",sans-serif}
+  .pm-kicker{font-size:11px;letter-spacing:.22em;font-weight:800;color:var(--pm-accent);margin-bottom:14px}
+  .pm-guide h2{font-family:"Songti SC","STSong",serif;font-size:34px;line-height:1.2;font-weight:700;margin:0 0 10px;color:var(--pm-ink)}
+  .pm-lede{font-size:14.5px;line-height:1.75;color:var(--pm-sub);margin:0 0 22px}
+  .pm-steps{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px}
+  .pm-steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+  .pm-steps span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:800;color:var(--pm-accent);padding-top:2px}
+  .pm-steps b{display:block;font-size:15.5px;font-weight:700;color:var(--pm-ink);margin-bottom:2px}
+  .pm-steps em{display:block;font-style:normal;font-size:13px;line-height:1.6;color:var(--pm-sub)}
+  .pm-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:4px 0 16px}
+  .pm-actions button{cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;border-radius:4px;padding:11px 18px;transition:.18s;border:1px solid transparent}
+  .pm-primary{background:var(--pm-accent);color:#fff}
+  .pm-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .pm-ghost{background:transparent;color:var(--pm-ink);border-color:var(--pm-line)}
+  .pm-ghost:hover{border-color:var(--pm-accent);color:var(--pm-accent)}
+  .pm-note{font-size:11.5px;line-height:1.7;color:var(--pm-sub);border-top:1px dashed var(--pm-line);padding-top:12px}
+  .pm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
+  .pm-toast.on{opacity:1}
+  `;
+  document.head.appendChild(st);
+  card.classList.add('pm-card');
+  var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
+  card.innerHTML = '<div class="pm-guide">'
+    + '<div class="pm-kicker">WEB AUDIO · 60 秒上手</div>'
+    + '<h2>'+cfg.title+'</h2>'
+    + '<p class="pm-lede">'+cfg.lede+'</p>'
+    + '<ol class="pm-steps">'+steps+'</ol>'
+    + '<div class="pm-actions">'
+    +   '<button class="pm-primary" type="button">开始</button>'
+    +   '<button class="pm-ghost pm-demo" type="button">一键试听</button>'
+    +   '<button class="pm-ghost pm-full" type="button">全屏演示</button>'
+    +   '<button class="pm-ghost pm-save" type="button">保存分享图</button>'
+    + '</div>'
+    + '<div class="pm-note">'+cfg.note+'</div>'
+    + '</div>';
+  function open(){ modal.classList.add('open'); modal.style.display='flex'; }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 按 ? 重新查看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
+  card.querySelector('.pm-primary').addEventListener('click', close);
+  card.querySelector('.pm-demo').addEventListener('click', function(){
+    close();
+    setTimeout(function(){
+      var c = document.querySelector('canvas'); if(!c) return;
+      var r = c.getBoundingClientRect();
+      var x = r.left + r.width * 0.5, y = r.top + r.height * 0.52;
+      ['mousedown','mouseup'].forEach(function(t){
+        c.dispatchEvent(new MouseEvent(t,{clientX:x,clientY:y,bubbles:true,button:0}));
+      });
+    }, 400);
+  });
+  card.querySelector('.pm-full').addEventListener('click', function(){ close(); try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} });
+  card.querySelector('.pm-save').addEventListener('click', function(){
+    var c = document.querySelector('canvas'); if(!c) return;
+    var W=1600,H=1000, out=document.createElement('canvas'); out.width=W; out.height=H;
+    var g=out.getContext('2d');
+    g.fillStyle=cfg.panel; g.fillRect(0,0,W,H);
+    g.fillStyle=cfg.ink; g.font='700 58px "Songti SC","STSong",serif'; g.fillText(cfg.shareTitle, 60, 96);
+    g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
+    var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
+    g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · WEB AUDIO', 60, H-38);
+    var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') close();
+    if(e.key==='?' ) open();
+    if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
+  });
+  open();
+})();
+
+</script>
+</body>
+</html>

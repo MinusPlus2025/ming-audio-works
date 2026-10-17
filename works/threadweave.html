@@ -250,7 +250,7 @@ var PATTERN_HOOPS = [
 
 var TOP_HOOPS = [
   { id: 'sym',    x: 0.505, y: 0.068, r: 19, label: '对称: 8x',   sub: 'SYMMETRY', col: '#1e3a8a' },
-  { id: 'scale',  x: 0.570, y: 0.068, r: 19, label: '春江雅乐',   sub: 'REPERTOIRE',col:'#0f766e' },
+  { id: 'scale',  x: 0.570, y: 0.068, r: 19, label: '春江',     sub: 'MOTIF',    col:'#0f766e' },
   { id: 'upload', x: 0.635, y: 0.068, r: 19, label: '📂 传音频',  sub: 'UPLOAD',   col: '#6b21a8' },
   { id: 'wav',    x: 0.700, y: 0.068, r: 19, label: '🎵 导WAV',   sub: 'EXPORT',   col: '#b45309' },
   { id: 'video',  x: 0.765, y: 0.068, r: 19, label: '🎥 录视频',  sub: 'VIDEO',    col: '#b91c1c' },
@@ -572,6 +572,8 @@ function findStencilPartnerPeg(pegId) {
   return bestId;
 }
 var THREADS = [];
+var motifStep = 0, motifAccum = 0, motifLeadColor = 0, MOTIF_CLOCK_ON = true;
+var bodyConv = null, bodySend = null;
 var loomImage = null, loomBackup = null, imageThreshold = 0.55, imageInvert = false;
 var imageColorMap = true, densityThreshold = 0.12;
 var KNOTS = [];
@@ -582,6 +584,7 @@ var state = {
   symmetry: 8,
   scaleIdx: 0,
   isPlaying: true,
+  bpm: 72,
   radarAngle: 0.0,
   lastPegId: -1,
   needleX: 0.5,
@@ -1266,6 +1269,53 @@ function playSilkThreadSegment(th, isUserStrum, forcedFreq) {
   }
 }
 
+
+function twAngleDist(a, b) {
+  var d = Math.abs(a - b) % (Math.PI * 2);
+  return Math.min(d, Math.PI * 2 - d);
+}
+function playMotifStep() {
+  if (!audioCtx || THREADS.length === 0) return;
+  var sc = SCALES[state.scaleIdx % SCALES.length];
+  var notes = sc.notes;
+  var motif = sc.leadMotif && sc.leadMotif.length ? sc.leadMotif : [0,2,4,3,5,4,2,0];
+  var bass = sc.bassProg && sc.bassProg.length ? sc.bassProg : [0,3,2,0];
+
+  // nearest active thread to the shuttle: it chooses timbre and pan; the motif chooses pitch.
+  var best = null, bd = 1e9;
+  for (var i = 0; i < THREADS.length; i++) {
+    var th = THREADS[i];
+    if (th.active === false) continue;
+    var d = twAngleDist(th.angle || 0, state.radarAngle);
+    if (d < bd) { bd = d; best = th; }
+  }
+  if (!best) { motifStep = (motifStep + 1) % 256; return; } // image density can create rests
+
+  if (motifStep % 4 === 0) motifLeadColor = best.colorId;
+  var deg = motif[motifStep % motif.length] % notes.length;
+  var freq = notes[deg];
+  var lead = Object.assign({}, best);
+  lead.colorId = motifLeadColor;
+  lead.glow = 1.45;
+  lead.vel = Math.min(0.62, 0.30 + (best.vel || 0.3) * 0.5);
+  playSilkThreadSegment(lead, false, freq);
+
+  if (motifStep % 2 === 0) {
+    var bdeg = bass[(motifStep / 2) % bass.length] % notes.length;
+    var bfreq = notes[bdeg] / 2;
+    playSilkThreadSegment({ p1: best.p1, p2: best.p2, colorId: 2, len: 0.70, angle: best.angle, panOverride: 0, vel: 0.26, rim: true }, false, bfreq);
+  }
+  motifStep = (motifStep + 1) % 256;
+}
+function motifClock() {
+  if (!audioCtx) return;
+  motifAccum += 135;
+  var stepMs = 60000 / (state.bpm || 72) / 2;
+  if (motifAccum < stepMs) return;
+  motifAccum -= stepMs;
+  playMotifStep();
+}
+
 // ============================================================================
 // 100% VISUAL-TO-AUDIO SHUTTLE SCANNER (Zero Ghost/Unmapped Instruments!)
 // Sound is generated ONLY when the rotating shuttle crosses an actual thread
@@ -1277,6 +1327,7 @@ setInterval(() => {
   var stepSpeed = 0.088;
   var oldA = state.radarAngle;
   state.radarAngle = (state.radarAngle + stepSpeed) % (Math.PI * 2);
+  if (MOTIF_CLOCK_ON) { motifClock(); return; }
   if (!audioCtx || THREADS.length === 0) return;
 
   var normOld = (oldA + Math.PI * 2) % (Math.PI * 2);
@@ -1380,8 +1431,11 @@ canvas.addEventListener('mousedown', (e) => {
         tb.label = '对称: ' + state.symmetry + 'x';
       } else if (tb.id === 'scale') {
         state.scaleIdx = (state.scaleIdx + 1) % SCALES.length;
-        tb.label = SCALES[state.scaleIdx].name.slice(1, 5);
-        if (THREADS.length > 0) playSilkThreadSegment(THREADS[0], true);
+        var scName = SCALES[state.scaleIdx].name.replace(/[《》]/g, '');
+        tb.label = scName.slice(0, 3);
+        motifStep = 0; motifAccum = 0;
+        twToast('曲目动机：' + SCALES[state.scaleIdx].name);
+        if (audioCtx) playMotifStep();
       } else if (tb.id === 'play') {
         state.isPlaying = !state.isPlaying;
         tb.label = state.isPlaying ? '■ 抚琴中' : '▶ 已暂停';
@@ -2347,6 +2401,8 @@ document.getElementById('upAudio4').addEventListener('change', function(e) { ini
 window.addEventListener('DOMContentLoaded', () => {
   resize();
   if (!loadLoomState()) weavePresetPattern('dunhuang');
+  var scaleHoop = TOP_HOOPS.find(function(t){ return t.id === 'scale'; });
+  if (scaleHoop) scaleHoop.label = SCALES[state.scaleIdx % SCALES.length].name.replace(/[《》]/g, '').slice(0, 3);
   drawLoom();
   requestAnimationFrame(loop);
   twBindBar();
@@ -2356,7 +2412,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停左侧乐器或右侧纹样可看大字提示。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
