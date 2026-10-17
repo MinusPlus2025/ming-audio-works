@@ -302,7 +302,7 @@ var TRACK_STEMS = [
   { id: 0, name: '脉冲星引力波', sub: 'PULSAR SUB-GRAVITY', hex: '#c084fc', muted: false },
   { id: 1, name: '极光星云合唱', sub: 'NEBULA CHOIR PAD',   hex: '#6ee7b7', muted: false },
   { id: 2, name: '主星天体交响', sub: 'CENTRAL STAR SYNTH', hex: '#93c5fd', muted: false },
-  { id: 3, name: '六卫公转琶音', sub: '6-BODY ORBITAL ARP', hex: '#f7b2c4', muted: false }
+  { id: 3, name: '六卫公转琶音', sub: '6-BODY ORBITAL ARP', hex: '#f7b2c4', muted: true }
 ];
 
 var DEFAULT_SPHERE_NODES = [
@@ -474,8 +474,8 @@ function initAudio() {
   masterGain = audioCtx.createGain(); masterGain.gain.value = 0.88;
 
   delayNode = audioCtx.createDelay(); delayNode.delayTime.value = 0.38;
-  var fb = audioCtx.createGain(); fb.gain.value = 0.44;
-  var df = audioCtx.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 3200;
+  var fb = audioCtx.createGain(); fb.gain.value = 0.52;
+  var df = audioCtx.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 2600;
 
   reverbNode = audioCtx.createConvolver();
   var sr = audioCtx.sampleRate, len = Math.floor(sr * 4.0);
@@ -488,7 +488,7 @@ function initAudio() {
     }
   }
   reverbNode.buffer = buf;
-  var wet = audioCtx.createGain(); wet.gain.value = 0.65;
+  var wet = audioCtx.createGain(); wet.gain.value = 0.78;
 
   masterGain.connect(comp);
   masterGain.connect(delayNode); delayNode.connect(df); df.connect(fb); fb.connect(delayNode); df.connect(comp);

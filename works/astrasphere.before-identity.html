@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASTRASPHERE · 星籁 — 天体引力合成器（Web）</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #020308;
+    color: #f0f4f8;
+    font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    overflow: hidden;
+  }
+  .atrium-shell {
+    width: calc(100vw - 12px); max-width: 1200px;
+    height: calc(100vh - 72px); max-height: 860px;
+    background: radial-gradient(circle at 54% 47%, #141d3d 0%, #070b19 52%, #020308 100%);
+    border: 1px solid rgba(147, 197, 253, 0.28);
+    border-radius: 14px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.95);
+  }
+  #sphereCanvas {
+    width: 100%; height: 100%;
+    display: block;
+    cursor: grab;
+  }
+  #sphereCanvas:active { cursor: grabbing; }
+  .hidden-input { display: none; }
+
+  .guide-modal {
+    position: absolute; inset: 0;
+    background: rgba(3, 5, 12, 0.88);
+    backdrop-filter: blur(18px);
+    z-index: 30;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+  }
+  .guide-modal.open { display: flex; }
+  .guide-card {
+    max-width: 760px; width: 100%;
+    background: rgba(12, 17, 32, 0.96);
+    border: 1px solid rgba(147, 197, 253, 0.48);
+    border-radius: 16px;
+    padding: 28px 34px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.85);
+    color: #f0f4f8;
+  }
+  .guide-card h2 { font-size: 18px; color: #93c5fd; margin-bottom: 12px; }
+  .guide-card p, .guide-card li { font-size: 13.5px; line-height: 1.72; color: #cbd5e1; margin-bottom: 8px; }
+  .guide-card ul { padding-left: 20px; margin-bottom: 18px; }
+  .close-guide-btn {
+    background: linear-gradient(135deg, #93c5fd, #f7b2c4);
+    color: #090b10; border: none;
+    padding: 9px 26px; border-radius: 999px;
+    font-size: 13px; font-weight: 800; cursor: pointer;
+  }
+
+  .as-bar {
+    width: calc(100vw - 12px); max-width: 1200px; min-height: 50px;
+    background: #0a1024; color: #dbeafe; border: 1px solid rgba(147,197,253,.35); border-radius: 8px;
+    display: flex; align-items: center; gap: 10px; padding: 0 14px;
+    font-size: 12px; flex-wrap: wrap;
+  }
+  .as-bar button {
+    background: #7dd3fc; color: #06121e; border: 1px solid #38bdf8; border-radius: 4px;
+    font-family: inherit; font-size: 12px; font-weight: 800; padding: 6px 12px; cursor: pointer;
+  }
+  .as-bar button:hover { filter: brightness(1.08); }
+  .as-bar button.ghost { background: transparent; color: #dbeafe; border-color: rgba(147,197,253,.45); }
+  .as-bar label { display: inline-flex; align-items: center; gap: 6px; color: #bfdbfe; }
+  .as-bar input[type=range] { width: 100px; accent-color: #7dd3fc; }
+  .as-bar .as-status { font-weight: 700; color: #fde68a; }
+  .as-bar .as-sp { margin-left: auto; font-size: 10px; letter-spacing: .12em; color: #7dd3fc; }
+  .as-toast {
+    position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%);
+    background: #0a1024; color: #e0f2fe; border: 1px solid #38bdf8;
+    padding: 8px 14px; border-radius: 999px; font-size: 12px; z-index: 90;
+    opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .as-toast.on { opacity: 1; }
+
+  .pm-hint {
+    position: absolute; z-index: 25; transform: translate(-50%, -50%); display: none;
+    background: rgba(18, 12, 8, 0.84); color: #fff; padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 700; letter-spacing: .04em; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35); pointer-events: none; line-height: 1.4;
+  }
+  .pm-hint .ring {
+    display: block; width: 34px; height: 34px; border: 2px solid #fff; border-radius: 50%;
+    margin: 0 auto 7px; animation: pmHintPulse 1.6s ease-out infinite;
+  }
+  @keyframes pmHintPulse {
+    0% { transform: scale(.8); opacity: .9; }
+    70% { transform: scale(1.35); opacity: 0; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="atrium-shell">
+  <canvas id="sphereCanvas"></canvas>
+  <div class="pm-hint" id="pmHint" style="left:54%;top:47.5%"><span class="ring"></span><span>点球面种星</span></div>
+  <input type="file" id="upAudio1" class="hidden-input" accept="audio/*">
+
+  <div class="guide-modal" id="guideModal">
+    <div class="guide-card">
+      <h2>《ASTRASPHERE · 星籁》v17.0 多重星系与天体引力合成器 · 演奏指南</h2>
+      <p><strong>核心升级（5 大天体形态实时切换 × 6 种异构公转天体 × 马尔可夫生成式太空交响引擎）</strong>：</p>
+      <ul>
+        <li><strong>1. 五大主天体形态与专属音色库（点击底部 [🪐 切换星体] 或顶部天体栏切换）</strong>：
+          <br>· <strong>🪐 土星冰环巨行星</strong>：DX7 六算子水晶星铃 + 冰晶泛音琶音
+          <br>· <strong>🕳 卡冈图雅黑洞吸积盘</strong>：《星际穿越》巨型教堂管风琴（Pipe Organ）+ 重力透镜深空低音
+          <br>· <strong>🌀 仙女座双螺旋星系</strong>：CS-80《银翼杀手》模拟铜管（Analog Brass）+ 64 颗粒星云合唱
+          <br>· <strong>☀️ 日冕耀斑红超巨星</strong>：温暖模拟脉冲序列（Solar Moog Sequencer）+ 日珥共振峰滤波器
+          <br>· <strong>💎 戴森球星际母星</strong>：高频量子玻璃竖琴（Quantum Glass Harp）+ 多声部复节奏钟琴
+        </li>
+        <li><strong>2. 六大公转天体（环状行星、双尾哈雷彗星、双束脉冲中子星、旅行者金唱片、熔岩火卫、星云簇）</strong>：点击任意公转天体或球面即可种下新星标，单击深空背景可发射<strong>引力流星（Meteor Slingshot）</strong>穿过星轨激发连锁和弦！</li>
+      </ul>
+      <button class="close-guide-btn" onclick="toggleGuide(false)">我知道了 · 进入《星籁》多重星系宇宙</button>
+    </div>
+  </div>
+</div>
+
+<div class="as-bar" id="asBar">
+  <button data-as="load">载入音频</button>
+  <button data-as="demo" class="ghost">生成一段</button>
+  <button data-as="reactive" class="ghost">音频反应</button>
+  <label>灵敏度 <input type="range" id="asSens" min="0.4" max="2.4" step="0.05" value="1.0"></label>
+  <button data-as="help" class="ghost">说明</button>
+  <span class="as-status" id="asStatus">生成模式</span>
+  <span class="as-sp">MING</span>
+</div>
+
+<script>
+var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, userAudioAnalyser = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+
+function ensureIOGraph(ctx, masterNode) {
+  if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
+  if (!mediaStreamDest && ctx.createMediaStreamDestination) { mediaStreamDest = ctx.createMediaStreamDestination(); masterNode.connect(mediaStreamDest); }
+}
+
+
+function updateUserAudioUI(loaded) {
+  var btn = document.querySelector('[data-as="load"]');
+  if (btn) btn.textContent = loaded ? '卸载音频' : '载入音频';
+  var rb = document.querySelector('[data-as="reactive"]');
+  if (rb) rb.textContent = loaded ? '音频反应 · 开' : '音频反应';
+  var st = document.getElementById('asStatus');
+  if (st) st.textContent = loaded ? '分析源 · 等待能量' : '生成模式';
+}
+function stopUserAudio(updateUI) {
+  if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
+  if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
+  userAudioBuffer = null; userAudioAnalyser = null; audioReactive = false;
+  if (updateUI !== false) updateUserAudioUI(false);
+}
+function handleUserAudioUpload(file, ctx, targetNode) {
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    ctx.decodeAudioData(evt.target.result, function(decoded) {
+      stopUserAudio(false);
+      userAudioBuffer = decoded;
+      userAudioSource = ctx.createBufferSource();
+      userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
+      userAudioGainNode = ctx.createGain(); userAudioGainNode.gain.value = 0.60;
+      userAudioAnalyser = ctx.createAnalyser(); userAudioAnalyser.fftSize = 256;
+      userAudioSource.connect(userAudioGainNode);
+      userAudioGainNode.connect(userAudioAnalyser);
+      userAudioGainNode.connect(targetNode);
+      userAudioSource.start(0);
+      audioReactive = true;
+      updateUserAudioUI(true);
+    }, function(){ if (typeof asToast === 'function') asToast('音频解码失败：换一个 WAV/MP3 试试'); });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportCurrentStateWAV(filenamePrefix, synthCallback) {
+  var sr = 48000, dur = 8.0, numSamples = sr * dur;
+  var left = new Float32Array(numSamples), right = new Float32Array(numSamples);
+  synthCallback(left, right, sr, numSamples);
+  var buffer = new ArrayBuffer(44 + numSamples * 4), view = new DataView(buffer);
+  function writeStr(offset, str) { for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); }
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + numSamples * 4, true); writeStr(8, 'WAVE'); writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 2, true);
+  view.setUint32(24, sr, true); view.setUint32(28, sr * 4, true); view.setUint16(32, 4, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, numSamples * 4, true);
+  var offset = 44;
+  for (var i = 0; i < numSamples; i++) {
+    var sL = Math.max(-1, Math.min(1, left[i])), sR = Math.max(-1, Math.min(1, right[i]));
+    view.setInt16(offset, sL < 0 ? sL * 0x8000 : sL * 0x7FFF, true);
+    view.setInt16(offset + 2, sR < 0 ? sR * 0x8000 : sR * 0x7FFF, true);
+    offset += 4;
+  }
+  var blob = new Blob([buffer], { type: 'audio/wav' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = filenamePrefix + '_48kHz_Master.wav';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  return blob.size;
+}
+
+function toggleVideoRecording(canvasEl, ctx, masterNode, filenamePrefix, onStatusChange) {
+  ensureIOGraph(ctx, masterNode);
+  if (isRecordingVideo && mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop(); isRecordingVideo = false;
+    if (onStatusChange) onStatusChange(false);
+    return 'stopped';
+  }
+  var canvasStream = canvasEl.captureStream ? canvasEl.captureStream(30) : null;
+  if (!canvasStream) return 'unsupported';
+  var combinedTracks = [...canvasStream.getVideoTracks()];
+  if (mediaStreamDest && mediaStreamDest.stream) combinedTracks.push(...mediaStreamDest.stream.getAudioTracks());
+  var combinedStream = new MediaStream(combinedTracks);
+  recordedChunks = [];
+  var mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '';
+  mediaRecorder = mimeType ? new MediaRecorder(combinedStream, { mimeType: mimeType }) : new MediaRecorder(combinedStream);
+  mediaRecorder.ondataavailable = function(e) { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = function() {
+    var blob = new Blob(recordedChunks, { type: mimeType || 'video/webm' }), url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = filenamePrefix + '_Interactive_AV.webm';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  };
+  mediaRecorder.start(200); isRecordingVideo = true;
+  if (onStatusChange) onStatusChange(true);
+  return 'recording';
+}
+
+var canvas = document.getElementById('sphereCanvas');
+var ctx = canvas.getContext('2d');
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+function resize() {
+  var rect = canvas.getBoundingClientRect();
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+}
+window.addEventListener('resize', resize);
+
+// 5 Morphable Central Celestial Megastructures & Their Distinct Sonic Worlds!
+var CELESTIAL_SYSTEMS = [
+  {
+    id: 0, name: '🪐 土星冰环巨星 (Saturn Ice-Ring Giant)',
+    timbreMode: 'fmbell',
+    chords: [
+      { label: 'Fmaj9#11', sub: 43.65, nebula: [174.61, 220.00, 261.63, 329.63, 392.00], stars: [523.25, 659.25, 739.99, 783.99, 987.77, 1174.66, 1318.51, 1567.98] },
+      { label: 'Gmaj9#11', sub: 49.00, nebula: [196.00, 246.94, 293.66, 369.99, 440.00], stars: [587.33, 739.99, 830.61, 880.00, 1108.73,1318.51, 1479.98, 1760.00] },
+      { label: 'Em11',     sub: 41.20, nebula: [164.81, 196.00, 246.94, 293.66, 369.99], stars: [493.88, 587.33, 659.25, 739.99, 880.00, 987.77, 1174.66, 1479.98] },
+      { label: 'Cmaj9#11', sub: 65.41, nebula: [130.81, 196.00, 246.94, 293.66, 369.99], stars: [523.25, 587.33, 739.99, 783.99, 987.77, 1174.66, 1479.98, 1567.98] }
+    ]
+  },
+  {
+    id: 1, name: '🕳 卡冈图雅黑洞 (Gargantua Accretion Hole)',
+    timbreMode: 'organ',
+    chords: [
+      { label: 'Am(add9)', sub: 55.00, nebula: [110.00, 164.81, 220.00, 246.94, 329.63], stars: [220.00, 329.63, 440.00, 493.88, 659.25, 880.00, 987.77, 1318.51] },
+      { label: 'Fmaj7#11', sub: 43.65, nebula: [130.81, 174.61, 220.00, 246.94, 329.63], stars: [261.63, 329.63, 440.00, 493.88, 659.25, 783.99, 987.77, 1318.51] },
+      { label: 'Dm9',      sub: 73.42, nebula: [146.83, 174.61, 220.00, 261.63, 329.63], stars: [293.66, 349.23, 440.00, 523.25, 659.25, 880.00, 1046.50,1318.51] },
+      { label: 'E7sus4',   sub: 41.20, nebula: [123.47, 164.81, 220.00, 246.94, 329.63], stars: [246.94, 329.63, 440.00, 493.88, 659.25, 783.99, 987.77, 1318.51] }
+    ]
+  },
+  {
+    id: 2, name: '🌀 仙女座双旋星系 (Andromeda Spiral Galaxy)',
+    timbreMode: 'cs80brass',
+    chords: [
+      { label: 'Dbmaj9',   sub: 69.30, nebula: [138.59, 207.65, 261.63, 311.13, 415.30], stars: [277.18, 311.13, 415.30, 523.25, 622.25, 830.61, 1046.50,1244.51] },
+      { label: 'Abmaj9',   sub: 51.91, nebula: [155.56, 207.65, 261.63, 311.13, 392.00], stars: [311.13, 392.00, 466.16, 523.25, 622.25, 783.99, 932.33, 1046.50] },
+      { label: 'Fm11',     sub: 43.65, nebula: [174.61, 207.65, 261.63, 311.13, 392.00], stars: [261.63, 311.13, 392.00, 523.25, 622.25, 783.99, 932.33, 1046.50] },
+      { label: 'Eb6/9',    sub: 77.78, nebula: [155.56, 196.00, 233.08, 293.66, 392.00], stars: [311.13, 392.00, 466.16, 587.33, 698.46, 783.99, 932.33, 1174.66] }
+    ]
+  },
+  {
+    id: 3, name: '☀️ 日冕耀斑超巨星 (Coronal Flare Supergiant)',
+    timbreMode: 'solararp',
+    chords: [
+      { label: 'Dmaj9#11', sub: 73.42, nebula: [146.83, 220.00, 277.18, 329.63, 415.30], stars: [293.66, 369.99, 440.00, 554.37, 659.25, 830.61, 880.00, 1108.73] },
+      { label: 'Bm11',     sub: 61.74, nebula: [123.47, 185.00, 220.00, 293.66, 369.99], stars: [246.94, 329.63, 369.99, 493.88, 587.33, 739.99, 880.00, 987.77] },
+      { label: 'Gmaj13',   sub: 49.00, nebula: [146.83, 196.00, 246.94, 293.66, 369.99], stars: [293.66, 369.99, 440.00, 493.88, 587.33, 739.99, 880.00, 1174.66] },
+      { label: 'A13sus4',  sub: 55.00, nebula: [164.81, 220.00, 277.18, 329.63, 392.00], stars: [329.63, 392.00, 440.00, 554.37, 659.25, 783.99, 880.00, 1108.73] }
+    ]
+  },
+  {
+    id: 4, name: '💎 戴森球量子母星 (Dyson Sphere Megastructure)',
+    timbreMode: 'shimmer',
+    chords: [
+      { label: 'Ebmaj9#11',sub: 77.78, nebula: [155.56, 233.08, 293.66, 349.23, 440.00], stars: [466.16, 587.33, 698.46, 880.00, 932.33, 1174.66,1396.91, 1760.00] },
+      { label: 'Cm11',     sub: 65.41, nebula: [130.81, 196.00, 233.08, 293.66, 392.00], stars: [392.00, 466.16, 587.33, 783.99, 932.33, 1174.66,1567.98, 1760.00] },
+      { label: 'Abmaj9',   sub: 51.91, nebula: [155.56, 207.65, 261.63, 311.13, 392.00], stars: [415.30, 523.25, 622.25, 783.99, 932.33, 1046.50,1244.51, 1567.98] },
+      { label: 'Bb13sus4', sub: 58.27, nebula: [174.61, 233.08, 261.63, 311.13, 392.00], stars: [466.16, 523.25, 622.25, 783.99, 932.33, 1046.50,1396.91, 1760.00] }
+    ]
+  }
+];
+
+var TRACK_STEMS = [
+  { id: 0, name: '脉冲星引力波', sub: 'PULSAR SUB-GRAVITY', hex: '#c084fc', muted: false },
+  { id: 1, name: '极光星云合唱', sub: 'NEBULA CHOIR PAD',   hex: '#6ee7b7', muted: false },
+  { id: 2, name: '主星天体交响', sub: 'CENTRAL STAR SYNTH', hex: '#93c5fd', muted: false },
+  { id: 3, name: '六卫公转琶音', sub: '6-BODY ORBITAL ARP', hex: '#f7b2c4', muted: false }
+];
+
+var DEFAULT_SPHERE_NODES = [
+  { lat: -0.55, lon: 0.4,  color: '#f7b2c4', size: 1.1, pulse: 0.8 },
+  { lat: -0.25, lon: 1.2,  color: '#93c5fd', size: 1.0, pulse: 0.9 },
+  { lat:  0.05, lon: 2.0,  color: '#6ee7b7', size: 1.2, pulse: 1.0 },
+  { lat:  0.35, lon: 2.8,  color: '#fde047', size: 1.0, pulse: 0.7 },
+  { lat: -0.40, lon: 3.6,  color: '#c084fc', size: 1.1, pulse: 0.85 },
+  { lat:  0.18, lon: 4.5,  color: '#f7b2c4', size: 1.0, pulse: 0.95 },
+  { lat: -0.12, lon: 5.3,  color: '#93c5fd', size: 1.15, pulse: 0.8 },
+  { lat:  0.48, lon: 6.0,  color: '#6ee7b7', size: 1.0, pulse: 0.9 }
+];
+
+var SPHERE_NODES = JSON.parse(JSON.stringify(DEFAULT_SPHERE_NODES));
+
+// 6 Distinct Orbiting Celestial Bodies (Ringed Planet, Halley Comet, Binary Pulsar, Voyager Probe, Volcanic Moon, Star Cluster)
+var MOONS = [
+  { type: 'ringed',  name: '🪐 泰坦双环巨星', dist: 1.26, tilt:  0.32, angle: 0.4, speed:  0.014, r: 14, color: '#93c5fd', voice: 'fmbell',   trail: [] },
+  { type: 'comet',   name: '☄️ 哈雷双尾彗星', dist: 1.40, tilt: -0.42, angle: 1.5, speed: -0.017, r: 11, color: '#67e8f9', voice: 'shimmer',  trail: [] },
+  { type: 'pulsar',  name: '🌟 蟹状脉冲中子星',dist: 1.54, tilt:  0.22, angle: 2.5, speed:  0.012, r: 12, color: '#fde047', voice: 'solararp', trail: [] },
+  { type: 'earth',   name: '🌍 极光海洋行星', dist: 1.68, tilt: -0.18, angle: 3.4, speed: -0.010, r: 13, color: '#34d399', voice: 'fmbell',   trail: [] },
+  { type: 'voyager', name: '🛸 旅行者金唱片', dist: 1.80, tilt: -0.28, angle: 4.3, speed: -0.008, r: 11, color: '#fbbf24', voice: 'shimmer',  trail: [] },
+  { type: 'volcano', name: '🌋 洛基熔岩火卫', dist: 1.92, tilt:  0.16, angle: 5.1, speed:  0.007, r: 13, color: '#fb7185', voice: 'organ',    trail: [] },
+  { type: 'galaxy',  name: '🌀 麦哲伦伴星系', dist: 2.04, tilt: -0.24, angle: 5.8, speed:  0.006, r: 15, color: '#c084fc', voice: 'cs80brass',trail: [] }
+];
+
+// Background Twin Spiral Galaxy Particles (450 stars in distant spiral arms!)
+var GALAXY_STARS = Array.from({ length: 420 }, (_, i) => {
+  var arm = i % 2;
+  var u = (i / 420);
+  var theta = u * Math.PI * 4.5 + arm * Math.PI + (Math.random() - 0.5) * 0.45;
+  var rad = 0.04 + u * 0.44;
+  var cols = ['#93c5fd', '#f7b2c4', '#fde047', '#c084fc', '#ffffff'];
+  return { theta: theta, rad: rad, col: cols[i % cols.length], size: 0.6 + (i % 5) * 0.35, alpha: 0.15 + (1 - u) * 0.55 };
+});
+
+var SHOOTING_METEORS = [];
+
+var BOTTOM_PILLS = [
+  { id: 'play',   x: 0.130, w: 0.120, label: '■ 星系运转中' },
+  { id: 'system', x: 0.275, w: 0.120, label: '🪐 切换天体' },
+  { id: 'drop',   x: 0.420, w: 0.120, label: '✦ 超新星波' },
+  { id: 'meteor', x: 0.565, w: 0.120, label: '☄️ 流星群' },
+  { id: 'clear',  x: 0.710, w: 0.120, label: '↺ 重置宇宙' },
+  { id: 'wav',    x: 0.855, w: 0.120, label: '🎵 导WAV' }
+];
+
+var LASER_ARCS = [];
+
+var state = {
+  isPlaying: true,
+  sysIdx: 0,
+  barIdx: 0,
+  rotY: 0.0,
+  rotX: 0.26,
+  spinSpeed: 0.0085,
+  sphereRadiusScale: 1.0,
+  energyPulse: 0.5,
+  supernovaRing: 0.0,
+  markovIdx: 2,
+  waveOrder: 5,
+  spawnTypeIdx: 0,
+  time: 0.0
+};
+
+function toggleGuide(show) {
+  document.getElementById('guideModal').classList.toggle('open', show);
+}
+
+
+
+var audioCtx = null, masterGain = null, reverbNode = null, delayNode = null;
+var audioEnergy = 0, audioCentroid = 0, audioReactive = false, audioSensitivity = 1.0;
+var nebulaOscs = [], nebulaFilter = null, nebulaGain = null, pulsarOsc = null, pulsarGain = null;
+var dopplerBowOsc = null, dopplerBowGain = null, dopplerBowFilter = null;
+var SAMPLE_BANK = {};
+
+function buildMultiCelestialSampleBank(ctx) {
+  var sr = ctx.sampleRate;
+
+  // 1. DX7 6-Operator Glass Star-Bell (Saturn Ice-Ring Timbre)
+  var lenFM = Math.floor(sr * 3.0);
+  var bufFM = ctx.createBuffer(2, lenFM, sr);
+  var fL = bufFM.getChannelData(0), fR = bufFM.getChannelData(1), fc = 523.25;
+  for (var i = 0; i < lenFM; i++) {
+    var t = i / sr;
+    var env = (1.0 - Math.exp(-t / 0.007)) * Math.exp(-t * 1.5);
+    var op2 = Math.sin(2 * Math.PI * (fc * 3.501) * t) * Math.exp(-t * 5.2) * 1.8;
+    var op3 = Math.sin(2 * Math.PI * (fc * 2.002) * t + op2 * 0.5) * Math.exp(-t * 1.6) * 0.7;
+    fL[i] = Math.tanh((Math.sin(2 * Math.PI * (fc * 0.999) * t + op3) + 0.35 * Math.sin(2 * Math.PI * (fc * 0.5) * t)) * env * 0.45);
+    fR[i] = Math.tanh((Math.sin(2 * Math.PI * (fc * 1.001) * t + op3 + 0.5) + 0.35 * Math.sin(2 * Math.PI * (fc * 0.501) * t)) * env * 0.45);
+  }
+  SAMPLE_BANK['fmbell'] = { buf: bufFM, baseFreq: 523.25 };
+
+  // 2. Gargantua Interstellar Cathedral Pipe Organ (Black Hole Timbre)
+  var lenOrg = Math.floor(sr * 3.2);
+  var bufOrg = ctx.createBuffer(2, lenOrg, sr);
+  var oL = bufOrg.getChannelData(0), oR = bufOrg.getChannelData(1), fo = 261.63;
+  var drawbars = [0.5, 1.0, 1.498, 2.0, 3.0, 4.0, 6.0, 8.0];
+  var drawAmps = [0.45, 0.55, 0.25, 0.40, 0.22, 0.28, 0.14, 0.10];
+  for (var i = 0; i < lenOrg; i++) {
+    var t = i / sr;
+    var env = Math.sin(Math.PI * Math.pow(t / 3.2, 0.65)) ** 1.2;
+    var sL = 0, sR = 0;
+    for (var d = 0; d < 8; d++) {
+      sL += drawAmps[d] * Math.sin(2 * Math.PI * (fo * drawbars[d] * 0.9992) * t + d * 0.3);
+      sR += drawAmps[d] * Math.sin(2 * Math.PI * (fo * drawbars[d] * 1.0008) * t + d * 0.7);
+    }
+    oL[i] = Math.tanh(sL * env * 0.28);
+    oR[i] = Math.tanh(sR * env * 0.28);
+  }
+  SAMPLE_BANK['organ'] = { buf: bufOrg, baseFreq: 261.63 };
+
+  // 3. CS-80 Analog Blade-Runner Cosmic Brass Swell (Andromeda Spiral Galaxy Timbre)
+  var lenBr = Math.floor(sr * 2.8);
+  var bufBr = ctx.createBuffer(2, lenBr, sr);
+  var bL = bufBr.getChannelData(0), bR = bufBr.getChannelData(1), fb = 261.63, lp1 = 0, lp2 = 0;
+  for (var i = 0; i < lenBr; i++) {
+    var t = i / sr;
+    var env = (1.0 - Math.exp(-t / 0.14)) * Math.exp(-t * 1.15);
+    var vib = Math.sin(2 * Math.PI * 5.2 * t) * 0.004 * Math.min(1.0, t * 1.5);
+    var sawL = 2.0 * (((fb * (1 + vib) * 0.997) * t) % 1.0) - 1.0 + 2.0 * (((fb * 2.002) * t) % 1.0) - 1.0;
+    var sawR = 2.0 * (((fb * (1 - vib) * 1.003) * t) % 1.0) - 1.0 + 2.0 * (((fb * 1.998) * t) % 1.0) - 1.0;
+    var cut = 0.03 + 0.16 * Math.sin(Math.PI * Math.min(1.0, t / 1.4));
+    lp1 += cut * (sawL - lp1); lp2 += cut * (sawR - lp2);
+    bL[i] = Math.tanh(lp1 * env * 0.48);
+    bR[i] = Math.tanh(lp2 * env * 0.48);
+  }
+  SAMPLE_BANK['cs80brass'] = { buf: bufBr, baseFreq: 261.63 };
+
+  // 4. Solar Moog Resonant Pluck Pulse (Coronal Supergiant Timbre)
+  var lenSol = Math.floor(sr * 1.6);
+  var bufSol = ctx.createBuffer(2, lenSol, sr);
+  var sL = bufSol.getChannelData(0), sR = bufSol.getChannelData(1), fs = 261.63, slpL = 0, slpR = 0;
+  for (var i = 0; i < lenSol; i++) {
+    var t = i / sr;
+    var env = (1.0 - Math.exp(-t / 0.004)) * Math.exp(-t * 3.2);
+    var sqL = (Math.sin(2 * Math.PI * fs * t) >= 0 ? 0.8 : -0.8) + Math.sin(2 * Math.PI * fs * 1.5 * t) * 0.5;
+    var sqR = (Math.sin(2 * Math.PI * fs * 1.002 * t) >= 0 ? 0.8 : -0.8) + Math.sin(2 * Math.PI * fs * 1.498 * t) * 0.5;
+    var cut = 0.04 + 0.28 * Math.exp(-t * 9.0);
+    slpL += cut * (sqL - slpL); slpR += cut * (sqR - slpR);
+    sL[i] = Math.tanh(slpL * env * 0.55);
+    sR[i] = Math.tanh(slpR * env * 0.55);
+  }
+  SAMPLE_BANK['solararp'] = { buf: bufSol, baseFreq: 261.63 };
+
+  // 5. Granular Shimmer Star-Cloud & Quantum Glass Harp (Dyson Sphere Timbre)
+  var lenGran = Math.floor(sr * 3.4);
+  var bufGran = ctx.createBuffer(2, lenGran, sr);
+  var gL = bufGran.getChannelData(0), gR = bufGran.getChannelData(1), fg = 523.25;
+  for (var i = 0; i < lenGran; i++) {
+    var t = i / sr;
+    var swell = (1.0 - Math.exp(-t / 0.015)) * Math.exp(-t * 1.4);
+    var grainWindow = 0.5 - 0.5 * Math.cos(2 * Math.PI * ((t * 16.0) % 1.0));
+    gL[i] = Math.tanh((Math.sin(2*Math.PI*fg*t) + 0.5*Math.sin(2*Math.PI*fg*1.498*t) + 0.35*Math.sin(2*Math.PI*fg*2.003*t) * grainWindow) * swell * 0.38);
+    gR[i] = Math.tanh((Math.sin(2*Math.PI*fg*1.002*t+0.7) + 0.5*Math.sin(2*Math.PI*fg*1.501*t+0.3) + 0.35*Math.sin(2*Math.PI*fg*1.998*t) * grainWindow) * swell * 0.38);
+  }
+  SAMPLE_BANK['shimmer'] = { buf: bufGran, baseFreq: 523.25 };
+}
+
+function initAudio() {
+  if (audioCtx) { if (audioCtx.state === 'suspended') audioCtx.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  audioCtx = new AC({ sampleRate: 48000 });
+  buildMultiCelestialSampleBank(audioCtx); 
+
+  var comp = audioCtx.createDynamicsCompressor();
+  comp.threshold.value = -14; comp.ratio.value = 3.0;
+  masterGain = audioCtx.createGain(); masterGain.gain.value = 0.88;
+
+  delayNode = audioCtx.createDelay(); delayNode.delayTime.value = 0.38;
+  var fb = audioCtx.createGain(); fb.gain.value = 0.44;
+  var df = audioCtx.createBiquadFilter(); df.type = 'lowpass'; df.frequency.value = 3200;
+
+  reverbNode = audioCtx.createConvolver();
+  var sr = audioCtx.sampleRate, len = Math.floor(sr * 4.0);
+  var buf = audioCtx.createBuffer(2, len, sr);
+  for (var ch = 0; ch < 2; ch++) {
+    var d = buf.getChannelData(ch), lp = 0;
+    for (var i = 0; i < len; i++) {
+      lp = 0.92 * lp + 0.08 * (Math.random() * 2 - 1);
+      d[i] = lp * Math.pow(1 - i / len, 1.8) * 0.88;
+    }
+  }
+  reverbNode.buffer = buf;
+  var wet = audioCtx.createGain(); wet.gain.value = 0.65;
+
+  masterGain.connect(comp);
+  masterGain.connect(delayNode); delayNode.connect(df); df.connect(fb); fb.connect(delayNode); df.connect(comp);
+  masterGain.connect(reverbNode); reverbNode.connect(wet); wet.connect(comp);
+  comp.connect(audioCtx.destination);
+
+  pulsarOsc = audioCtx.createOscillator();
+  pulsarOsc.type = 'sine'; pulsarOsc.frequency.value = 43.65;
+  var pulsarLFO = audioCtx.createOscillator(), pulsarLFOGain = audioCtx.createGain();
+  pulsarLFO.frequency.value = 0.45; pulsarLFOGain.gain.value = 0.08;
+  pulsarGain = audioCtx.createGain(); pulsarGain.gain.value = 0.045;
+  pulsarLFO.connect(pulsarLFOGain); pulsarLFOGain.connect(pulsarGain.gain);
+  pulsarOsc.connect(pulsarGain); pulsarGain.connect(masterGain);
+  pulsarOsc.start(); pulsarLFO.start();
+
+  nebulaFilter = audioCtx.createBiquadFilter();
+  nebulaFilter.type = 'lowpass'; nebulaFilter.frequency.value = 1200; nebulaFilter.Q.value = 2.8;
+  nebulaGain = audioCtx.createGain(); nebulaGain.gain.value = 0.015;
+  [174.61, 220.00, 261.63, 329.63, 392.00].forEach((f, idx) => {
+    var o = audioCtx.createOscillator();
+    o.type = idx % 2 === 0 ? 'sawtooth' : 'triangle';
+    o.frequency.value = f; o.detune.value = (idx - 2) * 8.5;
+    var g = audioCtx.createGain(); g.gain.value = 0.13;
+    o.connect(g); g.connect(nebulaFilter); o.start();
+    nebulaOscs.push(o);
+  });
+  nebulaFilter.connect(nebulaGain); nebulaGain.connect(masterGain);
+
+  dopplerBowOsc = audioCtx.createOscillator();
+  dopplerBowOsc.type = 'sawtooth'; dopplerBowOsc.frequency.value = 329.63;
+  dopplerBowFilter = audioCtx.createBiquadFilter();
+  dopplerBowFilter.type = 'bandpass'; dopplerBowFilter.frequency.value = 1400; dopplerBowFilter.Q.value = 4.0;
+  dopplerBowGain = audioCtx.createGain(); dopplerBowGain.gain.value = 0.0001;
+  dopplerBowOsc.connect(dopplerBowFilter); dopplerBowFilter.connect(dopplerBowGain); dopplerBowGain.connect(masterGain);
+  dopplerBowOsc.start();
+
+  ensureIOGraph(audioCtx, comp);
+}
+
+document.getElementById('upAudio1').addEventListener('change', function(e) {
+  initAudio();
+  handleUserAudioUpload(e.target.files[0], audioCtx, masterGain);
+});
+
+// Generative Markov-Chain Note & Timbre Trigger (Never sounds identical twice!)
+
+var DLS_W1_DATA = {"harp": {"name": "HARP_70A", "sr": 22050, "bits": 8, "unity": 70, "fine": -1, "lstart": 2937, "llen": 520, "b64": "gICAgYGCg4KCgoGAfX57d3Ryb2ttdHV0eH2AgH58fHt8gomOj5aipqGbnqOkoqWnopqSiYODg3hpX1dTUEEvMUhXWVhcY2VlZ253fYGDiJSktsPM0d/q3sO1s7OspJ6alo6Denh0aFhKPDIoFQQMJT1GS1NdZ21zd3RycHBxdICQn6ezzN/Zx72+wL63rKKenZqanqKhnJWNiHxiS0ZUYmZiX2JlaW1pX1VOSEE7P0tTV2aFnp6TjJCZoaCZk5WXmJuiqKqqpKCgmIRxbXuOmJmbnaGmqKGThnxyZVVPUlBJT2V2dGVbW2FoZ19bXWFla3F6hIuPlp+hlYiGlaizuLu9wsjLxrmroJWBaltUSDg5SVdWTEVGTlhcWVhbX2ZscXuHkJairrKpm5eisbu/vr2+wL+5qZiMgm9ZTEc7LzFEVVtWT1FbaG9xc3d/iI6RmaCipKqzs6WSh4mTnKCcmZqeoJ2Rg3tzY1JIQzcqKz1SX2BeY3KCjZOTlZqhpKassbGzusXHu6iZk5aamY+FgH+BfG9jXFRENCskFwoIFSs9RUdRZXuPnaWtt8HGzNPZ2dnf6OneybaqqKikmIl9d3VuXlJLQzUnIRwSBgQQJjtER09gdoubpK23v8XJz9LRztPc39bDr6Kfn52Vh3x4d3FlXFhRRjw3MigdFx4yRU1OU2ByhZOcpK61ub3CxcTBxs/Tzr+top6fn5qNgXx7c2dfWlJHPjkzKx8XGyw9RkhLVWZ5iJOeqbG3vMPIx8bK09nWyrmspqWno5aKhYF5bWVgWE5GQDoyJxweKzpERkdOXGx5hZCbo6mxuLy8u7/Hz8/FuKylpainnZSQjod8dW9nXVVPSkI2Kio0Q0xOTlNdanR9ho+Vm6Kprq6tsLnCxL2xpJycoJ+YkY+PiYF7dW1kXFVQSDsvLDVDTlBQU11ocXmCipCXn6esrq6yvMbJxbqupaSnpZ2WlZWQiYJ7c2pgWVNJOiwnLDdBRERIUVxmb3iAho2WnqSnqKy2wsnIwbWtq62rpJ+enZmUjYeBd21mYVdIODAyPEVHR0lRWmJqcnl/hYyUmp2doam0vL64rqWkpqSemZiYlpGLh4F5cGpmXlFCNzc/SEtLTlVdZGx0eoCHjpacnp+iqbO8wLyxqKamo56Zl5eVkYuHgXlwaWVeUUE1MzpDRkdKUVhfaHB4foWMlZyfoaSrtL/FwriwrKumoZuYlpSQi4aCenFrZ2FWRjk0OUBERklQV15ncHh/hY2WnaCho6ixvMTDu7OvrKiinJiWk46JhH94b2lmYVdIOTM1Oz5ARElQV2BpcXmAiZObn6GjqLC8xcfAurazr6qjn52alZCLhn52b2tnXk8/Nzc7PT9CRkxSWWJqcXmBi5OYm52gqLW/wr65tbGuqKKem5mUkIuHgHlzb21mWElAPkBDRUhMUVdeZW50e4KMk5iam5yjrri8urayrqqknpqXlJGMiYWAenRxb2peT0VCQkVHSU1SWF1ka3F3foeOk5aXmJ6os7m6trOwrKagnJmXlJCMiYV/eHV0cGRWS0VERUZIS09UWV9ma3F4gIiOkZKSl6GstLa1s7KvqqSgnZuYlJCNiYR9enp3bV9TTElISUpNUFRYXWNobXR7goiMjIyQmaStsbGxsa+spqKfnZuXk5CNh4F+fnx0Z1tTTkxLS0xPUlZbX2Rpb3Z9hIeIh4qSnKasrq6vr6yopKGfnZmWk4+KhIGBf3htYVhRTUtLTE5QVFldYWZscnqChoeGiI+Zoqmtr7Gxr6unpKKfnJiUkIuEgYF/enBkWlNPS0pLTVBUWFxgZWpweYGGiIiJjpihqa2ws7Syrqmmo6CcmJSQiYN/fn15cGVbVE5KSElKTVFVWV5jaG93gIaIiImOlp+nrbG0trWxrammop6alpGKg39+fXpyaF9WUEtJSElMT1NYXWFmbHV+hIiIiYyTnKSqr7O1tbKtqaainZmVkIqDfn19enVsY1tUT0tKS01RVFhdYWVrcnuCh4iJio+Xn6assLS1tLCsqKSgnJiUj4iCfn18enNrYlpTTktKS05RVVleYmdsdH2EiIiJi5GZoaitsbS1s6+qp6Ofm5eTjYaAfX18eHFoX1hRTUtKTE9TV1tfZGhvd4CGiIiJjZScpKqvsrW0sa2ppaGdmZWQioN/fX17dW1kXFVPTEpLTVFVWV1hZmxzfIOHiImLkJigp6yxtLWzr6qno5+al5KMhoB9fXx4cGdfV1FNS0tNUFNXXGBkaXB5gYaIiIqOlZ6lq6+ztbOwq6ikoJyYlI+Ign59fHlzamFZU05LS0xPUlZaX2NobnZ+hYiIiYyTm6OprrK0tLGtqaWhnZmVkIqDf319e3VtZFxVUExLS05RVVldYmZsc3yDh4iIi5CYoKessLO0sq6qpqKempaSjIWAfX18d3BnXldRTUtLTVBUWFxgZWpxeYGGiIiKjpaepauvs7Szr6uno5+bl5OOh4F+fXx5cmlhWVNOTEtMT1NXW19kaG93f4WIiImNk5ujqa6ytLOwrKikoZyYlJCJg359fHp1bGNbVU9MS0xPUlZaXmJnbXR9hIeIiIuRmaGnrLCztLGtqaWinZmVkYuEf319e3dvZl5WUU1LTE5RVVldYWZrcnqCh4iIio+Wn6Wrr7K0sq6qpqOfmpeSjYaAfX18eHFoYFhSTkxLTVBUWFxgZGlweICGiIiJjZSco6musbOyr6uno6Cbl5SOiIJ+fXx6dGtiW1RPTExNT1NXW19jaG51foSIiIiMkpqhp6yws7OwrKikoZyYlZCKg399fHt2bmVdVlFNTExPUlZaXmJnbHN8g4eIiIqQl5+mq6+ys7GtqaWinpmWkYyFgH19fHhwaF9YUk5MTE5RVVldYWVqcXmBhoiIiY6VnaSprrGzsa6qpqOfmpeTjYeBfX18eXNqYlpUT01MTlFUWFxgZGlvd3+FiIiJjJKaoqissLKyr6uno6CbmJSPiYN+fXx6dW1kXFZRTk1NUFNXW19jaG10fYSHiIiLkJigpquvsrKwrKikoZ2YlZGLhH99fHt3b2dfWFJPTU1PU1ZaXmJma3J6goaIiIqOlZ2kqa6xsrCtqKWhnpqWkoyGgH19fHlyaWFaVFBNTU9SVVldYWVqcHiAhYiIiYyTm6KorLCysa6ppqKfm5eTjoiCfn18enRsY1xWUU5NTlFUWFxgZGludn6Eh4iIi5GZoKarr7Gxr6qmo6CcmJSQioN/fX17dm5mXldST05OUFRXW19jZ2xze4OHiIiKj5aepKmtsLGvq6ekoZ2ZlZGLhYB9fXx4cWhgWVRQTk5QU1ZaXmJma3F5gYaIiImNlJyjqKyvsbCsqKWhnpqWko2HgX59fHpza2NbVVFPTk9SVVldYWVqb3d/hYeIiIuSmaGmq66wsK2ppaKfm5eTj4mDfn18e3VuZV5XUk9OT1FVWFxgZGhudX2Dh4iIipCXn6WprbCwrqqmo5+cmJSQioR/fX18d3BoYFlUUE9PUVRXW19jZ2xzeoKGiIiJjpWco6isr7Cvq6ekoJ2ZlZGMhoB9fXx5cmpiW1VRT09QU1daXmJma3F4gIWHiIiMkpqhpquusK+sqKShnZqWko6Ign59fHp1bWRdV1NQT1BTVlldYWVpb3Z+hIeIiIuQmJ+lqa2vr62ppaKem5eTj4mDf319e3dvZ19ZVFFPUFJVWVxgZGhtdHyChoiIiY6VnaOorK6vrqqmop+cmJSQi4WAfX18eHJpYltWUlBQUVRYW19jZ2xyeYGGh4eIjJOaoaaqrq+uq6ejoJ2ZlZGNh4F+fXx6dGxkXVdTUFBRVFdbXmJmanB3f4SHh4iLkZifpamtr66sqKShnpqWk46Jg359fXt2b2ZfWVRRUFFTVlpdYWVpbnV9g4eHiIqPlp2jqKyur62ppaKem5eTj4qEf319fHhxaWFbVVJQUFJVWVxgZGhtc3qChoeHiY2Um6Knq66vraqmop+cmJSRjIaAfX18eXNrY1xXU1BQUlRYW19jZ2txeICFh4eIjJKZoKWqra+uq6ejoJ2ZlZKNh4J+fX16dW1lXlhUUVBRVFdaXmJmam92foSHh4iKkJeepKmsrq6sqKShnpqWk4+Jg399fXt3b2dgWVVRUFFTVlldYWVpbnR8g4aHh4mOlZ2jp6uur62ppaKfm5eUkIuFgH19fHhxaWJbVlJQUFJVWFxgZGhscnqBhoeHiY2Tm6Gmqq2vrqqmo6CcmJWRjIaBfn18enRsZF1XU1FQUVRXW19iZmtweH+Fh4eIi5GZoKWpra+uq6ekoZ2ZlpKOiIJ+fX17dW5mX1hUUVBRU1daXmFlaW92fYSHh4iKj5eepKisrq+sqKWhnpqXk4+KhH99fXx3cGhgWlVSUFBTVlldYGRobXR7goaHh4mOlZyip6uur62qpqKfm5iUkIuFgH19fHlyamJcVlJQUFJVWFxfY2dscnmAhYeHiIyTmqGmqq2vrquno6CcmZWRjYeBfn18enRsZF1YU1FQUVRXW15iZmpwd3+Eh4eIi5GYn6WprK+urKikoZ2alpKOiIN+fX17dm9mX1lUUVBRU1ZaXWFlaW51fYOHh4g="}, "fmbell": {"name": "FANTA81", "sr": 22050, "bits": 8, "unity": 81, "fine": -12, "lstart": 2374, "llen": 821, "b64": "gICAgICAgYGBf319fH6DhYWEfnZ4eX6LkYaDdmVwhoqWmHxtbGd1lJaSjXVea3aCnKGKfnBebYaPmZ19a2llcpSXko91YGt1f5ydioFyXnGFjJucfG5sY3WSlJGPcmNrc4Kdm4uCb2F0hYydln1xa2F3jpCTkXJkbG+CnpyNhm5hc4SLn5l+cGpfc4+SlZByYWttgp+fjohuYHKEjaGcfnFmXnOPkZePcGFra4KfnY+Kb190goyhnX5zZl1zj4+Vj29hamyBn5uRiXBhdoCMopx/dmdbc4qPl5BuZGdpf5+clYtvYnN+jaWdhHdlWHGIj5mSb2NlZ3+enZaNb2Nyfo2mnYR2Zllxh46Wjm5iZmeBnZ2Vjm9ndYCPp5uEeGNacoWKmIpsY2Vjgp2bmJFxaHh/kqechXtiXHGBhpSHbWZjZIGYmJ2RdW55fJOlm4t9Yl1veYaThW1nXmOAlpqhkXdydXuWp5ySfV9aa3WHkoNuZFphf5Seo5V7dHV+laahlX5jW2ZyhJCCb2NZYH2ToKOVfXV1gJipo5Z9X1lkc4eRgG5dU2CAlaSnkXp0c4CfrKWXe1xYZHOIkX9sXVBef5SjqpJ7dXR/oa2lmH1bWmVuho97a2FPX4CSoKySfHl0gKKtopt8XFxmbIWNeWtgUGCAkKCpknx8doOirKGcfF1dZWmCi3ZqYFFfgI6gqJN+fXaEo6yjm31eX2Rrgol0a11RYX+OoaeRgH14h6Wrppp7X19gbIKFdWtbT2J8j6KmkYJ8eYqmq6ibe2FfYGyDhHVpWU5jfJCjpZCCe3mNp66qm3liXWBtgoJ2aVhPYnmOo6WShHx4jKSsq598ZV5caX+BeG5ZT191iaOllol/d4qhqq2igWhfWWV7gHpyXFFecYWhppiNgXmKoamto4RqYFhleX95cVxSXnCFn6SXjYF8jKGoraKEbGJaZXl8eHBdUV9vhJ2klo6Dfo2iqa2ihG1iWmN4enZwXVBfb4GcpJaOhn6Oo6qtpYVuYlpid3p3b1tRXm2BnaKXkIZ+kaKprqaFcGNYYnV3dXJcUl1qfZugmpWJgZKgprGniXRkVGBxdXZzW1JcZnyaoJuZi4SUoqayp4p1ZVRfb3FzcFpSXWV7l5+am42Il6OnsqeKd2VVX25ucm5ZUl1jepeem52RipmkqbGoi3hkVV5sa3BsWFFbYnmWnJ2ek42epKqzp4t7ZVVfaWhuaVVTWmF4lZmeoJWToKOqs6WNfWZUX2VmbGhTU1lfeJSZn6OXlaGlqrWkjX1mU15jY2tlU1NYXXmSmqGmmJmjpau1pY9+ZVRcYWBqYlFRWFx4kpqjqJycpaWstqaPgGNTWl9eaWBPUFZbeJKapqqenqilr7amkIBiU1pbXGZdTVFSW3mSmqqrn6GpprK4pZJ/YFNaVltjWUtRUFp5kJutrqKmqqeyuaWVf2BSV1NaYlZLT05Ze5Cer7Cjqaqptbmmln5dUVRQV2BSSk5OWXyQoLOyp6urqbe4p5Z9W1FQTlVcT0pMTFx7kaO1squtrKy5t6eWe1tRTktTWU5JTEtce5KluLSur62turiol3pbT0tHUVVMSUxLXnuRp7u3sbOtrrq3pph6Wk9KQ05TSklNS159kqq9urO1rq+5t6eXeFlMREJLUEpKSk1ffZWuvry3ta+yurWolXZYSkA/SU1ISklNYn6XssG9uravs7y1qJRzVEc+PkhLR0lKTWOAmbPFwLu3sLG8taeUc1JEPDpHTUlKTE1jgp22xsK7tq+yurSmknBQQTo5RkxKS01PZYSfuMnEurevr7q2o5BuTD06OEVNSElPUWeKorrLxbq4sLC6taGOa0k9ODdFTUdMT1JqjaW/zcS6t6+xu7OhimdGOjQ3RU1JTU9TbI+ows/FvLeusLqxn4pmQzYxNEROS01RVW6SrcTQx7y2sLG5sZ6FYUE0MDVFTEtOUVhylLHI0Me9ta6zuLCeg10/MCw1RUxOUFBZdJWzy9LJvbOtsbavnYFcPS4sNURNT1FTXXaXtMrTyr21rq6zrpl/XTsrLDFBUFFSV151mrbL1c29tK2ssa2aflo5KCcwQVFUVFhhd5u5ztbOwLSsrLGpl3xYNyclLkBOVVhaY3uaudDYzsK1q62vp5Z5VDcmIy5ATFVZW2eBnrrR1s/Et62urKOSdlE2JiEtP0tUW15qhKC809fQxbetrauhkXRQMyMfLD9NWF1fbIShwNbZ0cS0rKyqoZBxTTAfHi0+TltdYG+HosLW2tPFta2ppqGOb00vGxwrPU9cX2NxiKXE19rWxrWtqqOejGxLLxoaKjtOXWFmdoumxdfa18m3ramimYlrSC0aGCc7Tl5laXeNqMXa3djKuKyooJeHaUUqGBUmO05eZmp6kanG2t3ZzLmtp56UhWVEKhcUJjlNX2dtfpOrydrd2c24rqackoNhQSgUFCc6TWFoboGXrcvc3drOuK2mmpCAXz4nFBQnOk1ianGEma7M3d7bzritppeOfVw8JxMUJzlNY2tziJuxzd7d3M25rqWWjHpYOyQREyc5T2RtdYqds8/f3tzOuK2klYp4VjghERMnOk9kb3eMoLbQ3+DczrisopSHdVM2IBASJzpPZnB6j6O30uDh3M+4q6CRhHJRNB8PEiY6UGdzfpGmuNPi4t3QuKqfj4JvTzEeDhImO1FpdYCUqLvU4+Lez7ionYt/bEwvHA0RJztSa3eCmKm81uTi4M62p5uIfWpJLhwMECg7VG56hJuqvdjl4+DPtaeZhnpoRi0aChAnOlRueoedrcHc5+biz7Snl4R4ZEMrGAkRJjlUbnmJn7DF4Ojo4861p5WCd2BAKRYHESU5VG55jKGyyeTr6uTMtaaTgHVcPScTBRIlOFZueo6ltM7m7ezly7SlkH5yWDomEAURJThXbnyRp7fS6e/u5cqzpI18b1U3JA4FEiQ4WW9+lKm61uzw8OTJsqKKemxRNSIMBBIjOlpwgJirvtnu8fLkyLKfh3dpTTMgCwQTIztbcoObrsHc7/Py5MexnIRzZUkyHgoEEyM8XXSGn7LE3/D08uPGsJmAb2FGLxwJBRIkPV92i6K1x+Lx9fPjxa6XfGxbQiwbCAYSJD9ieY+nucrj8fTz4cSslHhoV0ArGwgGEyVBZH6TrLvM4vHz8uDDqpB0ZFQ9KhsJBxUmQ2eCl7C+zuPw8vHfwaiNcF9ROioaCgcWJ0ZqhZy0wc/k7/Hv3r+miW1bTTcpGgsJFylHbYmhuMXR5O3w7t2+pIZpV0k1JxsLCxgrSXCMprzI0uTs7u3bvaKEZFREMiYbDA0aLEtzkKnAy9Xk7Ozs2byggWFQQS8lGw0PHC5OdZOtxc3X5Orq6te6nn5eTD0sJBsPEB4vUXiXscjQ2OTo6efVt5x7W0g6KSMbERMhMlN6mbXM1Nrl5+fk07WbeFhFNiciGxIWIzVVfZy5z9fb5eXk4tC0mHZUQjIkIBwTGCU3V4CfvdPZ3uXk4uDNspZzUT8uIh8cFRsoOVqCosDX3ODl49/dyrCUcU47Kx8eHBcdLDxdhKXD2t7i5eHd2sitkm5MOCgcHRwZIC8/YIenxt3h4+bf29bFqpBrSjUlGRwcGyQyQmOJqcnf5OTm3djTwqiOaUcyIRcaHRwoNUZljKvM4ubm5tzV0L6li2dEMB4VGR4eKzhJaY6uzuXo6OXb0s26o4llQi4cExgdIS49TW2QsNDo6url2dDKtqCHY0ArGRAYHSMxQVBwkrLS6uzr5tfOxrOchWA/KBcOFx0lNURUc5W01evv7ObWy8KvmYJePScVDRUeJzlIWXaYtdfs8O7m1Mi/q5Z/XDslEgsUHyg8TF16mrfY7vHv5tPFu6aTfFo5JBAKEx8rQFBhfp252vDy8ebSw7iij3lYOCIPCBMfLUNVZYKfu9vx8/Hm0MGzn4t3VTcgDgcTHy9GWWmGor3c8fXy5s+/r5uHdFM1HwwGEh8xSl1uiaW+3vL28ubNvKyWg3BRMx8LBhEgM05hc42owN/y9vPlzLmpkYBtTzIeCgURITVRZXeSqsLf8/b05Mu3pY18aUwxHQkEESE3VGp8lqzE4PP29OTKtKGJeGZJMBwJBBIhOVdugJuvxeHz9vTkyLOdhXNjRy8bCQQSIjtbcoWes8bi8vbz5MaxmoFvX0QuGwgFEiM9X3WKorbI4vL18+PFrpd8bFtCLBsIBhIkP2J5j6e5yuLx9PPhxKyUeGhXQCsbCAYTJUFkfpOsu8zi8Q=="}, "organ": {"name": "C_ORG66A", "sr": 22050, "bits": 8, "unity": 66, "fine": -25, "lstart": 593, "llen": 235, "b64": "gICAgICAgYGBgoKCg4SDg4WEhIWEgoKCf315eHh3eHp7fH+Af35/f36Ag4aHhoN/fX19f4OIjI6OiIN/fn59gYaHh4WCfXx9gYWHiYaCgX13dHZ5fIGAfnl2dXR0dHd3dXZ0cXJ3en6BgYOBgYOEhIqOj46IhYSHi4+Tk5CKgnx6fIGFioqGfnRta2xze4GGiId/eHR2fYGGh4Z+cmxpaWx2f4SGgn99fH6EhImOjYuKjIyNkZGRjoqHhYeFhIV+eHFoYV5jaXV8fH17dnN3eX6Fi4qIgnl1eHqDk5qdnZGFenFudYKIjJKRjY+UkZWfnZeTiX56eXV6gHt9gXFoZV9faGZgX19dZXN4gY+RiIJ7bm96gJKhpqmnmYV7e4GMlpKMjIZ+hIqSpa+jmIx5aWZmaXuHkZOJdmNYV1ViYltcX1pfbXWIkoiAfnlycXF6jJ+wtbeplo2KjaGon5qRgnyIl6Gnn4qCem1gWldge4yYno9sTjk1QVZeXF5WTF5yfo+SgX55c3FtYmN1jabE1si0n5OTpamdlIeAi5ilsremjYR6cWthUlZpcoCLgW1ZR0BTZmFWTkJKYXiKnZ6Ffn+ChHZjZH2XrMrXz8CslpisqJGFeoCYpLC8t5l+eXt6c11NUmBnbXt2dWtQTFtgRi0kJD9ri6KpmHloZ216cWh3kq2yyM3GwLGdpK2bfWxieaSzwci6noB1bnByX1VebnaHm52hj3NueGpGKB4nWIOYnpZ2T0JPZnhnU0thgZu5wca+pJGXoIZeTUx2rs/W0rmGbm1zhWxBMDJRcZSzw8Cmg3V1bTwcChNHY3Z0aD4cJT9ea00zJ0x3ocTU3smqm6e0k3FpcKfe9/z006WTlqCsiWRWYYKhxt/r4sGhlpiETzYjOWmAi4ZxQCg1TmxpRy4nVXmivsnMr5CHlpduUUlclcXW1sqgdmxvfIBUNi0/YoKlvMW1k3lzd1YoFAYuV253cFcoHDJNal89KjJlirbN29e4oJ6xqX5sZ4jF7vv66LmYlJmqoHNbV3KRs9Xm69Ovm5WVaD8tJVR1iIqAWi4sQV5xWTklOmmMtMTOwZ6IjZyFW0xLd7DR2NK5hg=="}, "cs80brass": {"name": "BRASS72A", "sr": 22050, "bits": 8, "unity": 72, "fine": 2, "lstart": 7241, "llen": 211, "b64": "gH58e3p6e36BhoyTlI2Ff3x7fHx9fn+AgH9+fn5/f39/gIGBgYCAf359fHx8e3p5eHd4eXyAhpGgoI+CeXd5e3p6fICBgYF/fn19fn+Bg4iKiYR/e3l5eXl4eHZ1dnZ4e3+Dip6wm4V7dXl8d3R2fICAgH99fH19fn+Cho6Uj4R9eHZ2eHZ0c3R1dnl+gYaUtKiIfnV3fXlxcnd9f4B/fXx9fX9/gYKGi5iaiHt3dXZ3dXJxc3Z4fIKHnMCignpze391b3B1fH1+fXx8fXx7fX+BhoqXopOAeHR1d3ZycXJ2eH1/hpXHroN7c3x+dG5uc3l5enl4eH1+foCCgoaKnKaOfnl2eHt4dG9xcnJ2e4KIodKlhHx3f3ltaGpzeHp7e3t7fHx8gIGCh5uvl4F7eXd3d3dzc3Rzc3d9goWk1qCDeniAeGtlZ292eXp8fXx9fn+EhYWLo7CQfnl4dnd1c3FycXNye3+Eh7bQlIJ1e4F1ZmRodHZ4d3x/goKDhoqGiYyor4l2dHd1dHJwbm1wcnN7gYWh0KKGfHeGg3FqZ3J2eHl4f4WGhISIiIKGjaykf3FydXVycG5qa290d3+FodKkiIB3hYl3b2xxeHd4d3qEi4uKiod9fYCbpIRybnF2d3VxbW5vcnd+iJ7TqoaBd4GKe29wc3h4enl8g4+RjIN8dHd5lqKEdHFwdnh3dHBycnF2eYeSy7uKhnqBjYNybW90dXl4fIGRnJR8dXB0dpCfgnN0cHN4d3Z0d3dydneGjb7Ok4l+fYaEdG1tdXR4dnZ5hpOdj3xycXKBnYlyc3Fyd3h3dXd5dXd4hIqs1qKNhn2Dg3VraHBzd3h0cnmJnp2Bc29xeZuVdnFyc3h6enZ4fHl4d3+HoNSqi4mBh4d4a2Vrb3R5dXF0g5moiHFtcXWWn3xwcnV4eXl4d357e3l9hqLSo4aDgYeHd21lanB0eHdwc4WipoBua3F0kaGDdHV2e3t5dXV9fHp5e4Wn0ZyEgISMhnZvZ2ttcnZ2cXSEpqh+a2xzdpOegXZ2eHx+eXNxfHt7en2Fq86ahIGHjIFzcGlqbXB1dXN0f5Sxl3Jsc3iVm3pzdX2Bgnt0bXd5e3t7gqrJl4WDi49/cG1nZ2ptcnR0dHyLp7OMdXR5lJZ0bG55gYR+eHF3dnp7fYOwvo6DfYqYhnFva2llZ21wbm5yfpKvqZeQipqSbmJja3mCf3t0dXN3fISQv7SIgXiFlot3cm5rYmVtb3BxcHiEnKeMfIatso1yZmVteHZvcHZzd3uAkryhiIuOl5uMenBqZ2JibG9zc3Bze4ymn4aInI6TlHhsbXBwaGdtbnaBiKe5iXx8gpOenJmHd2ddWmVrcXVzc3h+mquVkpqJn5hxZmVmbWpnb290fouzsHx4d4SUlY6TlpF2ZFteX2tyc3R7fJCxt63SsnJiWU9WYGdrcXVybXqSv6l9eHWBjYiHmKqcfWldWV1pcnBzdXmEp8zx4YZnWlJRWVVfbHVya2p2oMSZgnt9ho6PqaiVg3VoYWFjZWRobW1wf5XN7NrAeWVfVFBSUGZxcmtte7S2h3dvd4uSq7KWjIR0bG5ta2VjZ2pra3WPxd6vhY6sfGphUExkaGdocYu6oHtsZXOAg5O4vJ6RhXFpa2tmYmlvcHJ4jrrLtY1ygrKCYE9CSmRna3ahs4VzbmZwdXaLpKy5uJuDdWljX2NsbXV+fJarr7aWdp+kbWBINz9YaXeNup10a2NqdnmCk6OgmKm5mnxrZFZdanF0eoagn5mxvMaGZWhgU0dATmyCp658ZV5mc3p5fo6dnJu2s5WCdGBVXmptd36Nn5WNy/eaamVraWRHPktsjK+RaFlcbnp1dX2Mmq+4n5SVinhqZ2ZiaHZ/lZWIicL8q21faXJkSj1Pbp+se2FYX3V5bm92h7XDo5KWn5KBdm9mZGRrhJaFfoSd4sx4ZmhhVk5IXYGzmHJjXmh3c3N1f4GetKOUm6idhHdvZmZsc5CTgXx9i7/NiGRlYFROUmeYqoh0Y2Fqb3Btd4F9jbGyn56ol312cmpqcoWYh3l7fZXctW1bX2RdVVh9pI13bWFob25tbHV9iJOqtaKcoZR7dXdwbHuOi3x7f5jGtZBlVV5zaF1mlZN1bWVib3Btb3R3f4GZrp6Slp2Vh4F7bnOGhXp4fpLHqpqHW1Rmdnd0jpl2ZmFeZnNycXh6d3mTpIyGi5CVnZaHenZ9jH1yeYChxp2agFlQZXV8kaeGZ19hYmlvbXWDf3iEnot9foWBj6WhjomDjYdxbHqEqryWlHdOTGB0jK6hcV5bYGhvb216g355i5iHeH2BfpKppJaNk5J5bnV8nMSXfohrSFFheqm9iWNVV2Fvc3N0fXp1c5Cdh3x/fXySqaSVmZ6Hc3J4kr+XcnWDbFlZaJPBnWxXU1dkb3V2e3t4dY2ZiXx5dXJ+mKulnaibfG95ibmndGpxgHBhZIC5tHpbSlFdZG52foB7eImZg3h4d2xygpusra6oinN1faS4g3BodH9vZnipwJRoSUNPYGdxeYKBgYadinZxeHFsdYebrLO2l3x0eYS6pHZsbHp8ZmmUvKiCWkRFVmNud4WCf32UmoFwcnFtbXuJnbXCqIp5e3yptHtqbnaFemN5rayNbVBGTFtrdoCFfXiIpY91cW9ranGBj6bCuJqEfX2ct4dpZWl5jn1xoLaUdVRERVBidICIhHp+op58b2tnZnB5hJa6xKiLhYa2uHtmXFtoho+AmLighmhGO0VRZ3eFioZ8k6CJdnFtZmt2f4ulv7KQhoacw5ZrXl9mc4yQkbKljXpcRD9DVmh9hYqInJiHe3ZuaG13eoKWt7WXgYGFpbmJZ2Roan6XmbCqjXpiUkQ9SV91g4mHlqaQfXZ0bW1xdnuKprqegn6Hmb6edWJeZXKOo7W0kn1iUkVBQ1dwhoqHgJmkjHt2bGVsd36Hnbimh3mBnMumdmNZXWx6mrfBoYdqVEdCQk9ogoqJgZGnlH94dGtjbnqDlbKvj3d4oNClfGZYWWhyi7XOrId0V0tJQklfe4WIiZurloB1cGpma3V/jaqymn1yhsK4hnFeXWhygKfVu4t3X05NRURVb4OGhp+vloF2cmlqcnZ9ip2xooZ0cI3BrH5pYGNreJHV1pZ7Yk1NS0NNZIGKhoujnY1+d2tmcXt7hJu0qY14b3KVv5txZGNndYO/6KyBalJLTUdGVHSKjYKMpKGNfXJnZnJ+gpKwrJKEcm+DuKl6aGJicYSo38CLcVlOT0pFUWl+iYeAmK2ei3pvZGVzfIipsZaJe3F6qqt/b2Vga4Cf0c6bdlxQUEtGT2R3hYeDk6yjjoB2ZmZyeYGdrZiFgHpzkbWOcmxpaXmQwtSxgmBMTkxJTF1vf4iFjqehkIWDcmZseH6UqZqFgHt7faOkf3JwanCFsdDCmG1NRktGS1hpfImGgZmmlIaGgXBrcn6PqqWHfHx4d4GknXtzb2x8pb29rIBaR0hDRFFmeImJfIGjoo6GhHpvcHuIoqqTfXt3dneXqYZ2cG13nrGrsZdpTEZFQ01hc4SNgnSJp56OhIB2dnqDlqGVhHp2c3V+pZ+CenR3mLCgpZx5VUdFQkheb3yJint8nqSShn96fICBj5aPhn12dHR0k6+Sfnt7kq2cn6WHX0dEQkNWaXaDioV7iKKbi4KAfn+DkpWKgXt4dHFygK2qhX5+jamdkqKTb1BDRENOYXJ+h4h/gJifkoV/gICGlZyNgXh0dXRwc4evqomDjKOdjJmbellGQ0ZMWW17gYSBfI2jno6Bf4GEkpmOgHp4d3ZybnaYtp2Kj6eeh4uZh2VLQERMU2V5gIN/eoGUpp6KgoOEjpqSgHh4eXZ0bm59qbOZk6ejh4aTkG5TQ0NJUFtwfYOCfH2InaWUiIWHjZqVg3Z1dXRzcXB2jbWzn66ng3yLk3xbRkVKUVdmeICAfXyBjqKfkIiKkJuXiHtycHFxbG51gZy/tbWuh3J+k4dnTUdJUlZeb3p8fX1/hJOmoZGMk52Tg392bm5wbGpwfo+2ysO2i29vh451V0xMT1NYaHh9fnp7fIOZrKWWlKCVf3p5dHBtbmtqdYWiztPCl3VpfZB9XU9NT1JWYXF/g315eHqLqK2fmKOaf3R3d3Rua2xtdIGTuODVpnxmboqHZ1RQUFBVXWd3hIJ6eHd8mbCon6ejhXJ0endxamdpcX2Mpd3ssoZrZn+JbllVVlJUWV9ugYV/eXd0haiyqKyojXRvd3p2bWZmbniGmMb5zZJ1ZG+FdV5YXVdTWF1keIOBe3hwdpm1s7Ksk3ltcXt7dGtlZ3N/krTw46F9amd8fmNZYF9VVlpgbYCBfHlzb4arvryymH1sanJ7eHJtZ218jKvX4ruKcmx5f2paXmJbVFZbZHaAfnx2b3ubvcq9nYFuaHB7enFuaWl1haTL2cqbe3B0gXNfXmJfV1JUXW18f315cneNrM3PqYRwZmt5fXRua2lvf5zJ0s2sgnZ1e3RiYGZjW1NQV2V1f4B8dHSDnMPXuIx1amh0fHdwbm5uepTAx725lX56e3RmYWVmYFVOUl5seYB+eHV+k7nbxJV7bmZuenl0cW9tdYy1wrK3p4iAfXptY2JhYVpQT1llc39+enh8iqjQ0KaCcmprdnh2dXRtcYavvaqrsJeGf35xZmVhYF1STFVha3l+e3p8hZzC07WNdm1rc3Z0dHhzcH+ouaiirqWOgn52Z2plYF9XTVFcZnF7e3x+g5W1y76afW9scXV0dXl4c3qitqWboayZhn9/bWloYmFcUU5XYGp3enmAhpOuv8Clh3NucXV0dHh5dXeYs6OZlqqqkIOEcmVqZ2JdVE9UXWRxeHuBiJGntLiskXtxcXFzdHh8fHqUr56Tj5uvnIWGfmhnaGRfWFJTWmBqc3h/h5Cira2vnIR0dHJzdXl8f32TqJeMipCrq42IiXVmaGRdWFRUV11mbXZ/h5Kkq6Soo416cm9vc3uAgoGTpZaIhouktZaFi39nZGZgW1hWVlliaHF9hZGnrJ6boZWBdnBtcXqBg4KQpZWGgoaZtqSHiolxZGVhWlhXWFhfZGx4hI6lrp6Sm5uJe3Nra3eDiIaQp5WCfYCOrrKQh498ZWNkXVpaWFdcYmhyf4qfsKKQk5yRgnduaXF/iIeMppyCenuGobihipOIamJiW1daWVhcYmZue4mcrqSQi5mYinpvaGx8iYyNpKGDeHaBlbWwkJGRcmBgXlpbW1ZZX2Rqd4WXrKmVhpCbkYJyaGh2ho6No6WFdXN9jKm6npCVfGNfXVlaXFdYXmNpc4GTqauZh4aYmIp2amVugpKToqaHdXF6iZ25qpGXh2heXVtbXVhVWWFpcn2OpKqaiYGQm5OAcGdqfJCVoaOIdW91hZSxuJ6cjm5dXVtZW1lWWF5pcXmKo6ucjICHmJaGdWpodYyYo6aLdW1ygpKrvKSblHRdWVpcXlxXV1tncXiHoKmci4CBlJqMfHBqcYaXp6uNdGhtfoygu6+im35hWVhaXV1YWVpibnaCm6ifjoOAj5mOf3NrboGVprKTdWdpeYmXtbinoYVlWVhaXl1YWVlfanWAmKeej4SAipiShXpvbXuQorOZd2hndYeSrruqppBrWVdYXV1ZWVpeaHN9k6WfkIR/hZaVh3xzbXWMpLefemhlcYKNpr+xqphxWVVXXV1ZV1lcZnF8j6OgkoV/gZOXi4F5cXOFn7ije2hjb4CKn760qZ57XFNVXF5bV1hbZnB6jaGekYaAf5KajYF7dHOBm7eogGthanqHmbq3p6WKZFVWW1xaVlRZZW93iqGfkoeCf46bjoF8eHR9lLOuh25hZnWDlLm9qqaQa1dVWVtaWFVYYW13h56ekomDgIqZkIJ8eXV7kLGzjXBiZHKCkri/qKOVcVlVWFtbWVZWX2t2hJyfkYiDgImZkoR9end8jau2knJhYW+AkLXDraSXdVxUV1paWFVUXGl1hJuhkoeCgoqZk4V9e3h8iqi4lHJhYG19jK/FsqaaemBWV1pZV1RSWWd0gpejlYeBgYmZlYZ+fHt+jKm3lHJfXmp7iq/GsaObgGVaWVtYV1VSVmVygZailYd/gIeZl4d+fX1+i6a3l3RhXml7iqzDsaOcg2dbWVxZVlVSVWJwgJahk4Z+foicmYd9fHx9iKS5nXdhXGZ3hqbEtaagiWlbWV1YVVJRVGBtfZWilIZ/fYecm4l+fHt8haC5oXtkXGV1hJ6/uamjj21bWl5ZVFFQU15repKjlod/fIKan42AfHt9hJ26pXxkWmJzg5/Buaijk3BcWWBcVVBOUV1qeI6jmYmBfoCUno+Cfn1+hJq5p31kWWByg6DBt6WglnZeWGBeVlBLTltqeYyim4h/fX+UoZKDfnx8g5i4qoFmWl5xhKPCsqKel3thVl5iW1NLTFlpeIugm4h+foCToZSDfnx9g5a1rYZpWV1tgZ/AtKObmoJkVl1kX1VMSVVneImfnYp+fYGTnpKDfn1+hZW0sIlrWlxqfpq+uKadm4RlVlxkYVhOSlNldoacnYx/fYGQm5KFgH9/hJOzs41tWVtoepjAuqWbmIpsVllkYltQSVBhdYecno1/fIGPm5OGgICAhJCwtY9vW1pneZW/vKabmI1uVlZkZV5TSE5fc4aanI1/en+QnZOGgH+AhZGvtJFyXVpmd5G6u6WbmZByWFVkaGJWSUtbcIWanY1/en6PnpWGgH1/hY+rtZV0X1pkdI65vqebl5B1WVFgamdbTUtYbYOYm4x/en2NnZSGgX5+hI2nuJx4YFpjcoq0vaiblpJ7XVFeamleUEtVaH+XnI6AeXuLnpaGgH5+hY6mtp17YVpjcYWtvKudlZSCYlFaZ2lgUkxUZn2VnpCAeHuKnpiGf318hI2itaOCZVphb4KpvKudk5OIZ1FXZmtkVk1TZHqUnY+AeHmGnJuJgHx8go2is6OFaVthbn+lu6qckpOMbVNVZW5pWU5RYXaQnZGCeHiDmpyLgH17gYygsaKIbVxhb4CkuaqbkZCOc1VUYm1rXVFRX3ONnZKCeHaBmJyMgH17gIuesKSNcl9gbX2guKmZkI6QelpTYW9vYVFQXHGLm5GDeXeBl5yMgHx6fomZrqiSeGJgbHuataqZj4uQgmBTXm5xZVRQWm2HmZKFeneAlZyNgHx5fIeVq6yYfmVganiWtKqYjYiNiGhVXGxyaVlRV2iBl5OGe3Z9kZ2Rgnx6e4SSqKuZg2pia3iRsquYjIWJi29ZW2lybFtSVmV8lpaIe3V7jpyThH16e4WUqaiXhW1kanaMr7CcjISEinZdWmVxb2FVVmN4k5aJfXZ5jZ2VhXx5eoKSqKeXiHFlanaKra+bi4GAiYBkW2NwcGRXVmB1kJSIfXZ4ipyXh356eoGQpqWVi3dpbHaGpq+ejYF9hIRrXWFtcWlcV15xjJOHfHV4ip2YiH56eX+No6aWjHxta3SCnrCjkYN8f4V0YWBqcWxgWVxth5CGfXd4h5ybjIF7eH2KoKaVjIByb3SAma6mk4N6eoJ5ZWBocG5lXV1qgo6FfXd3g5ickIR9en2Hm6aWi4J1cHV+k6qolYR5dX1+bmNocXFpYF9nfYuFfHZ1f5Sdk4d/fH2GmqWViIJ5c3V+kaiolYR2cXaAeGhocHNtZmFkd4iEe3V0e5CdlomCfn6FlqSWh4J7dnd+jqOnl4V3b3F+fW5qcHRxamRjcoSDenRzeYybl4uDf3+EkqOYhoF+enl+ipymnIp5bmx4gHRrb3R1b2djbX+BenRydoaXl42GgoKFkaGZh4B+fXl8h5imn4x7bmlygHpubnR3c2tkaXuAenRxdIGSmJGJhIOEjZ6biYB+f3t7hJOjopF/b2dsfX5yb3R5dm9mZ3Z+enRwcnyNlpOLhoWFipqdjYB+gX98go+gopKAcGZoeYJ4cHR6eXFnZHJ9enVwcHiIlJWOiIWFiJeekIJ9gYJ9gIucopaDcmVldIJ+c3N6e3RqZG97e3Zwb3WDkZSPioaGiJaekoN9gYWAfoeXopmHdGZib4CCd3N5fndtZGt5e3dybnJ+jJORjIiGiJSdlIV8gIeEf4SUoZuKd2ZganyEfHV5f3pwZWl2endzb3B5h5GTj4mHh5GdlYh+f4iIgIGOnp6Pe2pfZneDgHd4f3xyZmd0eXd0cHB3hJCUkYqGhY+cl4l+fYaJg4CKm5+TgW5hY3KBg3t4fXxzZ2dyd3Z0cnF1gI2Vk4yGhI2cmIp+e4SKh4GHl6CXhXJjYW59hYB5e3x0aGZwdXR0c3J1fouVlY6Hg4ubmYx/eoGJiYOFlJ+ZiHZmYGp4hYV8ent1aWdvc3Nyc3J1fYmUl5GJhImam41/d32GioaFkJ6cjXppYWdzgYiAe3t2a2ducXBwcnN2fIeTl5OLhIiZm41+dnqEiomGjpuekX5sYmZwfImGfXt4bWdtb21ucHR3fIWRmJWNhoiYm41+dXeAiIqIjJielYNxZWRsd4aKgHx5b2hsbWpqbnR4fISPl5iRiIiXnI9/c3R9hYmJjJWemYh2aGVqcoGMhX16cmpsbGhnbHJ4fIKMlpqUi4iWnZCAcnF5goiKjJScm4x6bGZobnuLioB8dWxsa2VkaHB4fYKKlZuXjoqWnpGAcm92foaKjpObnZB+b2hoa3WIj4V+d25tamNgZG13fYGJk5uZko2Xn5GAcm1ze4KJjpOZnpSCc2tpanGCj4mAenJva2FdYWp1foGHkJqblZCXoJOBcmtweH+HjpSYnZeHd25qaW18jo6FfnZxa2BaXWZzfYKFjpicmJKYopWDc2tvdnyEjZSXnJqLfHFsaWt3ipGIgXlzbF9YWmJwfIGDi5adm5abo5aDdGtudHqBi5SXmpuPf3RuaWlyhJKNhXx2bl9WV19seoGDiJOcnZmcpZmEdWxtc3h+iJOXmZqRgndwamhvfpGSiIB6cWBVVFxpd4CChZGbnZqcp52Hd21scXd8hZGXmJqUhnpybGlteY2UjIR9dGFUUllldH+Cg46ZnpydqKGJeG5scHV6go+Xl5mWiXx1b2lsdYeVkIeBeGVUT1VhcX6BgoqXnZ2dqaWMem9sb3R5gIyWl5eWjH93cWtrcoKUk4qEfGhUTlJebXuBgYeUnZ6eqqmQe3Btb3N4fYmVl5aWjoF5c2xrcH2Rlo6HgG1WTVBaaXmAgYWRm56eqa2UfXFtb3N3fIaTl5WWkIR7dG5rb3mNl5GKhXJYTE1XZnZ/gIOOmZ6eqLCbgHJub3J2eoOQl5WVkoZ8dnBsbnWIl5ONiHdcTEtTYnJ9gIKLl52eprKhhHRub3F2eYGOlpaVk4l+d3FtbnODlZWPjH5hTUlQXm97f4GJlZ2epLOniXVub3F1eX+LlZaUk4uAeHNubnJ+kpaQjoNnT0hNWmt5foCHk5udorGtj3hubnF1eH2Ik5aUk42BeXRvbnF7jpeSkIluUkhLV2h2fX+FkZqdoK+ylXtvbnF1eHyFkZaUk46DenVwb3B4ipaTkY11VkhJU2Rze36Djpicn6y1nH9wbXF0eHuDj5WUk5CGe3Vxb3B2hpWUkZF8XElHUGBwen2BjJecnam2o4NybXB0eHqBjZWVk5GIfXZycHB0gpOVkpODYktGTVxteH2AipWbnKW2qYl0bW90d3l/ipSVlJKKfnZycHBzfpCWkZOJaU5GS1lqdnx/h5SanKKzr493bm5zd3l9iJKVlJOMgHdycHBye42WkpONcFJGSVVndHt+hZGZnKCws5V7b21ydnl8hZGVlJOOgnlzcHByeIqWk5KQd1dHSFJjcnp+g4+YnJ6ttZx/cG1xdXh7g4+VlJOPhXp0cXBxdoaVlJKSflxJRlBgcHl9goyXm52ptqOEcm1wdHh6gY2VlZSRh3x1cXBxdIKTlZGThGNLRk1cbXh9gA=="}, "choir": {"name": "CHOIR65A", "sr": 22050, "bits": 8, "unity": 68, "fine": -20, "lstart": 3689, "llen": 8712, "b64": "f3BkXFZUVFlkbXl/g4iJiIR6cGhlY2JjZGt3hZCWmpmamJaPh4B9fH+DiZCboaaqqKWek4d4a2BZV1dbY2x2fYWIjI2JhXtxamZkZWJhZ3F9ipCRk5OTkY2IhIKBg4WNmJ6ko6Kjn5aKfXNqX1lYXGRveICEiI2QjIh/eG9oZWZlZmZsdYCIjJKQj4yKh4eHhoWHjZObn6GfnpuUioB0bWliXV1ocH2DioqNjo6Ig3p0bmplZGlrb3N4f4GIi4uGg3+Ch4qNkJOYnKKjoJyWjoZ6cWlnZ2RiaHJ9iJCOkZKRjYV7d3JvbGlpbHF1enx9gH9/f3x4d3l/iJGWnKCipqaim4+HeXJpZGRnaWpye4iTlpKVkpGLgHV0cnFtbG11eH9+fHx7eXZzcG9wc36Ik52lp6mopZ+ViHtxaGNhZGhvd3+Ik5mcmpiVkIN5dHNwb21tc3h9f358e3dwbGlpaWlvfIybpKusrq6ono1/cmhjXF1ia3V+ipKboaGemJSMf3hybm9ucHZ7foCBf3x4cWlgXmBgZW58jp6mr7K1sKaXh3htY11bXWNueYWSnKKmo56ZlIp/dnJubW92foCCgoOCf3hsYVlXWFtfanaKm6ivtbSwo5aGd2piXF1gZnB/jZihpqeloJmPhn53dG9ucnyEg4GCg4J8c2ZcWFNVV15qeIeWo6uvr6idj4J2bGNhZGpudYSRm6OlpqOfmJCHgHt4cnF1fYSCf36BfHZtYlpVVFJUW2p1hZKgqa2qo52Rh3pwZmVqcHN6hJKco6Sno52XkoqDe3p1dnd/gYB9gX56cGxjXFVSUFJZZnSAj5ylpqWin5OJfHRtbnBycniEkJicoKGinZqVj4eDfXt5fH9+e3p9e3ZwbGVeWVRTVVpha3aEjpWYnJ2dlo+FfXp5eXZ2e4OMlJieoaShn5qTjYmEfXh4eHZ3dnV0cXBtaGJeWVdYW19mb3yFjJCZnZ2YkouGhIB6d3l9houPlJ2jpKOjnZWPjYiAenR0c3NycnJycXBrZ2BcWlhZWmBnc32GjJSanZmVk46Ig317foKGiY2Un6ippaOemZSPh3xzb29tb3BtcHV2dW9rZmFbVVVVWl9pc4CMl5yempyakYmCfXt+gISJkZynra2rq6adlIqAdGtqZ2dpbW5yeXt5c2xnZFpWUVJUW2h2go6Wm5uenpuOhH59f4KCg4uVoq6xrKyqpp6TiX5waGloZ2tucHR3fHt1bmhhWlRTU1RYZ3SAi5SWmJmbk4qBgIKDhIWLl6GpsbGvrqykmIuCeGxnZmZnam5zeHl9enVtaGBaVFBSVVxqeH6JjZOVlZKOhIF/hYiJipSeqLK1s7GxrKWViH5zaWNiZGVobXJ0eHp4cmpmYFlUVFZbZXJ9goeNk5OPioR9fYGGiYiRnKevs7e2s66onI2Bem5lYWJmaW1xdXd6eXRsaGNeVlNVXGNueYKFiY6QjYaAeHZ4foSHjJins7m6u7m0raOShHhxaWNhZWpvcnV5enl3c2liX1pVVFpianN7gIWHiomCenRzdXp/iI+Xo7O6vb69ubOonI+CeXFoYl5jam9wc3NxcG9tZmBbWlhdZG11fYWJjY2KhHpybm9ycXqEkJ2ptLvAwsK7r6KXin1ybGZiYWdwdXZ1dHBsa2hgWlRWWWJpdHyGjpGQjYeAdm1rbXBxeIWTo623u8DCwLiqm5GFfHFrZ2ViZ3B1c3NwamZmZV1aVlxlbHN8hI2Tlo+IgHlxbGhqa3J4iJijrrS8wMK7tKaYj4d7cWtraGhrc3Zxb2xnZmRgW1dbYWxzeoGLkpWWkIR8dW9rZ2drc32Kl6Ottry+uriwpZeLhHx0bmpoaW5zc29oaGhmYVxbWWBocXd+hZGWmZaOg3pycGtlZGlyfYmVoKq0u7y1squkloyCfXVybG1ucHFwa2hoZmJdWlxgZ252eoGKlZiXkoyDenVxa2pma3N9h5Sdqa+2tLSwrKKTiYR9d3Jtb3BvbmtqaGdkXlpaYGVrc3d+ipOZm5eTi4R9d3BrZ2drdHqFj5ulrK+xrqymnJKMiIF6dHR2dHBrZ2dkYl1YVltgZ293f4iQlZqdmpaNgnx4cm1na252eYKKmaGkpqinpqCakY6Kg315eXl3b2poZmFdV1VWW2Rob3mEjpmdnqCdmJCIgXhybGlrcXR4f4mUnKGhoqGempaTj4qFf3x8fXlwaWRjXllVVVdfZG53gY6YnqCgn56ZkId+eHRvbm9wdXuBiY+VmJqYlpKRkpKOioeIiYWBfHJpZFxUTk1PVVxlcn+NmKKnqaimnpWOh3xzbGxvcnV2fIKKjZOTk5CLiImNj4+MjI2QjImAc2ddVlBLSkpSXGh5h5ahqaywrKiflYyEe3FtbHBzd3p+hYiKjo6LhoSBhIiMjo6QkpOPiX9xY1dQSUZGTlVjcIKToKyytrOuppyUin93bmptcXh5fX6ChYqKiIN/e36AhoyQkJKUlZKIemtcU09IR0dNWWt5iZqlr7e7tq6jmpKJf3ZubG1zeXx9gH+ChYGAfnp3eXuGjZOTk5WUjoBzZFlRS0dHSlVmdoaSoKu2vbyzqZ+WjoZ+dG5rcHZ5ent8fn5+fn5+enl8hI6VlpKSk46Cb2JXUUtJSEtUZXeHkpymsLm7uK6km5KOiIB5cXBzeHh2d3Z2dHZ4fH19foSMlZualJCJgnJlV1BLSUhOVmFzgpCXoaq0uLe0q6KalpGKgn14dXJycW9vcG9ucXV9gIWJkJWampqTiX5wYVJIR0dITFVhcYOVn6arr7O1tbGonZaQjo2IgXl1cXBtaGVjYmRpcnmCi5Sbo6amnpGDdGRTQzo6PURQXm6Bk6Kts7Wzsa2rpJyTjo2NjpCMgn13cmtiWVZYWV5odIOToKqtsq6ikH5rWUU1LS83R1hofI6itL6+ubOqpJ+Yk4uHiI2VlpKMgnpwZVlSTU1PVmV2iJqptLq5r6GLeGNMNykkKjZJXG+HnLK/x8W8t6iil5GMh4aKj5mYk4+Ge2xfT0dERUhUYnaKoLHAxMGwn4t3X0kyIx8nNktfd42musXLysKzppqOh4SChIuRl5qZlI1+a1tOQz4+RlFhc4mgtL3BvK6di3VcRjQrKC88T2R9l629xsrIwbOkmIqCfX+EjI+Wl5aRi31vW0xBPEBIVGRzhZ2vuLy4rZyKdV9LPjUzNUFTa4OarLzFysa/sJ+TiIF6fIGIjZKVlpGJfXFeUUhERklTYXOFmKOqrrCroI14ZFNJQkBCSFhshZirusTGwrmqn5KNgHp4foSLjo+OjIN9dGdcUUxKT1VkbnyFkZqkpqWdj35xZFlUUE5UXnGElqa1vcC9s6edk4Z+dHR3foWHh4uJhoB4bWdcVlNTWF5nb3qEkZicnZyUin1uZmFfXmNodoWVoq+2trCooJiPgXh0dHZ6foOHiImGg3x6cGZeWlhYWFtibnqEjZGWm5uUiH12cG1sbnV9iJOgq6+uq6ObkYZ6cW5wb3F1fIGJi4qHhIF8dWpiWlVRU1pkbnqCiZKanJqRh4B7enl8gYaOmKKop6ihnJKHem9pamlsbnJ4goqQk5GLh4J7cWNXTUhKUVtmcXuJkpmgoZyWj4mHiIqNkJKan6KinZiSh3pvZmBfX2Rob3iBjJWXmJaQioJ0ZFdNR0hLU15qeYaPl56ipKCalZOUlpibnJycnZqWjIZ4a19aV1tdYmdueIeVnp+emZSNg3JiUklEREhPXWh4go6ZoKWqpKOgoqOjo6Kko6CdlYl/dGpbUUpIT1djaXKBjZ2kqKSflIh4bV5TS0VDRlRhcnyDjJOcpaqnpaaorK+urq2qoZiNgHJoV0pBQUVPV2BreYqYpKanoZqPg3VoW1BKR0lPWWNveIKMlJ2kp6yus7i6ubW1s62ikYBxY1dJPTY3PklVYXGCkZ2lqamkmox+cWZcVE5LTlRdZnF3gYmVnKSqsLW+w8K/vry3rZuHdmdXSDszMTRAS1lneYaVnKSmopuPhnpxaGBaV1hXXmNrbXd9h5GZoaq1wMjNzMrIw7mnk35pWEc4MS0vNEBOXm9+iZWcoJ2Wj4iEenFpZWVlZmRkaGxweHyGjpuhrrvHztLSz8jArpmFclxKOjErLzQ+TVtreYSOlZmWkIeCgXx2cWtucG5ta2ttbnF1fYeTnai3xc/Y29bRw7Kgi3dgTDsxKysxPUtaanaAiJGVk4qCeXp7eXNvcHV3d3V1cnBucHeCiZair73N2eDf2cy7qJN+Z1A9MConLTZFVWVyfoWNkY6Hf3h0dnNxcnV6fn9/f356dXR3fIWNmKa4w9Db3trTxLGchWxXRTYtKCoxP1JkcX2FjY6Phn50b21rbGxwdH1/hIiIg4F8f4OGjJSgrLrE0trb1cm2pY54YEs6LiYlLThNYHB8ho2UlI5/dGxnZGNkaW93e4GJjY+NiIWGiY2UnqexvcjT2NbMvayWfmdQQTQrJSkyRVlte4aMkpSQhXhtZmFeXmBnb3h9hY+TlpKSj5CRlp2mqrO+ytDQzL+yoot0W0k7LykmKzpOYnWDjZSYlYx+dGliWldWXGRsc32IkJebnpybmp2iqa2vt77Fx8S7sKGQemVTRDgwKis1Rltse4eRl5aShXxxZ1xWUldcYmdyfIeSnKKjpKSlqq+xs7S5vsC7tKyjlIJuXExANzAtMj1PYXB+jZaYk46GfHJlXFRTVllfZ3J/jZikrK6ssLCzsa+wsrSysa2nopmLempcTkM3MDI4RFVkcoOQmJiVj4l9cGNZVFBQVVpkcoCRn6uztre7vbqzsLCxrqeknpuXj4FzZltPRDo2OkFLV2V0hY+RkI6KhnttYltVU1NYY256i5mnsrm8vb26tLGtrKihm5iVkoyEeG5kWk5EPz9DTlVhb3uGi42NiYV8c2dhWVVVWF9sdYWVo621u76+vrizrqynopySj4yHgHpzaV9YTklHSU1SWmRxfYGFiImGgn1zbWZfW1tfanJ9iZikrre8v766t7OwqaGYkYuHgnx0cm1nYFlUUVJTV1xja3R2eX6EhoJ8dHFsaWNjZGpxfIaWoqyzuLzAvrq1rqWelo+Jgnp2cW9ubGdfW1taW11cYWZrbnN3e4B/fXl3dnNsaWdsc3mDjJmiq7W5vr2/urStopmPh394b2tsamdmZmRlZWNgX2FkaGdlZ250eXx8en16eXd2dnt9gYmVoKets7e3vL+5r6OWjYZ/dG5kY2ZoamlrbGxubWhoZmNgXl5jam9xdXl/f4CAf31+f4GKkJuhqK61ub7BvrWqnZKIfW9mX15eYWRmanB0dXNvaGdjXlpYWl9lbXN7goaGhoiJiIeEhoyUm6Kpr7S5vr66saSViX9yZltYWl1gZmpxd3t7dm9pZV5XUVFWXGJtdYCHi46QkZKOiYmMkpecpKuzucC/vbWqm45/c2VZUVJVXWJob3d8gn53bmdfWVJOTFNaZnJ8houRl5qamJKOjpKUmp6krLK6v7y0q56ShHdnW1BRVFtiaW93fIGDf3RpXVZQS0pLT1pnd4WOkpueop+bk5KTlZaaoqqxuL++t6yjlYd3aFxSTVBWXmdveHyAgoF4bGBVT0tHR0tUYnWCjJGco6mopJmUk5eXmZqfqLG3vLeuopiMfnFkWFFQVV9pcHR7f4GCenBhU0tKRkdIT1lre4mRmqOoq6ignJucnJycn6ixt7mzqZ+Xin5wZFlUUFdfaHF3eX6Bg3tyZVhOS0dHRkxUZnSBi5Sfp6mspp+bnZ+gnp+jrLG1tKuflYx+b2hhWldZYGlyeHt/foB7cGRZUk1JR0ZKUmBufISNmKKpqqmnpKKkpqSgpKisrq+pnZKIfHNoYl5bWmJqdXl9gIKAf3RpXldSTUdHSlBbaHJ+hpCao6WmqKenp6mopqaqqqyopJyQhHhwZ2FfXlxka3d9gIGEhIB7cGJaVlJNSEdMVmFtd4CIkZyio6WnqKenqaeqq6+sp6Oilot6bmVgXVtbXmZxe4CDh4uHgXdtY15aVU1ISU9YY253f4WSnaSmqaqrrK2srautrqihnJiPgXBkYFpaWFtgbHaAgYWJi4d9dG1nYF5aUU1QWF5nb3Z8hI+YnaGjp6ysrrGzs7KxqaGblId0ZFxWVVNTW2ZxfYOGiI2MhntybGVhX1tVUlRdYmpze4CJj5SdoKSoqauusrS1sq6on5eOf21eVVJPT1Zga3aAiIyOjouFfXdvamNgX1pXWVxeZW53foSIkZefpa2usbO3uri0r6mdkYR2ZVtQTElNWWNtd3+HjYqMiIR+eXJvamdoYlteYGNrcHV7gIaOlZqgp6yzs7m4t7SxqZ2Pf3FiVU1JSU5XYm52gIeMjIqIiIR+eXVyb2xpZWRkaWttcnh6foWKkZmkq7C0uLq7ubWqmol6bV9US0ZHTFdlcXqAhomMjY2LiIF/eXh0cW9tbW1tbnB1eXh7fICHkZ6lq7C1uLy5tKeXhnZrXVJKRkdQW2lzfIKHjJCPj4yJhoN/enZ1dHR0cm5tbnJzc3FzeICNmaKqr7i6vLmzppeHdmpfV1FMTFJea3N3foOHioqKiYiIh4J/fn+Dgn56dXBxb2toZmdseIaUn6ewucC/u7GklIN1aV5YUU9RWGVwdHd6goeIhIOAgoeHhIOEiI2PioR8dXBqZV9aXmRvf5Ccp7G8wL64rp+RgHNpYVlWVFhgbHR1d3yCh4R/fH+Eh4iGhIqQlpWOhn53cWlgV1ZZYXB+jJ2nsrm8urGpnYt8c2xkYF1eZWtyeXd5fIGAeXR2eX6DhYeLkZeem5SNgHZsYldRUFZhbnyNnaqzuby1rKCXh3twb2lmYmlvdnt8eXh7e3hva210eH6CjJOZoaShnZOGempbU0pKUFtndoaXp7G4urasoJeLf3dzb2xvdHp9f315eXhzbWZiZG1yeYKNlJ2lqaekmop8bmBVTkxNVmJwgJCep6+1squflo6GgHp4dnh8f4GAfXt3cW5pY2NlaG12f4uTmp+ipaCXjYNzZ11UUlNZYW15h5KfqK2vpZ6YlIyHg4F+fH6BgYB+dXFtamllZmVncHmCjZKWmJ+fm5SKf3ZrYlhVVFphanSCjpmiqKqloJ6Yko6Ki4iFg4GEgnxzbGdlZ2NhYmZveYGLkJSZnp6alYyEenBjWlJRU11jbHmGkp+pq6yopp+cl5aUjoWAgIN/eG1lYWZlY2FkaHB0foOKj5WYmJSSkI6Fe2teWFFVWFphanqJl6assrGxraajoZuPg318fHhvZ2NlaGdmZWhuc3h7gIGGjpGRj46OjYh+bmRaVlVVWF1reoaVpbG4uLixrqmlmo1/eXZ3cmtoZWZsamhna29zcnZ5f4ONkJKNjZGRiXxrXlZQUVBTWmt8jZ2tu8HAv7u0q6OUhnp2dnNuZ2hpbW5tamdpb29wcHV7gouRlJKQlJGHd2daTUhFRk1YaoCUpLfH0NDJw7qsn5F/dHBxcGxpbHBybmtsZ2VoaWVncHqEjZSWl5mZlYhzYVRHPz1BRlRohJuvwtDY2tLKvayXh3pybW5ua2lzd3VxbGlkY2RkZGVueoaPlZmalpaOgG5dT0M9Oj9JWm+NpbrJ2eHe1cm7ppB/dGxra2xscXZ5eHFua2RfXF9kaXSAi5GXn56bkYR0YlBDOTQ0PEldeZm1ydfk6ebay7ieh3Zvamdob3J2fHt4cmtlXlhWV11ndYWQmJ2lp6CTg25aRjktKCkzRWCBo8LW5vD0793Jr5aAcWllY2lxeX+Afnt2aWFaUE5RWWZ1hpObo6qqoZJ9aFRAMCkmKTJGZIesyd3s9vnw3saqkn1uZmNkanV+gYB/fXVnXlNNTE9YZ3aGkZymraqejHhnUD0wKSYrN05tj7LM3+z19ezXu6OOe25lYmRveoGBgX57cmhdVE9NUl1pd4WQm6SnopiIdmNOPDAsKzI/V3WZttHj8PXz5823oox6aWBgZHF7gH59gHt1al9WUFBWX2tzgZCaoqOek4Z2ZE8/NDAvNkNdfJ240OPv8vHgyK6cinhpYWFodX2AgYOCfnVqXlVRTlNdZnB+j5idoZqRh3djVEQ6Njg/UGWCnbbL3+fp5NK8qZiKeWxlZ3B+hIWGhIF9c2heUU5OVF1mbn2KlJialY2Cc2ZWS0NBQ09edo6mu8zY4N/Vw6udjoFyaGZtdX+DiYmKiIB1aV9XUVZYXGNse4iQkJKOhntzZ1xPSkdNXG+BmKy/z9rc1sm3oJGDdWliZW11gIiQkY+LhHpqYFZQU1ZaYWx3hIuPkI2Eem9nXFROTldleIqhssbT2tfNu6mYh3VnYF9lb3aCjZmZmJGKfW1hV1FRU1VfanSAh4uLioN6cmtjXFhYYnKDkaOzws7Qyr6snpGAcGZgY2xyeoOOmZyZlIh8cGNcVlNRV15rcnh8goKDfnZwa2lnZWhzgZGgrrnDycW8rp6ShnZkYGBnbnN5g4+Zm5iRhnt0a2NeWlheZWtvcnZ4eXl1cnBubm5wdoGMmqiyusLCvLCmmY2BcGVfYmlucHV+ipKYlIuFfnt1a2VeXmRnaWhqbHB0cnJxcXR2en2DjJOdqa+1ubiupp2VjYF1amZobGxtcXqDi5GOioaFg35zaWNjZmZjX19gZWttb3F1e4KLjpWZnaOpr6+spJyYlY+If3hxcXR2dHJxdXiCh4eBgoKDgHpzbWprZmJbVldcYmJpb3SBj5qipaiqrbGuqJ6VjIuJhH5/fHt6fHt2dHJydHt8e3p+hIiGe3dxcnBrYlpOUFVcYGdueIeYqLCxr66usaqhlIeChYWCgYGCgoKAfXlzb2lvcXZ3eH2EiomCgHl0bmVbUkxMT1VcaHaFlai1ubezrqqmno6BeHqAg4WIi4+PjIiBenNqZ2prcXV5gYmMiYR/enFoX1JJRUNMVWBtgY+jt8THwLiupZyRgXFtcXmAhYmVmJeRjIR7cmlmZmdwdHyEioyLhn93aWBZSkRAP0tYZXeKmrHAy8rAt62kl4l2a21yeoCDi5SXlo6HgHVuZ2dnbHV9hYqPkY2GfG9fU0tBOjtBTl5ugpapusfOx7qvpJiLfXFscHeBiI2Tl5eSiYB4bWZjZWlzgYuRlJeWj4R2Y1FDNzMyNT5QZHuRpbjH0tLGtaaYjH5uZmhueIWPlZygn5WKgHZrZmRlbHqIk5qcm5iNf21ZRDMrJyguPVJqhJ6yxtTb18i2pZaFcmVhY2x3hY+Yn6KflYh9dGxkZmdygY+ZoKKhmIp5Y045Kh8gISo9VnGOpbvO293WxrSllIBuY2NocH2JkZihop2QgndyaGRla3iIlqCmpqGZiHZdRjAgGhweKkBefJauxNbd29G/rJyHdmdgZG55hpSco6alnI17c2lhYGRufo+eqq+tpZiIcVQ7IxIPEhgqQ2WFoLvU4uTczbuolH5qW1hhb36Ll6Kor6qejn9yaWBhZXKDkqGrsK6lmoRrTTMdDQoLFCtHZ4akwdnm5NnLuqaRfGhdXWVzf42ZpKmrpJmIfXFpZGVtd4iXqLG0rKGUfmNGLhUJBAoYMU5vjKrG2+Pc0MGynot4ZmBmc4CLlaCnrKefkoR3a2VlZm99iZups7Cqn5B3Wz4nFAkFDiA5VnWUscvX29DDtaeWhHFmZnB8ipafqa+tp5uOf3FnZGVncX2Po6+1sKaYh29UNx8OBQgVKUJgfZu3ytPTx7uuoJCBc2xueIaQmaKqramglod7b2lpaW92hZansrSqn5J+ZEszHQ8KECI2TmeBnbO/xMG2q6SajoN7e4KKlZqgpqilnpSKgXZta25xeICNnaWsqqKVhnNbQi0eFxkiMkJZb4efrrS0sKaenZWLg4CFjpqgpKerqaOck4Z6b2pscnZ5gI6cp6ulmYx+bFdCMCIfJTA9TV9yhZehqKmjm5iWk4+LiZGZoaSmqaumoZeOgndvb3B1eHqBj5qio5qSh3hqVUQ1LS01OkJTX26BjpabmZeVl5iXlpKTnKWopqamop+XkYh7c3F0dnx9f4eRmqCblIyCd2lXSDo0Nz1ARVBaaHaDi46RkZSbnZ2hn6Gora2npqGel5CGf3Rycnd5fH2BipGYmpaPhoB2alpNQj4/RUZMT1ZicHuAhImLkZifoaWnqLCzsK2oo5mWjYV8dHBxc3l5en2GjZSTkYuHgXptYVRHRUdHSUpLUl1rc36Cio+Wnqaqra2tsa+up6KXlI+Jg3x2dHR3e3l5e4KJjY2PioiHgXdqXFFLSUdEQEJJVWJweIaPlqCqsLKzsbCwrqeglZGLiYV+eHdyc3Z6eHh6gYiMkpaQj4+HfW1fUktFPjs4O0NRXWt6iJGepbC1ube1sq+rpZySjoiHgHp1cW5vc3N1dnmCipCZmJaVko1/bl5QRT88NjU6QVFgcYKQnKOqs7u9ubSsqKiimY2JgoN+eXVybXFwdHN2foaLkZaZmJiUi3xsXk5FPjk1MzVCUmN1h5eirLO+xMS9sKqloZiLgHt4eXV1cXBwcHR1eHuBiZCXm5yfm5WMfG1bSj84NDAwNkJTZHuPoKu1usfNyr6yqaOdkIJ4cXBtbG1qaW1wc3t9gIaPlJ6foaGal4x+bFtIPzYvLjA3Q1NnfpSms7rDztLMv7CknY+Bdm1mZ2VpaG1udXV7fYKFjJGYnqGlopyTiHpoV0c8Mi0vNj5LXHGInq66wszR0ce6q56PgnVqZGBgYmdqcXV5fICEh4uPlpmeoKCclot+cWJVRjkvLzQ+RlJieI+ktcLK0dPOxLmpmIZ4bWReW19jaG90e36DhYuLkpOYl5uZmpOKf3FjXFBBNC4yPUZNWmyCma29ydDS0crBuKWUgnRpZl9fYWJscXqAg4WNkJOXlpOUk5CPiH5wY11XTkI2MzlGS1VgcYWcrb7K0NDMyMG2pZOEdGtlYWRlaXB3f4WIi4yQkJCPi4uHiIWAdWhfW1ZQQzw8Qk1UXml5i52uvsvNy8fCu7KilIR1bGhoZ2pvdXqCio2MkI+TjouHgn1+d3NnXlhYVExHQ0VNVl1kcH6PoK+/xsvKxMG7sKKSgXNua2poZ3B2foeKi42NkZKPi4aAeXhybmRbVVFOS0lHS1BbYm94hpWjr73FyMXCu7WuoZODeXFxcGpudHh/hoiIhoqNjomIgnt3dW9rYFlSUFBPTU5QVmBqcXqIkJ6rt77AvLm3ta+klol/eXh2cXNzd36Fh4eFiYyMioR9d3FsaV5ZUlFPU1NTVlpianF2foKNlaOutba3ubm7uayfk4Z/eXVvbWxzeoOGh4eNj5CMhHtzamddWFNQTVBYWVtfYWhvdXd8gIWQnqqxtLq7wcK+s6aWioB6cWpmaG92f4OEh4mOjoyBenBpYl9aWVNTWF9hX2NjZWxvb3J1fYqYprC7wMPJzMa4qZeJfnRsZWBmb3mBg4SKjI+NhXhvaWFeWlpaWFtkbW5qaWhpa2lnZWpyf5Khrr7Gy9PTy7yrloh5bmZdXmZxf4aIi5CRkYl+cmlfWlVXWlxfZ293dXFtamhlXVdYX2l7jqGzw9Hb4d7QvqmUgnRnW1VZZHKAh4qOlJaRhnptZF1XVVlcYGZye4F9dWtjYlpQTExSYXmRp77O3ufp4tO+pY16a15WVFtjc4CIj5KVk4p/dmxiW1haYGZrdn6FhX1yZlxVSj88QU1jf5myyt7w9vHjzbWcgm5hVkxOWWp7ipGXl5eRhXlqYFdTVl5ncHqIkpSNf3BgUkU5LS02SWWDoL7X6/j78uHJrJF5aFpQS1FdcYOPmZucmY+BcmVZU1FXYWp2hJCamo98allLPTAlKTVPbIuqx+Dy+/fs2cKliXBhVlBNV2V3g5Gam5uViXxuYVlUWWBrdYCNmqCaiHViTj8wJB0mOlZ0kbLP6Pb89+vSup2CbF9UTE9YaXiJk5ucl4+DeGdcVVdcZ3OBjZujo5iEb1pGNSccGic/XHqZudXs9fbz482zlXxmW1JQVV9ufY6bn6CXjoFyYlZRWF5pdYKRn6illoJsWEUzJBweLEVge5u91uju8e7dxayPeGhbU1FWYnGCkpygn5eNhXNkW1pdZGx6h5KcoJmKeWRUQS8lIyo8UmqEosDW4uTm4NC6o4p4Z19aWmBqeIiVm5yYjol+cGNeX2hvd4OQmJ2dkoBsW0w6KiMlMkVbco+qw9bf4OHWx7Kdh3ZoX15gZ3F/jpmanJSMg3hrYV5haHF7iZSdn5uOe2pbSjgpJSw6TmJ8lq7D0tjZ1c28p5OBc2hlZGZteIaUm5yalYqAdmthYGRrcXuIkpiakoJ0aFpLOi4uOUhbb4WcsMLLzs3Jva+dinxxamlsb3V/jZebnZqTiIB3bmlpbXN4f4mQlI+DdWhcUUY5MjlGV2p+kqKyv8XGv7WtoZGEenNvcXZ7g4uUmZmZkouAeXJqaWx1fYCGjpOVindpXFNJQDY1QE9mdombqLXBwLy2p6CXiYF6dXR2fISMkJmampeOhXx0b2loa3d7gIePk49/b2RbUkhAOTxJXXF/k6CrtL27t66hmI+GgXx3dHd/h4uPlZaZlo2Gf3h0cXF1eHt9gIaIf3JiWlZSTUlHS1hre4qYpKuxtLSupZuSjIeAfnd2fIOIiYqPkZeRjYeDgH5+fn9/fnt7fnlsX1ZPUlJRT1BYaHmIkpmgpKuwsqaelZCOj4mFenh8goaFhIWMjo6MioWEhoWEgYJ8d3V0a2JYUk9TVlhbXmZxf4yRl56epKmqpZ6alZaTjYaAfX5+f3l5foiLj46MioyPj4iBeHFraGRcVFFRV11jZ2tydX6Fi4+Rk5WboKGhnZqanZ2XjYJ9e3p2cm91fYaPk5SUmJqWi39za2NaUkhHS1FXY210fYOGioyPj46OjJCUlpiXmZyiopuVi4WCe3VsaG52gouQkpeeoZuQf3NnWlBEPj5GTlhmdH+KkJKSkpCOi4eHiIqOkZWboqimop2VjIV6b2hlZ3F9h42SmaCgnIt6bmJSRDs3PUdSYG9/jZibmZeVkIqCfX5+hIiOlaKpr62qpJ2QhHhsZ2Rncn2GjpSdoJqQgG9iVEI2MDI+TV1vfY6eqKiknZWOhn12dXV5gIyWoautr6+pn5ODdm9oZ2dzfoqRm6GgmYt5aFdFMykmLTpOX3aIm6mysqykmZGGfHNwcXV8iZSfpqqtsKqgloZ8dXFvcHiAi5ObnpeLfW9gSTcqJCYxQVRof5Gks7m2saSZjYV6cm5wcHiFlJ2kqKqvqaGXi4B4dnd3fYGLk5qYjn9yY1U9KyEgKDRFWnKKorG9v721qpqNfnNrZmhsdoOSmqOssrKvopiNg398ent8gpCZm5SHdmhXRC4cFxkhNUpjfpuwwcjKxrysnYl5b2ZfY2hxgpCao62yr6uilouCfn1/gIOLmJ+fl4h2ZFI4IA8OER0wSGOEo73K0dDMwbGcinptYl1eZ3B/jZWhqrCwqqGWi4WAg4KAhY+coKCXhnReSTMZDQsQHS9KZ4upws7V1NDEsp2KeGheWVxlcHuJl6Ous7Gso5iOhYJ/f3+GkZyem5KFcl1FKRQLCxQhNE5xk7LJ1drX0MOwmYh0YlZTWmRveoqZqLG0s62imYuDgYB/gouWnJ2akoNuVjoiEAcKFCM3VHmcus7X2tfQwKyYg25fVlZdZW16i5qnr7Kwpp+XioWCgIGHj5edm5ePgGpRNyMRDBAaKj5df6C7zdfY08e6ppJ9bWBZW2NocHuLmaOpqqiim5WOiIWEio6RmJmWkYp5Ykg1JhoXHCk3S2eHo7fEzMzHvbCejHxvZWJhaW91gIyXnKGkoZyVko+Ih4qPlJSVlZSMgXBaRTcrIh8nN0ZbdJGmt8HGw72xo5KAcmpqZmdrcXqGkpucnJydnJeUj4uJjZeVkpKTjoZ5aVVDNi4mKDA+UWV8mKy6v8PBuayfjXhrZ2dpamxzfIaQmZuXmJuZlJWSjpCUl5SQj5CMgW9hVEY9NzAwOUlcbICWqLO6u7izppmJeW9scG5sb3V+hYuQkJGRl5mWk5KTl5iZko2KioZ6bF1VTEVBQD9FU2NzhJWmrbCvsKqilYR3b29zc25wc32Bh4qOjZGVmZiWlJqbmJWOiYqHgXNmW1dST0hISE9ba3qGlaOoq6uqppySgnhzcnJxb29yen+AhYiNkpibmpmYm52ZkYiEhIN9cWVfXVpTT09OVFppd4aWn6aoq6+oopWFe3JwbmxoaGtxdn2CjJCYnJ+dm5qfm5OIgX2AgHtybGppZGFaWFRVV2FueoeUnaOtr66mnZCGfHRrZmJiZ2xwdX+HkZqfn52Zm5mUjYR+fH99e3h1dnJuaGJgW1ZYXmdyfoyWn6asq6ielYqBdmxlYWFoam5zfoeQmZuam5eWk4+LgoB/f4KEgn99eXRsaGJbUVNYYW55h5Ofp62urKOZjX1zaWBbXmFmbXWBipOYm52dl5KPiYWDgH+BhIiKiIaAenJqYVVOS1FZYnCAkJ6qs7Syq6CShHZmXFlXW2Nsc36HjpOcnpqTjYiHh4OBg4aMkZSRjYmBdWlgVEpGSE9ZaXqKmaWwtratpZaGem1jX1xfZ210foKIjJOVkYiFhYiHhIWKkZeempeRkIV5aWBUS0RHTVZjc4SSn6qwr6melIqAc2xlYmlvdXl7fYKHioyHgH+Eh4mHjpWboqOgnJSNhHVjV09GREdOWWN0gpCfp6qpoJePiYJ6cmtqcHZ8enh5fIGEgXx5foSJi4yUoKisqqefl42Ab2FSSEJARE9ZZHCBkZyipqGblpCLhHx2cXN4fH18eXl+gH18eHl+homMkJuor7GvqKKXi31sXE9FQUBHUFlhbHqIlJmamJWRj5CLhoJ+fYGCgX55eHh3dnZ2eX2CiY2Voq60tK+poZaKeWlaTUdERkhRVl5nc4CIjY+NjY6Sk5KOjIyMi4qGgX16d3RxcXB0eX6EjZelsLm6tq6jlYp6aVlMR0RIS1BVW2JveYCEhYiHi5CSk5OTk5GPjIiHgX94dXNzdHd6gIaPm6m0ubq1rKGThndmVktHRUZITFBVXGdvdnuChoiOk5WXnJybl5SRjouHgnx4eHZ0dHmAipKeqbK3t7Orno+BcWNXT0xJSEdNTVRZYGZrcnqAhYuQlZ2goqWemJmWkY6Hgnx4dHZzeYGJk52ns7e0sKWbinxvY1dRTEhGSU1PUlNbYWlveHyCiZKboqSnqaahoJ2WkYmDe3VycnR4gIqVoKqxsa6ropOBcmlhWFJOS0xOUlVXWFxgY2xxd4CFjZaeo6yuq6Whn5uUjoV6dHN4en2Dj5qlra2rqqScjHlsZV9XT05NTU9SVFRZXV9jaHF8hIqRmaKosLOvpqKgmZOMg3l1d3t/gIqUoKWopqagnJB/cWhkX1hSU1VTVFNUVVZXWlxjbnuBiZKdqLG3uLOrpqKdk4l/eXV5fYCFj5qipaWjoJuShnVqXl1ZVFFVVllXWVlYWVtdXmRveICJk5+qtLm4s66qpp6QhYB8fH+Ag4mVnKSioZ+ZkIh8cGRcWFRWVlpaWFdZWVlYWltdZnB6go6YpbC2ubmzrqmil4yBgH6Ag4eLlp6mpaKemI2EeG5jV1FSVFhcYFxaXF5cWVdWWF5oc3yEkqCutrq5t7Oup5yQhYGCgYWIjpegp6mmn5iRgnRrYVVMS09UXWFiYGFjZWFaVFdZYWx1f4yarLS6ubm1sqibjoV9f4KHiY+YoamwrKeckIJ2aWFXTUdJT1hhZGRkZGVkYFhVWF1mb3eFlaexuLm6trWtn5CGfn+BhYyQl6GrsK+onI+CdGheUklESU9YYWZnaWltbGdcWFddZG90fouerLW5ubWxq6CUiH9+gISIkZmiqrCzrqSYiXlrXVRJQkFIT1ZeZmprbW5tZmJfY2Zuc3uIl6Svs7OzrqehlYqBfYCFipOaoaiws7SpnYx/cGNVTEI/Q0pQWGBmbXB0dXJtamlrb3R4gYmUn6arq6iinJWPh4J/hYuUnKOpsra3sKSWiHhpWEtBPTpARk5ZY2tyeHx+enZzcXFxc3mBiZKYnqOlop2Xko6JhoeMk5uhqa6zt7SpnI6BcWBPRT46PEBHUVxocXqAhIOAfHh1c3Fyd32Di5GWm52cmpaVkI6NkJWcoaWrsrW1rqSWiXtqWEo/ODc4PUhUYGx5gIiLioeAe3Vyb3Byd3uCiZCVmJqam5qXlpibn6KjqK2ysqylmo+Cc2FSRTw5ODlATFpndICJjo+Ph4J7dG1qZ2ptdHmCiY6UnKGio6GhpKioqaqsrrCrpJyUiHhoWUxCOjc1OUJRYG17iJGUk5GLhHpxamRiY2VqcXqEj5miqauqra2vrampqqupp6Odl4+DdGZZTkM6NDY8RlVicIGNlpeWko2CeGxkXVlYXGJrd4KSnqqxtLW5urewrKurqaKemJWRinxvY1lORDs4O0JMWGZ0hY+SkZCNiX5xZl5ZV1ZbZW97i5mnsrm7vby5tLCsqqegmpeUkYqDd21kWk5EPz9DTlVgb3uG"}, "kalimba": {"name": "KLMBA70", "sr": 22050, "bits": 8, "unity": 58, "fine": 25, "lstart": 1446, "llen": 48, "b64": "gIJ+nbuJe5KFlau9ub6In4Nfa5WyjpJpKjojTnM2aEgvCx0dQU1iYFFJZ1dxk63Cpa+6pLPA7urp3uTMw9fl6+q3tqGfkK+hl4V3UVE7YV5fR0YZESNPVmpQTTAnMWBtgYiLd2pkfp/Crb6ujYWbob+rrZl1Z21qbmt4VkkvPEhJVFpXPixDWG1reIN5fo+UpLTDzce1tLbN5On867y3wcHPwsSwkH5+em1za1VBMjQhIisuLhULICosL0NHRE9panV/lJqVkI2QsLHD1bqotqi8tbu+rJmXjoKIlIB7bmZWU1ZZZl1ES1hfX2pyenuLj5STnqe0srWttrvA0tCttKikpZ+klIJ5b1pOVkk4NDEjFhobIi0hHiYyOUZSYGd3hpCWnqiyucXCxtHS4OvT0s/Ex7u+uKufoY+CgoFsZGhaSEU+P0ZBOjc8P0tQV1xlb3mBipGSnaissre1u8u8srSsqp6hn49+d21hXV5TQ0NBMTIwLjg3Nzg8RlJgcHyHkJqipLS7w8rT1dvV1Ofh1M/KwbWvsamckIN0amRiTktLOTEsJiwqKCsrKC85Qk9daXB5eoeRmaatucHBvcnX08/S1MK2tLGmoJOEeWxmWExRR0E4LS8yMTg+REdRWmd0hYyanqKttcHFz9nXzM7T0sjFyLemoJ6OhnxtYVZPSDg6ODMqHR0iIicwNjk+SFZgcYCKlJqkqrS8w9Tc19XZ39nP3NXDt7iqopmMgndvaFNKRkA9LykqJycuNTs9RlReaXqCjZmgqrG4usfT0cvKz867xce4paKZjYV3bWNbXE8+NDIzKSYoKiUpMzxDSFlmb4CKkZ+ps73Fxs/c39/e4efQ1NrQvLOwopiKgHJkYVtJOjY0KSMkJSUhKDI4OEZUXmt9gpGYoK61ub/I0NLNzdnHwMnEs6Sglo2De3JjXVxSPjg6NC0tMTUxNDtESFNjcHeJkZmjqbjCx8zR09bV0d7UxcjHuqiinJGGf3ZmWlZSPTc6MyojJCsoKC45OUBQXWNzg4qVnKews73GzdLSzdXVx8bJwrCnpZqMh4F0aWJfSzpAPjcwLjMxLTE8QUVWaG51ho6apLC6vMLIzNPV0tPVyr6+uqqenJOAd29lXFZWSDI0NjQuKzEzLS86Q0ZTZG9zgouUnKazuLzFyM/T0tDU0cXBwrWnpqGQhn5zaGBgVz87PTw2MTI1MS84REZOXmtwfIWNlZ+rsra9vsTKysnIyr+1ubGjnpyPgnxyZ15eXUo/Pz86MzU6OTU4Q0hOXWpxeoWMk5yqtbzEyMnQ0NHN086/vryso6CUh39yZ1pXVUc5NzUxKSotMS0xOkRIVWFtdoSMlJyosbvAx8fNzs/Jzs2/ubutoZ2Thn91bV5ZWE9CPz48NDQ1Ojo8QktQW2Vud4SMlZ2lrba8wsTHycrDxcm/tLasnpeNgntyal1WU0xAPDw6MzAyNjc6P0lPWGJqdIGKlJ6krLW9w8jLzs/KyM/Jvby4qqGXjIR7dGleWlJGPj89NzIyMzY3O0JJUlxha3mCipmgp622usDEyMrFwsrHu7a1qJ+VjIR6dGxgW1VMQUE/OzU0NTk7P0RNU15kbXuHjJujqrG6v8XK0NLNx8zMwbm4raOXjYR6cWxgWFJJOzw6ODQzMjU3O0BJT1thanaDiJWgp662u8DEys/MxcnLw7i2rqSZkIqAdnFnXVlSRENDQDs6OTo8QEVLUVxhZ3OChpGepKqxt73ByM/NxcTHwrm3sqebkIiAdXBoXllTQz0/PTo6Ojk5O0FITlliZ3GAho2dpKy0ub/Cx8/SzcrLxry4tKuhlo2EeXFpXVdURz0+PDg1Nzg4OD9GS1VgZW19houZoqmxuL7DxczQzMfIxb23s6qglYyEenFrXldUSkBBQD06Ozs7PEJKT1djZ216homWoKevtbrAwcjNysXFw7u2squhlo2Fe3JsYFdUTEFBQD06Ozs8O0JKT1diZ216hg=="}, "strings": {"name": "STRNG71B", "sr": 22050, "bits": 8, "unity": 71, "fine": -7, "lstart": 147, "llen": 11272, "b64": "gIB/f35+fn19fX19fn5+fn59foCBgYB+fX+BgYOEhoeHiIqLjY6OjpGVlY2Bc2xubm5tbG1ubnB1fHt7eXN1en6Bf357eX18gIuUlpGRlpqanJyan6ytoIdpWl9jY2BbXGBgY256gn54bWludHx8fXtzc3V4iaSpnZyiqquoqKOmu8S7l2JJSlRdWk9QU1FTY3WDgnlwY1tic3l8e3BoaXGFp7qwqKqrs7Opqa64xcSpdk5AQldgVlVTTlBgd4CAfndpXFVjcXd3eW5dZYCftLaura2xuKuiqLO+va6MXUI+S19fW1ZSUlxxf35/g3JbUFhpdHN1eF9beZquuLSxsrK3tKmjq7u+rJh0STxCVWVjW1VSXXB2eX+EgWNNUVxpcXB3cFtqjKS1uLS0s7e4r6SntLmwnYVeOzlKXWxiV1hga25vf4iFclJKU1tkcHR0ZmF+mrK5tbm7uL25qKmzsbCmj3JNOUBPZGtiXV9kZ2d2iYp8X1FOT1Zkb3ZyYnGPqLm3s7u9u72zrbGwqqWZgmFIPkFYa2ppaV9eYm2CjoFoWlFLTFVlcHZva4Kbqbe1t8O+ub22sLCpopmNeVtFP0pdaHJ4allYYnGIjHdpU0dKUWFsb3RvdZOfqLS5wL+6wsS3q6Wimo6DdFVCRVBbb4B6Y1VYZXeJhHFZREhVYGZqcnhyfpykpbS+vLq/ycS1opeYlYyFc1FESE9hfYZyW1FYa3mEfmFKRlNlZWNxfXp1hJ6qsbe1t73Iy7+olI+TlYyFcFFBQ1Rwhn1lWFVebnqAZ05JUmNsaGx7fXJ0j6m2t66uu8PGxbadkY6MkZeKaU4+R2J6fnNhVVRhcn9uTElUYWpub3h7dG9/oLCwtKytwMLDv6iUkIiImqOLYkc/U295d25fVFlobW9cTVNcZ25yen1xbHORsK6tsqqxwMK9sJ+Sh4WTpaeBVkRJWWt4dmpbUVxnYmZYTlpqcXJ1fHFqc4KgrqqrrauzuLq4q5eHhJClrJt2U0VOXW95cmVZVl1ZX2JVWmVyd3Z1cm51eounrKyuqayxrbS4ooyJi56xqZJvUEVOZnN1cWRUT1FYZ11aZG94eHJscnh/gZOmp6mspqqqo7KymIiNm6yvqIxfQz5Vc3Vwb1tFRlNla2Bjb3Z1cWpxeX+Cg5qon6euo6SgprKnk46XpKy0pnZOQUhhd3ZwZE4+SFpscWdrcnVvanJ+fH5+jKWhnKmnnJ+kq6ublJ2fqLSxlGFHR1FoenVlWEI+TWF4dG1tbmxrcHyBfH2AlaGdpaeZk5qnr6WYnJ6dsLqtglNKTlp1e2xZSD1EWnSBdGtpZ2dwfIV+eXiDl52ipJqTl5+qrKiin56ntbqia0pLU2d3c2JIPT9TbYSCcGZkY2h4hIF3eHiLmp2hmoyRmKGwtKiamaOttraRXklQXm91bFE5PE1kfId7al5jbHN8gn9+eHqRnJ2fkImXl6a7tJ+ZnaOtuqx9UklXZ3FvXkM5SGByg4Z2XlxrdXV7gn97cYSamZqViZCTnLzAqpuYm6e1t5lpTk9dbG9jUT5BWmh3iYBmWGN2d3F7g4N3d42YmJeQio6Ys8O5o5WWo7K4qoBcUVhkbGFYTUBNYXCEh3BcXm94cHF/iYJzfpKWlJePiJGovMKxl42Yrbi2mW1VVV5qZVxcUUlRZXuFfGVbZHBybXOGjHh2i5KSlZCOlKK1wriejZSmsbypfGBWVWBkYGBdUExadIKDdF5fZ25wcHmQhHOCjZGUjZGaoK++uqGOj6Oyu7OKaFxYX2FgYWJYU1ljeYJ9aVhea3Byc4GKgn+EjY6Nlp+jqbK4qZaNmKu1uaB2W1ZbYGJjZVxWXmBtfYN1WFRibXN0eoKGgn+Li4iWnqezrq+snI2Op7e4q4hgT1diZGFhYVxdYmh0gH1iVVxnc3J3f4GHg4iLhZGeqruxpamjkouftLmwkmpSUl5oZmFhYWBjanB5fWpZWmBwc3N7f4WFhYqKjpmovrmmpKOTjJmwurGYdFpRWGZnYmJjZWRsb3R3a15ZXGtydHh8h4WBiIyPlqS9vqiiopSLkae6tJt7X1VXYGdkYmRqZ21xc3ZqY11caG5zeHeCh3+Hj4+Wn7fEsaGhkoqQoLazm4FnWFxaXmNkaG9tbnFvdXFqX1tmbnRycn+Kf3+Ok5aerby7qaGUiIqbs7Seg2pYXV9dYGBmcXZ1c2xucm5kXWNpdHNseIiIfYKVnqGrtbquoZ2RiJKnrp6JclxYX19fX2Rxen55amdxc2tfZGpzdGlzf4eFe4ylpqmvtK+kn5qQjpuknYt4aVpVWltcYXKAhHxtZW10c2ZhanV2bG5zfoyAhKOrqKmvraSlpJqSkJiWinxyY1RSVFtfb4SKf29maXF6dGVnc3Vxbmt0hYaLoKqrp6qspKepo5yQjIqCfHttVkpJVmNqgpGDc2tpb3t9b2x2c3FuZGx+gYqeqq+ppaShpq2spZaGf3p3gXlcRkFMXm6Dkod3b2dpeYZ8cXd2cWxkZ3R6iJuosayopJyjrrOxn4d0a2+DiGlAOEVVboiWiHhxaml5iIJ4eHx2a2Bmbm6Emqayr6SfmaKxtrankHNgZn6LeEsxPU9lh5iLeXBta3iKiYF8e3xuY2NmZnuWo66yqaGWmrK7urKdeldVdop+WDUxQlyFmIx6cXNxeIiKiYN/f3JoZ19eco6gqbGsopSVrr6+tqiEW05nhYRhPjE6UHyYjH1ycnV8ioqPjH2AemxqYlRkhp6lrK+ol5CmvcG4qo9lUF51fWpJNjhJbpGPfXNzeoSOiYyShYGAdW1hVFl3maGkrK2cj6G5v7ivm3JYW2tyZlNDOkRmhIp/dHJ/jZGIiJGOgoR+cWZYV2iKnZ6qsKGTnbO9uq+fe11bZWdgVk5FQl54fXt4dX6UmYyHkJaHgIN8bl5VYXyUmqGuo5ehsLS4tKGEaV9iXldVVU5JWW9ycXd1fJqjkoqMmI+BhoN0ZlhedYWTn6ekmqCxsq2vqYxzZ2BYS01ZWFNcZ2dgbXl+l6mdkoySlIiIh3ltXl51fYKYpJ+epLGyqKWqmX1uY1dHQlRdX2ZkYFdbd4GQqaibj5KRjY6Mfm5kYXV8eYibm56stLCnnp6fjXZpVEU/SVplcmxcUU9mgo+grqaVk4+MkpCEdWdidn94go+Smqq3sqOdlpWZh3BZQTxDT2Z5d2ROTFxzjJqrtaKVj4iTmIl7cGZzfnh7h4iTrLu5o5WTjJaceVpENT9HXHl9b1VHV2h+lae5r5+ViYyZkIR5a3N8d3mEgYenu7mpk4yGiqCRYkY2NkNTdH52ZE5RYm6FoLm6pp2Ri5SUiYBzeX54doB/f567vauWhH6HmZh5SzczOUprfXdtWVJcanWQscKwnpuSkZaOh3x5gnt2fn94k7jCr5aDdXyVl4VkOSw0Q2B7eG5kXV5mbYCgvryjoZyTk4uJiXyAg3l4gXmKscG3mYRzboiYiHZPJyk7V3V5bWRiaGhmeI6tv6qio52bkISLh36Fg319e4Kkur6lhHRnd5SQemM4IDNNa3lxZWFuc2pwhZi1rqGoqKGZhoKKg4aKhYB7gZquurONdGlqgY+Da0siIkdjc3BnX2t8e3F/j6KunaavqqOSfH+HiIuOjH17kqm0uJ13aWl0hIVzVTIfOFpnbGZfZXmGf3mGkKChnrK2rJ2CdIGKjpOVjX6GoayvrItsa3B1e3RgPioyTWBmZWBic4WNg3+HkJudrMC7p5B3dYWTnJ2ZiIGSpamrmXZqbmtra2dRNTNEUlxkYGBsfY6ShIOFjZqiuMezmIJxeI6jqaGUh4yao6ShinFsamRfXFlFOUVKTFxkY2t5hpKQhIKBkpyrxr+ikXxxgp2zrZ6RjpGVnKCagm9lXlhTVVNFRUtGTGJpaniCh4+Oh36FlZ27xq+einV9kq24p56YlIyNmaGTemhYT0pOVFVLSklBUm9xdYCBg4yPhXyJlaXCuaOZhnyOo7a0qKaci4OPnZyHc15HQUdOVVZMSERIYnl7fX19gY6Tg3+Nl6i6rp+ai4ibq7Wxs6yUgICSnZOAaEs3NkhTV1RIQkdVcYOCe3V6g5OQhIKQmaSxqaOek5SirbW9vaOJfoSVmY51VDwvNU5XVU9CRFVogoeCdG16jZWMhIKRk52uraignKCkr7/Ht5eKf4KRk4hmQDEsN1FVUkdDUWR3ioh7bG2ElJCJhoeLiJ+0s6ijpqGluszJrJaJdX+Pkn5UNyopO09TTkdKXXB/in5za3SLkY6KiIiCiqm4s6yrp6SvxtG+qJZ8b3+QjG1ILiElPVJWVU1QZXeFhnZwb32JjIyJiYSCkay6t7Grq7K6zc21o4tyboCNgWI/IhQlRVVdV01ZbXqEgXNye4GFiomNioSElrS7trCvt7m+zsevl4Fxb4ONeVYvEQ4uT2BiWE9ddH2Ae3V7gHt/iI6SioSDnLe9tbS8vbvEz7ydjYF0dIOEbkcaBhU6XmhgU1BidX5+e31+fHZ/jZiUhYGJpbi2vMO+vL/HxqyTioJ2eIR7YDIJCSNLamZZUlNme3t8g4J6c3aGlJ6MfYaRqre+ycW8wMTAuaSRi4J1e3xyThsEFDVcalxYUVFsfHeEh3tzdICKnZ9+eoyZsbzIy7+/xr24r5+TiYF7d3NhOBMLIEJjZFtVS1h0en+JgHZxf4eQpI5xh5ehuMPJx8PEvLWzqqGRiIJ4cWhRKA8XMVFgW1hPT2J0foWEfXJ1hYyenHd3lZuuxMPEx8S8tLSzq52NhYF4aVtBHhclOlZaVFNOWGp5hIWAeHJ8i5edhnOKn6S8xLzDx761sbezpZmMhX5tXVAzHSIvRFVMS1NXYW9+hod7c3mHlJuNeoCcpLDDu7nCwruysriropiMhnRiVkIrJi03SEdBUVtfZnOBiIN4d4GNlY2CgZamprq7tLzBwLeuuLSpoZWRfGdbSTYxLi47QThDWmNma3eBhoF7gIWPjIaIkaWhqbuztLzAvbKytrKqnJqLaltSQTo5MC84NDtQX2lscnR+iIB+hImFg4+Tn6WgtLStuMC/trK0t7SonpV3X1RJQUE2KCsuNkVVaXNxbHKHioKBg4B+j5mapqCosqi0wcG5srS7u7SlmYFlWlBHRDsqJCYwPUpfcXNqaH2PjISBfHuLmpykpqOuqKq9w7yzsLvBva6ciGtgXFFIPzAiICk7SFJoc2xkc4qPiIF4doeXnaOppKyrpLbCv7uyucPDuJ6Kc2RjWks9MyIdKjVESVducWZthY6Lg3d2f46epKqlpq6lscC+vba7xMXApYZ6bmhlUzwzJRcnNj9FTGBuamqAjYqFeXmBh5qmqaejrKyrub+/u8DGwsGvinl2cG1eQS4mGyE1QUJCVGZtbXeJiIJ6en+ClaauqKGlrLG2u8HAwcfDva+TfHx6c2VHLyUfITI9Pj5MYWdueIaEfnt5f4KMorKqoKGptbm7wcTHzca8qpd+e4Z6ak8yIiAlMzw3OEVXZW12gIJ6fX59gomXtLOhm6G3vrzCxsjPzL6mlYF4jIZuVTcgHCYyPjgxPk5ecHV3fnd6g4GBhI+xuqebmLDEwMXJyc3Rx6WSh3WGkntaOSEbKTU+PC40RldseHR2c3eDgYWFh6m7rqCWqcbHytDNzc3JrpCHeXqRimM6IRonNj0/Mi4/Umd5dG9rcYOAhIqEn7izp5iiv8rQ19PNzMi1l4V9eIaPb0IhGCQ0P0I3KzhOYHJ2cGhpfYKCioeYr7Kqn6K3zNXd2s/Mxbeji4F5f4x4USkUHzE/Qz4vMUlcanJyZ2N1foOLh5epsKmfqLTH2+Lg08zEtKmUhn14gHZYNRoaKUBFPTY0Q1hja3BpYG18f4mLkqKvqJupt8ba6ejZzMK2q52Ogn15bVo9Jh4kOEY9Nzs/UV5ja2tmaXN8gYmWoK2omae3yNzp8OLQwbWropmIg3tkUT4vKSUyQUA6QUZLWFxjZmdtbnd6f5OdpqScpbHE3unz7tfBsqykopSIfWVKODIxLDE9PTtDTVFUVVtgZHN1dnNziZyoopymrb7e7PLz4Mi1qKajnZR9aEsvMjczNjk4PEZOWFZPVVhacH9+b2Z5lKmmnaOrt9jx9vTn0L+ooaahn4VnUCknOTk9PjM1SE9XX1BKUlVogIh2XmmGn6ejoaq2zez39uvZyq6coqqnkW1SMB80P0FDOS9EUlRgWkZHT2B7jYNhWHeSnainprXE3/f679/TuKGcp6+beVY3JCk+R0NANTpSWltdTj9JV3OMjnJTZYOSpK+rsL/S7/vy49rCrJ+fr6OCYj4pKDVJQz9CPUhaXFhTQUBQbYeLgFxZc4WZrLOyvc3j9fLq3sy5pZ+pp4lrTzIrMj5CPkpLRU5bWE9GQkpjf4eGalhld4+ltLa7ydrq7ezk0cWvo6GfknVgSDAzOTk+SlRQS1FWTkZISVp0foZ1XV5qh6Cttb3H0uHn5uTWzr+qnpWQf2tcQjU5MjRKW1xWS0pLR0pOVWp2gn1hXWd6mamvu8jO2eLg39nVy7ihj4iAdGtaQzYyLj9bYWFSQD9HTVBWYHB6fmxXY3aMp7K1wszS397W1NfVxKqRhHt5eGpYPy8uNVRoZltDNkBNT1daY3V0dF9ac4SZsLW5x9Da3tTN0tnQuJuEeXZ/fWtRMy02RWNsXkw3OktOVF1aanByb1hphI+muri7ydTZ1MzM1NbEpIt3c3+IfGNDLTdHVGhiUEA5R05PV1deaWpzZl56j520vbfCz9TRysnN1s6skn90e4aHd1k6NUVRW15TSEBETE1SUlhiZG5xZG2Gm6+7t7zJztLKx8jN0bqciXp6goyHbE07RFFXU05LSElLTk9KT11dZHFxa3mRq7i2uMLIzsvFxcbMwqeMg4N+g49/YEpGT1lPRElKUE9OUkZAVl5da3JwdYiktri1usHJzMbDwcXDsJWHjYZ+i4txWlFQV1I/Q0lQV1FRSjpJXFtibW51hpywurmxt8XPyL/EwL24nouRkoSFinxnXFhXU0I5RU5RVlhNOkFQVmFmaG6Cmqy2u7Gqu8vRvr3EubipkJGbkYaIfnBqY15TRz44SE5RYVc9PkxMW2ZgYnmbrLS5s6Wxw8/Jub2/uKyakpmak4l+cXJzZ1hIQzw6Sk1cYUY9SUpOXmJeao6uuLe0pKe8xcrBtrq9saGWlZyfkn5wb3p1Yk9EQTo9SVRfVEJGTUlPXF1ie6W7tbOrpbO9wMa+tLi6rZuVmZ+giG9qeH5xW0hDPzo/UVpZUkZKT0hPW2JukLO4tbKpqra7wcO5s7m6p5aVnqGYeWhzfnpnT0VBPjlEVlZWUUhNTEJPX2qBoLW5trCoq7a7vr22tr65opKYn5yKbW16e3RfSkM/PT5KVlZWUE1QREJYZ3yRpLe7uLGorra1ubm4vL+ynJOYmZB/cHRzdW1WSEI9QUNNVVNVVE9IP0lhc4aVq769tauqsrGxurq9w7ytmY6UkIuAdXBscmdTRD1DRkZPT05WVUtDQlVreo2ft8G4sayrrauzvb/Dvriqk4uNjJCBcGdobWROQURIR0dLSlJYT0hFSVxvhJmovryws7Cqqqq2wsPBvbahjIWGk5N2ZGFobl5HQkpKQ0JFSlVYUEpHS2B/lqGxvrSzuK+qqqq8x8K/u7GZhoKNmIdoX2JrallGR01HPT9FSlZXTktITXCSnqWxuLG2uq6npq/BxsG9uKWPgoiWkXhgYWdrZVNGSExCOkBDTVtVTUtFW4Weo6Sxt7O6vqyhrLfDxr+8sZ6LhpGQgm5hZGtqX09DRko/NjtEWVxMSUhScpainqKytrfDup+ks7bGxL24qJmNjo+Cd21mZ25mVEhBQ0c3MT1PW01HTFRlh56gmqW0tMLDqZ+vsrjIwrmtop2WkIJ4em9lb3BXSEc8Q0IvNUVWT0VKVGZ+kpian6qwv8azqKqvsrvHvq2pqKSZhHZ7fG5vdWJIQ0A8QTgxO0lPR0ZQZHqLkpOepaS3xravr6mwt73Brqmwr6aPdXWCenN5a1A9Oz89OjQ3P0ZLSEpceIuQjpWjoqrAuq6ysbC2t7yxp7G6tqCBcX2CfX10WT40Ojs7NTI4PkhKSFVvh5WPj5yjo7G2sbK1t7i1sq2pr7zFs5R5dH6GhndkRi8zODk2LjI3RElFUWV6k5yPkpyeqK6us7S8wLitoqWvu8vGp4l5eoWMgW5UMiozNzYvLDE+SUNMY3GGopqNlpeiqamxs7nHwLCemKy5ydO9nYR4gY2JdVw9Kiw0NCwnLDdFSEZacXyXqJGOkJamo6yytcbJtKKUnbvK082vlYOBiod8ZUgwJy4zLCImMDlHS1BnfI2moYyMi52mqbGzwMq9pZqYrMvS0cGoloiHhXxvVjwrKSwqIiEuND5LTll0ip2plIKGkKCqsLO5wcCun5+lwdLOyr2mlYyAeHFfSDUrJyEgHicyOEVRV2eGmaOfg36Klquytrm1trWqpKW2zM7Hy76klYFwa2JWQTIqHBoZHy45Q0tTYHmWoqOLeoKMpre4urKqr7WwrLbCx8fN0Ligi25hX11ROy8cFBMWJjdFSkxbcYmbqJZ6eYGdtr66sailsru1tsK+ws7VzrGVd1lXYVtHNCIWDgsdM0NOTVRne42npIB1eZOwwL+tqKSmuMO+wb23y9jXwp5+XVFhYVQ+Jh0OBREuQVBVUVxufZutjnJ0jam3wbKjpaauxsvAvbnC19zJqodlUVlkX0gtIREGCSE8S1pZWGNuiaiffXOFoLG5uqagrK680ce9v8HM4dCuk29ZVl5kUjYnFQoJFDNKVl9dWWF6l6KKeICYq662sKGpsbjLzcLDx8fZ17CZe2FfWl9YQTAZDAoPKElVXWNaV2yHmpGCgZCmqKuxqqiyusTIx8rNyc7RtZiDbGNdWlhLOCANDhQiQlNaZF5YZHeNjYqLjZygpausr7O9xcPDz9TPzsi2m4N4bF5cVE4/KRINFyI8T1tkXFpjbYGGiZKTmZqdpKi1ur/GwL/O29fRwq+chX14Z15VSz8wHhAXJDhJWWdYU2Bqd3+EjZealZWdoq/BxcnDusjc4trDppOHg35yY1VKPjQnGBcmOklXZVhRXm51d4GEk6CXkJWdqL3MysO7wNfm5suoioCIg3psV0w8NC0gHiU5TFhhV1BXaXl1fYKLnZmOjpakt8/Rwr3Bz+Hs16+IdIGHf3VdSTs0MSYjKzRJXmFWTlFoeXZ+foOXmJCKjqCyyNXJvsHM3OjfvpFxeoiDe2lLODQzLSkwNkFeaFlNSGF8dnyAfY+VkYyHma7B0s7Bw8rZ5t/GnXZvhod5cFI3MzMzMDY5OldqYFJFV3l7e399iY2KjIiUqbrM0sTCy9fl38emhW56i3luWzkvMzc3O0A8UGhlWUZPcXx/f32GiYKJi5CissLPyMLO2uTgyauSenSIf2taQjQxODo+REJJX2VfTUxpd36DgoOGfoCKk5upu8jJxM3b4N7OsZaGeoWCaVZEOjM5PD9FR0tXX2BWTl50foGHhYJ8eoiSmZ+0wsLDzt/h29G5m42GhIRtUUM9OT9AP0VKT1RbX1hSWmt+gYaGfnh3iZOTmqy+vr/L3+Xa0r+ik5CKh3ZRPz46QEVBQUdVVFRdWVdaZnl/h4d7dnOAlpaSoLS7wcrZ6dvNxK2bmJKGeltAOzxFSkNCQE9bUlpbVlxicoGKiX11cnuTmo+Sqbe8y9bj3s3DtaadnI12Ykg9PUdORUE+SlxVVFxXXWNpeYqIf3hxdo2clI2YrrjF1+De0MG4r6SglXhkUkM/RVBNRD1DVlhSXVpcZGZ1hYR/fHRxg5iWjY+htsPQ2tzWxby5sKabf2dbTEVFTE5HPz9MWE5YYFpmZ3GCgH1/fnZ5jpSPjZeru8rS1djKv7+3rKGJa2JYTElMTkpBQEhTTExgW2FtcX17d3yCgHiCjI6Ul6GwxczI0dDHxr+upZZ1ZmRXTkpOTkNARExNRVdfW294enRxe4CFf3p/iZWanaa9yL/F0tLPyrelmYRva19XTEhSSUA/RExFRlpaan9+c2tzf4mIfXh/jZqhpa+/ubjJ09rVvqqejHp0aF5VSE5ORT4+R0U9UFxkgIZzZWx5h42FeXqCkZ+prbW0q7zR3uPNsKOTgnt0Z1tNSU9LQjk9RDxEXGF2jXpjaXWEjoiAe3yHlqiyraymqsbb6eK/pZeIf3tzY1VNTExEPDk8PTxSZWuJiWRidHuLjoN8e4KMnrGxqKWgr8/p8divmI+IfnhvX1ZNS0Q8PTk3PUhfaXmPclxweYGPioB3gYaMqLWrpZydvuD17cifjYmFf3dtYVFIQzpBQTU4RE9ndIaCYWN2gIyNhXl8iYSUr6+opJaky+z85bKOhIWLfnVvXEdAPEBEOzdCSVZveoN0Ymx6io2Gfn2EhYWara6nmpa13ff3zqCFfIiKfnZtVDo5QURCPURKSFt3f3tsaHOBioSCg4WCgouesK2gmKLG6/rmuZJ8fYyMf3NjRDE8RUNFTEtDSWR9fHZucniBhYCFi4WAg4yjsaieoLHS8u/RqodzfZGPf2lROTJCR0lRUEpFTGp8fHZzd3Z7f4WOjX98hpOns6mjq7vb7N7Bnn9zgJKOdV1LNDNGTlVVT0lGVG9+fHd3dHR3g5GQinp7iZuws6uqrsPb39K4k3RwgZGEalhCLzpRXFlVVE1IV3Z+eHh2cm91jJWNgnaBkKO2ubKtscXX1smsgm5xgYt3alQ3NEZbX1pdWE1MYXh1eXp3cGx8k5SFeHaJnK+9ua6rr8nUz8CaeG1vfoF2aUk5QVFcYGRgWFNSY21vfnx0a3OGk4x+eX6Yq7y+saupssvRxKyLcmdrfIJ3XUNDS1NebG1iXVdPXGdwfnxwbX2Gi4V+fY+rub64rKmtuMrJtZiAbWNugIBsVE1PS1VleHVmYVJGWGlzgX1tcn+Dg4OFh564vLi0qquyub+5oo15ZGNxfXVkWlhMSl1yhHpnXUc+W2t3hHtxdH1/gIuPka6/t7a1q6yytrGomIZtX2dzdGxoYllIU26Di3ZiUTpFY2t7gnlycXl+iJaXnrS6tbu7rautqKKbkX5mYGRrb3JvYlNNY36PhG9eQTpVZG9/fnxwbnqHlZ2cpLS2u8e7p6ShnJaUj3ZfXF1mdHlsX1ddcoiPfmhNOUheZnN7fXxucoOUoKCcpK68zcuvmZWVlZKWimdVV1tuf3hnY2Rte4uJcFlFQFRjZXB5gX1ze42eoJuaoLPO1sKgjIWLkJWUdVRRVF96gnNrbXJ2f4x+Y1RKTmJfYHB6h4F6h5uhmpSZpsjhzquNe3yMl5eJY0hMV26Fg3RydXh5gYRuXVZRWmNSXnGBj4WElaGZkI2dud7etZV9cX+Wl4xzTUZSZn+FgHx2en12fnpnX1hYX1JLaHuQlo2Sn5uPh5WzzeDInYZwbImZjHxbQkZcfoWDg317gnl1fHBlY11eVkFTcoiamJienJOHi6nF19mxinhoeJKNfGdJP092h3+Ih32AhHd3dW1tZF9dREJggJOaoqOckoiFoL3M1Mece2lrhIt9alE+SG2JgYKKhX6HhHlyam9uZWJQPk9wi5akrqeTiYOVtsfNybWHaGd5gnxqVUNFYoGBgIqIgoeNgHdsbHVvY1pGR2B7kp6vspyKgoytvcrKup5vYHZ6dG1XR0VZeX98h4mEjZWHfHBndHdrYVFHWWuCmKm5q5GDh6S5wcu8podkanRta11HRVRteHmFiIKNmpCFd2hteHFrXktVZnSNpLSynImHmrG9xL+nkHlna2pjXU5JVmZucX6IgYqemYt8cG50cW1rWlJgcX6asa+klI6bprfBu6yXinNhYmJZUExUYmVleIeEi5+ckoJ0cnNvbnFlWFdwf4mlqaCcmqGjrL65qZ2Tg2dWW1hOT1xiYVxofoOLoqKTh3l4eGxudG5jV2mCh5OgmZmkrains7WooJmNdFdRU05PYGZcWWFte4uiqJqMfXp/cWh0dm5dZoSLiY+Okae3squrqaKeoZd8X0xITFBfaV1SX2ZshJ+ropKEfYB5anB5dGdsgouIhYOIor67sqqgmZulo4VhUUZDTWNtX1BWYmN2mKmomo+CfH5yb3h4b3OBjoyBdnyavMa9rZqOlaWojmVRSEFHX3FkU1RcX2eJp6yfk4uAf3tudHdyfIaNjYNxb5K3yMq3loOLorCbcVZIP0NacGlYUVRbYnqcrJ6WlIaAg3RxdnaEi46Og3RohLDGz8KffHuZsqV8WEpCQlJrbF5UT1dgco6ioZmYjoGBfXd2eIiPjY+GdGh7pL7Py6iCdoqrqYZjTkZFTmZqX1dOUl1qhZqanZ2ShIWEf3d2iJWTkId1aHmbscPPtYh1gpqgjXBZSkpPXmdhXFFOWmZ8kpKaoJWKhIiIfniHl5aPiHhqeJKru8jAl3h9kZWMeWFPTVJdZFxYVE9YZXiGjJmclI+KiY+EeoeXmZGJeW59kqK0v7qkh3+JhoF6altUU1pfXFtXUVZidn+ClJySj42KlJGDhZGXlY19b36Wnaq3tqqThYR+dnRwZF1XWVxUVllVVmB1enuMlZKPi42Zm4yGj5eakYF2fJGhpayurJ2OhHZqaHBuZlxbXFNRV1hVXXyAdIKNkpSKi5afmo2Mk5uThHyAjp+kpaarppeIdWNcZXJwZmFcUUxRV1pbdIV7eYGNl4yNlpyhlY2PmZaHgoaPnKGhoaGopI53YlJZbnhvY19SRktVX2JrfoN4eIiUjYyXnaOcko6SlI2Lio+aoKCjoaOoln1iTE1ldnhsX1dFRFNiam1ygYF2gY6OjJKapaGWj4uRj5KTkZicnaKmpKiZf2VNSmBwdm5fX088SWFqcXF5gXl+iYiNkpiko52Wio2Pk5mWnJ6cmaCpq6GFZUxGWW91bF5eWEJDXGpxdHh/e3mEiIyOlaSnopWJjJGUnJudnp6ZmqivpoxoT0ZQZ3RtXVxaR0JYZ3J2dnt7e4GFjY2QoKanloOHkJadoKCfn5qYoq6ulm5QR0xhdW5dV1tPRVZib3t1eH15f4GJjo2ZpKueg4CMmJ6jpJ+fn5yfqbGgeFVISVlyc2RUUVJNWWJqeHV1gX56foaMjZOerKiLfYOToKKqpJudnqClqqWKYEdLVWhzaldITlddYWpzcnN8gX52f42OkJWiqJeDfoedp62onp+gn6GopJh2TUVOXXFyX0ZCUWBmb3Nsb3N+jXxwh5CQkpmhoox9foymtLCjoKCcoKuqoIRXRE9abHNiSD5LXmxycGtubnWKiHR6jZOOkJylm4R7hZuvt6+kpJuWoqurk2dKSFRoc2lPPkRYb3hxaWxqboKNfneBj5CIkaKkkHl8kJ+zwLOon5ScqK+kgFZITl1qa11HPU1ocnZwaWhoc4mJfX2Fj4mKnaiagHeJmKa/wq+dkZSjsbKXZ0lLWWVoZVZARGRtcHdrZmdmfI+FgX6Fi4uVpKKKen2OoLjHvaKRj5mpt66DVEZTXWNnYUxFWmlpd3BhY2RvhoiCgX6EjZSdopaFeYScs8THr5SLkaKwt6JvSkpTXWdmWExQX2hvdGZfY2Z1iIiJf3yImJ2cmpB+fJOtwcO4no2Jma21tpVeRktZYmFeWFRWYWltZlxeZGl9iIeCe4SQmZmXlYx/jKa8w7inlIWLprK2rX5TRlBjYmRoW1FZZm1nWVtjX2uAg4R/hJCVlJKTk4yIn7PCvqibi4aYr7m5n2xPTFhhY2xlVVVcYWRZV2RfW3SCgoSCjpaRi46VmY+UprjCspyQiomfuL+yilpMVFxpcm1ZTlpgXF1SWWFYZn1+gYePlo+LipGdoJWbrbq7pZGQi42rwr2hdFhRVGVzeGhOTl1WVlpUV1labX+BiI6UjoiIkZymo5mor7GsnI+LjZqyu7CRbldPYnV3dF5ITFNPVFdSVFRZdYaLko6LiomOm6arnqGno6qnm46HkaOyu62KZVRbcHx5aVVIRkhNVVNVVlJgfo2Wj4SLjo+WprKomp6ZpK+lloqIlae3vKp/WVtte3luYVBDPkBPVk5TUlBvjZSPg4aOkpmkrbOlkZOYp6yhkomHka3BuZ51XWZ4eHBsWEE9PkBTVExQUGCBkYyFiJGSlp+st7SSgY6frKufjYKGnrnCspd2aW90cm9jSjs6PUVSUklKV3GMjoOFlJiUna63spmAhpKiq6ibg3qQrL2/r5B7dGttcWxYQTU4Q0lLSU9WYnyLhoOPnZubrbu2n4J8h5Wor6WOeoOfsbi8r417dGtoaV5MPDdBRkRCTFtcZIKOiI6WmqCruLynj3x3iZuoq52GgJGlsLu+q4x9cmZeW1VJPD5GQUBHTFhhbYyRjJGUn6+2ua2XiXR4j56op5aIjpijtsG7pYdzZ15XUFBKQ0dCPUlLSVdlfpWRipCbq7S1r6aYf3J+k56ioZeXlpWov8K4n35nW1ZQT1NNQ0VDRU1JR1hxj56OipGcqrGyr6GEdneKmZmcoaOelZyxwMezjnFaUE9NV1hHQ0hFR0tHTmaCn5qMjJCcpa22ro57eIGRkpWgqKmelKO2x8Wie2NQR0xZXFFISU1MTEhLXHSWpZCJkI+XpK+znX98gYeKkKOuq6Wdm6u+xLeMaFRCRVVdV0xJTk5PTEhSZoeloYiLjYyXqLCljn2BgoGPpK6uqqWhobXCvqN0UkNCTVheVUhPU1NSSkxhgJujkoeJiY+dq6SXiYKAgImgsLKtq6qgqb7AsopXPDtIUldXTU1VVlhQRll7j5eYkIWEh42epZ2Qh359i56usa+ytKilsLu8oWY+MzxUV1FRTU5YXlxOU3SKjpCRh4SGhpCZoJqMg32ImquvsLe5sq6utr6mdUkzNEpSTU5RUFZgYFVXa4CIho+MhIN+hI6Zn5GNi4udqrGyt7q4t7e6wKl7UzY2Q0pIR0tTVVxgXWRscXt9hZGKfnZ4go2YlZGVkpuorLK3ur2+v8PCq4JXPT1BQkNGSU5UWGVua29raHN+iIqCdm97g4WPlJyjoKSrrbW5uLa9ysqthVdARklJSEZJTk9WY3V1c29hZ3J8gn18dHF6eICVqaugoKqwr7KzrrbMzbeLW0JKUlJOR0lQUVVmeIN9dGZgZ3B6enx5b3BydoytsqSiqLKzr6+prMTNwppfREVQW1hMTlFPUmJ1g4I="}, "flute": {"name": "FLUTE73A", "sr": 22050, "bits": 8, "unity": 73, "fine": 10, "lstart": 1948, "llen": 80, "b64": "gICAgICAgICAgICAgYCAgH+AgICAgH9+fn5/gICAgH+AgIGBgYKBgYB/f3+AgYB/f4CBgoKCgYGAgICAf39/fn1+f4CAf39/gIGCg4KCgYB/f3+AgH9+fH1+gIKCg4ODg4KBgIGBf35+fn9/f39/gICBgYODgoGAgICCg4KAfXx9foCBgYGAgYGBgYGBgH99fX19fX1+f39/gIGBgYGAgYGBgoOCgH17fH6AgoOEhYaHhoWDgoB9eXl8f39/fX1+fn+AgYKCgH9+gIOFhH97enx7e3yAg4WHiImHhYOCgH9+f359e3p5e31/goKAfn1+f4KEhoWBfXp6enx8foKHi42LiIeFhIB9fHx7eXl7fX5+foCAfn19foCDhoeDfnp7e3p3d3uBiY6PjoyMi4iDfnx7eHV1dnl6e3yAgYB9e3yAhomJhYB8fHl2dXZ5f4WMkJOUk5GMhoB9enl2dHV2eHl6fH59enl6foOIiYWAfn16dnJzdn6Hj5OXmZuYk4qCfnh1cW9wc3Z4e31+fXt6fICGiIaCf4B+enNvb3J7hY+Wm56em5aOh4F8dW5ra29zdnh6eXl4eHp/hYiIhYSEgXpybWxxeoONlZ2kpqSck4qBeHBqaGltcXV5e3t7enh5fYOHhoODg4J7cWtrc3yGjpagp6qnoJaMgXhuZ2RmaWxxdXh5eXl4en6DhoaFhoWBenFsa3F4gYuYpa6wrKOZj4R5bmVgYGRobXN2eHp6enp+goWFhYaGg3t0bm1xeIGMmqawsq6mnJGGeWxiXFxdYWhuc3h7e3t9gIWGhoaHh4N8dG9vc3mBjZyrtLSwqaCVh3lrX1dTVFpjaG1xeH1/gYWIiIiIiIaDfHZxcnZ7g4+erLW3tK2jl4h3Z1pRTU5UW2JqcXl+gIKHioqJiIiHhH95dXZ5f4aToq+2t7KtpJiHdWRWTEZGS1NdZnB5gYaJjI6Ni4mHhoJ9eXd5fYOKl6ayt7azr6aYhnJgUEM8PENOWWRwe4SJi46Qj4yKiIeEgX18fYGHkJyosra1tK+mmIZxXUs9NTU8R1RhbnqFi5CRkpCMiYiHhYKBgoWJjpagqrK1tbOupZWAalVCNS8xOkZUYnF/iY+Sk5KPi4iIiIaEhIaJjZKZo6yxtLOzr6SRe2ROOy4qLThGVWR0go2SlJSRjYmIiImIiIqMkJSZoKasr7GysKqdinRbRDMqKi87SVpreoePkpKQjYqHh4iKi4yOkpaZnKOpra+xsrCnl4FpUTsqIyYwP1BhcoKNk5SRjomGhIaIi42QlJmcnqGmqqyur6+soY95YEcyJCIpNkZYanuHkJORjIiEgoOGio2RlpqeoqOlqKyurq2sp5uIblI5Jx4hLT5QY3WEj5STj4iCfnx+hIqQlZqfpKamp6qtra2tq6SVf2RIMB8bIzJGWWx/jJSVkoqCfHp6foWMkpiepKipqKiqq6ysq6eejHVYPCcbHSo8UWR4iZSYlo6EenV0dn2Gj5edo6irq6qpqaqrq6mjl4RqTTIeFx8xR11xhJObm5SJfnVwcXV9h5CZoKWpq6uqqamqqqqnn5B6X0MqGRklO1Nqfo+boJuQgnZubG92gIuUnaSpq6upqKipqauqpZuKcVU4IRQXKUNdc4eXoaKajHxwaWhtdoGNl6Gnq6ysrKqqqqytqqWYhGpLLhgQGS5JYniMnKWjmIh5bGZmbXiEkJmjqq6urKqqq6yurqyklX5gQSQRDhw0UGqBlKOoo5WBcWVhZW56h5Oep62vrq2rq6yusLCsopB2VzcbCw0fOldxiJypq6KRfWxiYGRue4iUoKiur6+urKyusLKxrJ+Lb08uFAcNI0BdeJCirKufi3ZmXl5lcX6MmaOrr6+urKytr7KzsqudhmlHJg4FEClIZYCWqK+rm4VwYVtdZXKAjZqkrbGxr62trrGztLKqmoFhPx8JBRQvTmuFm6qwqZiBbF5ZXWZzgpCcpq2wr62srK+ytbazqZd8WzgZBgYYNVVxi6CtsKeTe2dbWF1odoWSn6iusK+tra2vsrW2sqaSdlUzFQUIHTpZdpClsbGkjnZiWFZeaniGlKCpr7CvraytsLS2trGkj3FPLREECiFAX3uUqLKwoIlxXlVWX2x6iJaiq6+wr62trrC0trawoYpsSyoPBQ4mRWSAmKuzrp2FbVtUVl9sfIuZpK2xsa6trK6xtLa1rp6GZ0UlDAQQKkpphZ2utKyZgGhYU1Zgbn6Nm6ausbGvrq2vsrW3taybgmNBIgsFEy1NbIifr7Sqln1lVlJWYXB/j52or7Kxr66vsLO1trSqmH5fPR8KBxUxUXCLorCzqJN5YlRRV2NxgZGfqbCysrCvr7GztbayqJV6WzsdCwkZNFRyjaOxsqaQdmBTUVhkc4KSoKqwsrKwsLCxs7W1saaSd1g5HQsLGzdXdY+ksLCjjXNeU1JZZXSEk6GrsbKysbCwsbO1tLCkj3VXOB0NDR46WXaQpLCvoYtyXVNSWmZ1hZShq7GysrCwsLGztbSvoo1zVTcdDg8gO1p3kaSvraCJcF1TU1tndoaVoquwsrKwsLCxs7SzraCMclQ3HhARIj1beJGkrqyeiHBdVFRcaHeGlaKrsLKxsLCwsbO0sqyfi3FUNx8REyM9W3iRo62rnYdwXlVVXWl3hpWiq6+xsbCwsLGztLKsnopwVDggExQkPlx4kQ=="}};
+var DLS_W1_BUFS = {};
+function getDlsBuf_DLS_W1(ctx, key) {
+  if (!ctx || !DLS_W1_DATA[key]) return null;
+  if (DLS_W1_BUFS[key]) return DLS_W1_BUFS[key];
+  var d = DLS_W1_DATA[key];
+  var bin = (typeof atob !== 'undefined') ? atob(d.b64) : '';
+  var len = bin.length;
+  if (len < 16) return null;
+  var buf = ctx.createBuffer(1, len, d.sr || 22050);
+  var ch = buf.getChannelData(0);
+  for (var i = 0; i < len; i++) ch[i] = (bin.charCodeAt(i) - 128.0) / 128.0;
+  var rootHz = 440.0 * Math.pow(2.0, ((d.unity || 60) - 69.0) / 12.0);
+  DLS_W1_BUFS[key] = {
+    buf: buf, sr: d.sr || 22050, rootHz: rootHz,
+    loopStart: (d.lstart || 0) / (d.sr || 22050),
+    loopEnd: ((d.lstart || 0) + (d.llen || 0)) / (d.sr || 22050),
+    hasLoop: (d.llen || 0) > 8
+  };
+  return DLS_W1_BUFS[key];
+}
+function playDlsNote_DLS_W1(ctx, dest, key, targetFreq, gainVal, durSec, attSec, slideFromRatio) {
+  var item = getDlsBuf_DLS_W1(ctx, key);
+  if (!item) return null;
+  var now = ctx.currentTime;
+  var src = ctx.createBufferSource();
+  src.buffer = item.buf;
+  if (item.hasLoop) {
+    src.loop = true;
+    src.loopStart = item.loopStart;
+    src.loopEnd = item.loopEnd;
+  }
+  var rate = Math.max(0.18, Math.min(4.0, targetFreq / item.rootHz));
+  if (slideFromRatio && slideFromRatio !== 1.0) {
+    src.playbackRate.setValueAtTime(rate * slideFromRatio, now);
+    src.playbackRate.exponentialRampToValueAtTime(rate, now + Math.min(0.14, durSec * 0.45));
+  } else {
+    src.playbackRate.setValueAtTime(rate, now);
+  }
+  var g = ctx.createGain();
+  var att = attSec || 0.010;
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.linearRampToValueAtTime(gainVal, now + att);
+  if (item.hasLoop) g.gain.setValueAtTime(gainVal * 0.82, now + Math.max(att + 0.01, durSec * 0.45));
+  g.gain.exponentialRampToValueAtTime(0.0002, now + durSec);
+  src.connect(g); g.connect(dest);
+  src.start(now); src.stop(now + durSec + 0.03);
+  return src;
+}
+
+function triggerCelestialVoice(freq, panVal, customRole) {
+  if (!audioCtx) return;
+  var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+  var bankKey = customRole || sys.timbreMode;
+  if (bankKey === sys.timbreMode && TRACK_STEMS[2].muted) return;
+
+  var now = audioCtx.currentTime;
+  var pan = audioCtx.createStereoPanner();
+  pan.pan.value = Math.max(-0.88, Math.min(0.88, panVal || 0));
+  var filt = audioCtx.createBiquadFilter();
+  filt.type = 'lowpass';
+  // 3D Globe Vertical Tilt (state.rotX) directly controls Filter Cutoff (600Hz .. 12000Hz)!
+  var tiltNorm = Math.max(0.0, Math.min(1.0, (state.rotX + 1.2) / 2.4));
+  filt.frequency.setValueAtTime(650 + tiltNorm * 9500, now);
+  filt.Q.value = 1.6;
+  filt.connect(pan); pan.connect(masterGain);
+
+  // Map role to pure single-note real instrument in DLS_W1
+  var dlsKeyMap = {
+    fmbell: 'fmbell',
+    harp: 'harp',
+    organ: 'organ',
+    cs80brass: 'cs80brass',
+    solararp: 'kalimba',
+    shimmer: 'flute',
+    choir: 'choir',
+    strings: 'strings'
+  };
+  var dKey = dlsKeyMap[bankKey] || (['harp','fmbell','organ','cs80brass','choir','kalimba','strings','flute'][state.sysIdx % 8]);
+  var dur = (dKey === 'organ' || dKey === 'choir' || dKey === 'strings') ? 0.95 : 0.65;
+  playDlsNote_DLS_W1(audioCtx, filt, dKey, freq, 0.44, dur, 0.012, 1.0);
+
+  // Layer synthesized celestial harmonic body from SAMPLE_BANK
+  var item = SAMPLE_BANK[bankKey] || SAMPLE_BANK['fmbell'];
+  if (item) {
+    var src = audioCtx.createBufferSource();
+    src.buffer = item.buf;
+    src.playbackRate.setValueAtTime(freq / item.baseFreq, now);
+    var g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.22, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    
+  }
+}
+
+// ============================================================================
+// STRICT VISUAL-TO-AUDIO CELESTIAL HARMONY TRACKER (Zero Random Ghost Notes!)
+// Notes are triggered ONLY when 3D Surface Stars or Orbiting Planets cross the
+// Prime Meridian Scanner Arc (or when the user clicks/interacts)!
+// ============================================================================
+var cosmicTick = 0;
+setInterval(() => {
+  if (!state.isPlaying || !audioCtx) return;
+  cosmicTick++;
+  var hasBodies = (SPHERE_NODES.length > 0 || MOONS.length > 0);
+  var now = audioCtx.currentTime;
+  if (!hasBodies) {
+    // 100% Silence when all stars and moons are cleared!
+    if (pulsarGain) pulsarGain.gain.setTargetAtTime(0.0001, now, 0.1);
+    nebulaGains.forEach(g => g.gain.setTargetAtTime(0.0001, now, 0.1));
+    return;
+  }
+  var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+  if (cosmicTick % 12 === 0) {
+    state.barIdx = (state.barIdx + 1) % 4;
+    var ch = sys.chords[state.barIdx];
+    if (pulsarOsc && !TRACK_STEMS[0].muted) pulsarOsc.frequency.setTargetAtTime(ch.sub, now, 0.4);
+    if (nebulaOscs.length === 5 && !TRACK_STEMS[1].muted) {
+      ch.nebula.forEach((nf, idx) => nebulaOscs[idx].frequency.setTargetAtTime(nf, now, 0.4));
+    }
+  }
+}, 400);
+function spawnMeteorShower() {
+  initAudio();
+  var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+  var ch = sys.chords[state.barIdx % 4];
+  for (var m = 0; m < 5; m++) {
+    SHOOTING_METEORS.push({
+      x: 0.15 + Math.random() * 0.70,
+      y: 0.08 + Math.random() * 0.25,
+      vx: (Math.random() - 0.5) * 0.016,
+      vy: 0.008 + Math.random() * 0.010,
+      col: ['#67e8f9', '#f7b2c4', '#fde047', '#c084fc', '#6ee7b7'][m % 5],
+      alpha: 1.0
+    });
+    setTimeout((idx) => {
+      triggerCelestialVoice(ch.stars[(idx * 2) % ch.stars.length], (idx / 2.5) - 0.8, 'fmbell');
+    }, m * 90, m);
+  }
+}
+
+function triggerSupernovaBurst() {
+  initAudio();
+  state.supernovaRing = 1.0;
+  state.energyPulse = 2.2;
+  state.barIdx = (state.barIdx + 1) % 4;
+  var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+  var ch = sys.chords[state.barIdx % 4];
+  if (pulsarOsc && audioCtx) pulsarOsc.frequency.setTargetAtTime(ch.sub, audioCtx.currentTime, 0.3);
+  if (nebulaOscs.length === 5 && audioCtx) {
+    ch.nebula.forEach((nf, i) => nebulaOscs[i].frequency.setTargetAtTime(nf, audioCtx.currentTime, 0.3));
+  }
+  ch.stars.forEach((sf, idx) => {
+    setTimeout(() => {
+      triggerCelestialVoice(sf, (idx / 4.0) - 0.9, idx % 2 === 0 ? sys.timbreMode : 'shimmer');
+    }, idx * 65);
+  });
+}
+
+function projectSpherePoint(lat, lon, radius, cx, cy) {
+  var aLon = lon + state.rotY;
+  var x0 = Math.cos(lat) * Math.sin(aLon) * radius;
+  var y0 = Math.sin(lat) * radius;
+  var z0 = Math.cos(lat) * Math.cos(aLon) * radius;
+  var cosX = Math.cos(state.rotX), sinX = Math.sin(state.rotX);
+  var y1 = y0 * cosX - z0 * sinX;
+  var z1 = y0 * sinX + z0 * cosX;
+  return { x: cx + x0, y: cy + y1, z: z1, normZ: z1 / radius };
+}
+
+var isDraggingSphere = false, dragStart = null, didRotateSphere = false;
+
+canvas.addEventListener('mousedown', (e) => {
+  initAudio();
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) / rect.width;
+  var my = (e.clientY - rect.top) / rect.height;
+  var w = canvas.width, h = canvas.height;
+
+  // Top Header System Switcher
+  if (my < 0.065) {
+    if (mx > 0.62) {
+      state.sysIdx = (state.sysIdx + 1) % CELESTIAL_SYSTEMS.length;
+      triggerSupernovaBurst();
+    }
+    return;
+  }
+
+  // Right-Side 5 Celestial System Medallions (Direct 1-Click Galaxy/Star Morphology & Timbre Switch!)
+  if (mx > 0.85 && my >= 0.16 && my <= 0.78) {
+    var sysClick = Math.max(0, Math.min(4, Math.floor(((my - 0.16) / 0.62) * 5)));
+    state.sysIdx = sysClick;
+    state.waveOrder = 3 + sysClick * 2;
+    var sysObj = CELESTIAL_SYSTEMS[sysClick % CELESTIAL_SYSTEMS.length];
+    var mTypes = ['ringed', 'comet', 'pulsar', 'galaxy', 'volcano'];
+    var mNames = ['🪐 冰环伴星', '☄️ 吸积彗星', '🌟 脉冲伴星', '🌀 日冕伴星', '💎 戴森伴星'];
+    var mCols = ['#93c5fd', '#fbbf24', '#c084fc', '#fb923c', '#6ee7b7'];
+    var newDist = 1.32 + (MOONS.length % 5) * 0.15;
+    MOONS.push({
+      name: mNames[sysClick],
+      dist: newDist, angle: Math.random() * Math.PI * 2,
+      speed: 0.018 * Math.pow(newDist, -1.5),
+      r: 9.5, color: mCols[sysClick], tilt: (sysClick - 2) * 0.22,
+      type: mTypes[sysClick], voice: sysObj.timbreMode, trail: []
+    });
+    if (MOONS.length > 10) MOONS.shift();
+    SPHERE_NODES.push({
+      lat: (sysClick - 2) * 0.32, lon: (Math.PI * 2 * sysClick) / 5,
+      color: mCols[sysClick], size: 1.35, voice: sysObj.timbreMode, pulse: 1.8
+    });
+    triggerSupernovaBurst();
+    return;
+  }
+
+  // Left-Side 4 Cosmic Stem Mixer Cards
+  if (mx < 0.18 && my >= 0.26 && my <= 0.68) {
+    var tIdx = Math.max(0, Math.min(3, Math.floor(((my - 0.26) / 0.42) * 4)));
+    TRACK_STEMS[tIdx].muted = !TRACK_STEMS[tIdx].muted;
+    if (tIdx === 0 && pulsarGain && audioCtx) pulsarGain.gain.setTargetAtTime(TRACK_STEMS[0].muted ? 0.0001 : 0.24, audioCtx.currentTime, 0.08);
+    if (tIdx === 1 && nebulaGain && audioCtx) nebulaGain.gain.setTargetAtTime(TRACK_STEMS[1].muted ? 0.0001 : 0.22, audioCtx.currentTime, 0.08);
+    if (typeof asToast === 'function') asToast('声部：' + TRACK_STEMS[tIdx].name + (TRACK_STEMS[tIdx].muted ? ' · 已静音' : ' · 已开启'));
+    return;
+  }
+
+  // Bottom Pill Bar
+  if (my > 0.90) {
+    for (var bp of BOTTOM_PILLS) {
+      if (Math.abs(mx - bp.x) < bp.w * 0.52) {
+        if (bp.id === 'play') {
+          state.isPlaying = !state.isPlaying;
+          bp.label = state.isPlaying ? '■ 星系运转中' : '▶ 已暂停';
+        } else if (bp.id === 'system') {
+          state.sysIdx = (state.sysIdx + 1) % CELESTIAL_SYSTEMS.length;
+          triggerSupernovaBurst();
+        } else if (bp.id === 'drop') {
+          triggerSupernovaBurst();
+        } else if (bp.id === 'meteor') {
+          spawnMeteorShower();
+        } else if (bp.id === 'clear') {
+          SPHERE_NODES = JSON.parse(JSON.stringify(DEFAULT_SPHERE_NODES));
+          TRACK_STEMS.forEach(t => t.muted = false);
+          triggerSupernovaBurst();
+        } else if (bp.id === 'upload') {
+          document.getElementById('upAudio1').click();
+        } else if (bp.id === 'wav') {
+          exportCurrentStateWAV('Astrasphere_GalaxySymphony', function(L, R, sr, N) {
+            var chs = CELESTIAL_SYSTEMS[state.sysIdx].chords;
+            for (var i = 0; i < N; i++) {
+              var t = i / sr, ch = chs[Math.floor(t / 2.0) % 4];
+              var fa = ch.stars[Math.floor(t * 3) % ch.stars.length];
+              var env = Math.exp(-((t * 3) % 1.0) * 2.2);
+              var fm = Math.sin(2*Math.PI*fa*t + Math.sin(2*Math.PI*fa*3.5*t)*env)*env*0.24 + Math.sin(2*Math.PI*ch.sub*t)*0.22;
+              L[i] = Math.tanh(fm); R[i] = Math.tanh(fm * 0.96);
+            }
+          });
+        } else if (bp.id === 'guide') {
+          toggleGuide(true);
+        }
+        return;
+      }
+    }
+    return;
+  }
+
+  if (e.button === 2) {
+    if (SPHERE_NODES.length > 2) SPHERE_NODES.pop();
+    return;
+  }
+
+  isDraggingSphere = true;
+  dragStart = { x: mx, y: my, px: mx * w, py: my * h };
+  didRotateSphere = false;
+  if (dopplerBowGain && audioCtx) {
+    dopplerBowGain.gain.setTargetAtTime(0.18, audioCtx.currentTime, 0.05);
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!isDraggingSphere || !dragStart) return;
+  var rect = canvas.getBoundingClientRect();
+  var mx = (e.clientX - rect.left) / rect.width;
+  var my = (e.clientY - rect.top) / rect.height;
+  var dx = mx - dragStart.x, dy = my - dragStart.y;
+  if (Math.hypot(dx, dy) > 0.008) {
+    didRotateSphere = true;
+    state.rotY += dx * 3.2;
+    state.rotX = Math.max(-0.78, Math.min(0.78, state.rotX + dy * 2.4));
+    dragStart.x = mx; dragStart.y = my;
+    if (nebulaFilter && dopplerBowOsc && audioCtx) {
+      var now = audioCtx.currentTime;
+      nebulaFilter.frequency.setTargetAtTime(450 + (1.0 - my) * 3800, now, 0.04);
+      dopplerBowOsc.frequency.setTargetAtTime(196.0 * Math.pow(2, (0.8 - my) * 1.5), now, 0.04);
+      dopplerBowFilter.frequency.setTargetAtTime(600 + mx * 3200, now, 0.04);
+    }
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  if (dopplerBowGain && audioCtx) {
+    dopplerBowGain.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.45);
+  }
+  if (isDraggingSphere && !didRotateSphere && dragStart) {
+    var w = canvas.width, h = canvas.height;
+    var cx = w * 0.54, cy = h * 0.47, spR = Math.min(w, h) * 0.235 * state.sphereRadiusScale;
+    var distFromCenter = Math.hypot(dragStart.px - cx, dragStart.py - cy);
+    if (distFromCenter <= spR * 1.12) {
+      // Plant a new Star Beacon AND morph 3D Spherical Harmonic Cymatic Wave Order!
+      state.waveOrder = 3 + ((state.waveOrder + 2) % 9);
+      state.energyPulse = 1.65;
+      var nx = Math.max(-0.92, Math.min(0.92, (dragStart.px - cx) / spR));
+      var ny = Math.max(-0.92, Math.min(0.92, (dragStart.py - cy) / spR));
+      var lat = Math.asin(ny);
+      var lon = (Math.atan2(nx, Math.sqrt(Math.max(0.05, 1.0 - nx*nx - ny*ny))) - state.rotY + Math.PI * 4) % (Math.PI * 2);
+      var cols = ['#93c5fd', '#f7b2c4', '#6ee7b7', '#fde047', '#c084fc'];
+      if (SPHERE_NODES.length >= 22) SPHERE_NODES.shift();
+      SPHERE_NODES.push({ lat: lat, lon: lon, color: cols[SPHERE_NODES.length % cols.length], size: 1.25, pulse: 1.8 });
+      var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+      var ch = sys.chords[state.barIdx % 4];
+      var baseIdx = Math.floor((1.0 - (ny + 1) * 0.5) * (ch.stars.length - 3));
+      // Play a lush 3-note celestial chord arpeggio with distinct roles!
+      [0, 2, 4].forEach((offset, k) => {
+        var fStar = ch.stars[(baseIdx + offset) % ch.stars.length];
+        setTimeout(() => {
+          triggerCelestialVoice(fStar, nx, k === 0 ? sys.timbreMode : (k === 1 ? 'shimmer' : 'fmbell'));
+        }, k * 55);
+      });
+      LASER_ARCS.push({ x: dragStart.px, y: dragStart.py, alpha: 1.0, col: cols[SPHERE_NODES.length % cols.length] });
+    } else {
+      // Clicking in orbital space spawns a new Orbiting Celestial Body (Planet / Comet / Pulsar / Mini-Galaxy) + Shooting Meteor!
+      var spawnTypes = [
+        { type: 'ringed',  name: '🪐 冰环巨伴星', color: '#93c5fd', r: 10.5, voice: 'fmbell' },
+        { type: 'comet',   name: '☄️ 极光双尾彗星', color: '#67e8f9', r: 8.5, voice: 'shimmer' },
+        { type: 'pulsar',  name: '🌟 相对论脉冲星', color: '#fde047', r: 9.5, voice: 'solararp' },
+        { type: 'galaxy',  name: '🌀 伴生旋臂星云', color: '#c084fc', r: 11.5, voice: 'cs80brass' },
+        { type: 'volcano', name: '🌋 熔岩超热行星', color: '#fb7185', r: 10.0, voice: 'organ' },
+        { type: 'voyager', name: '🛸 深空金唱片帆', color: '#6ee7b7', r: 9.0, voice: 'fmbell' }
+      ];
+      var st = spawnTypes[(state.spawnTypeIdx++) % spawnTypes.length];
+      var newDist = Math.max(1.18, Math.min(2.15, distFromCenter / spR));
+      var newAng = Math.atan2(dragStart.py - cy, dragStart.px - cx);
+      var newTilt = Math.max(-0.55, Math.min(0.55, (dragStart.y - 0.475) * 1.4));
+      if (MOONS.length >= 12) MOONS.shift();
+      MOONS.push({
+        type: st.type, name: st.name, dist: newDist, tilt: newTilt,
+        angle: newAng, speed: (MOONS.length % 2 === 0 ? 1 : -1) * (0.007 + (2.2 - newDist) * 0.008),
+        r: st.r, color: st.color, voice: st.voice, trail: []
+      });
+      SHOOTING_METEORS.push({
+        x: dragStart.x, y: dragStart.y,
+        vx: (0.54 - dragStart.x) * 0.025, vy: (0.47 - dragStart.y) * 0.025,
+        col: st.color, alpha: 1.0
+      });
+      var sys2 = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+      var ch2 = sys2.chords[state.barIdx % 4];
+      [0, 3, 5].forEach((off, idx) => {
+        setTimeout(() => {
+          triggerCelestialVoice(ch2.stars[(state.spawnTypeIdx + off) % ch2.stars.length], (dragStart.x - 0.5) * 1.6, st.voice);
+        }, idx * 60);
+      });
+    }
+  }
+  isDraggingSphere = false; dragStart = null;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault(); initAudio();
+  state.sphereRadiusScale = Math.max(0.75, Math.min(1.30, state.sphereRadiusScale + (e.deltaY < 0 ? 0.05 : -0.05)));
+}, { passive: false });
+
+function drawScene() {
+  var w = canvas.width, h = canvas.height, dpr = Math.min(w / 1200, h / 900);
+  ctx.clearRect(0, 0, w, h);
+  state.time += 0.018;
+  state.energyPulse *= 0.93;
+  if (state.isPlaying && !isDraggingSphere) {
+    state.rotY = (state.rotY + state.spinSpeed) % (Math.PI * 2);
+  }
+
+  var cx = w * 0.54, cy = h * 0.475;
+  var baseR = Math.min(w, h) * 0.23 * state.sphereRadiusScale;
+  var spR = baseR * (1.0 + state.energyPulse * 0.035);
+  var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
+
+  // 1. Background Swirling Spiral Galaxy Arms & Distant Nebula Clouds!
+  ctx.save();
+  // Distant Nebula Clouds
+  [
+    { x: w * 0.28, y: h * 0.28, r: w * 0.22, col: 'rgba(139, 92, 246, 0.11)' },
+    { x: w * 0.78, y: h * 0.65, r: w * 0.25, col: 'rgba(236, 72, 153, 0.09)' },
+    { x: w * 0.65, y: h * 0.22, r: w * 0.18, col: 'rgba(56, 189, 248, 0.10)' }
+  ].forEach(nb => {
+    var ng = ctx.createRadialGradient(nb.x, nb.y, 10 * dpr, nb.x, nb.y, nb.r);
+    ng.addColorStop(0, nb.col); ng.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = ng;
+    ctx.beginPath(); ctx.arc(nb.x, nb.y, nb.r, 0, Math.PI * 2); ctx.fill();
+  });
+
+  // Swirling Twin Spiral Galaxy Arms in Deep Space
+  GALAXY_STARS.forEach(gs => {
+    var a = gs.theta + state.time * 0.12;
+    var gx = cx + Math.cos(a) * gs.rad * w * 0.95;
+    var gy = cy + Math.sin(a) * gs.rad * h * 0.55;
+    ctx.fillStyle = gs.col;
+    ctx.globalAlpha = gs.alpha;
+    ctx.beginPath(); ctx.arc(gx, gy, gs.size * dpr, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1.0;
+  ctx.restore();
+
+  // 2. Render Morphable Central Celestial Megastructure (Saturn Rings / Black Hole Accretion Disk / Solar Flares / Dyson Sphere)!
+  ctx.save();
+  if (state.sysIdx === 0) {
+    // 🪐 SATURN ICE-RING BACK HALF
+    for (var rb = 0; rb < 3; rb++) {
+      ctx.strokeStyle = rb === 1 ? 'rgba(247, 178, 196, 0.42)' : 'rgba(147, 197, 253, 0.36)';
+      ctx.lineWidth = (14 - rb * 3) * dpr;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, spR * (1.42 + rb * 0.16), spR * (0.38 + rb * 0.05), -0.18, Math.PI, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (state.sysIdx === 1) {
+    // 🕳 GARGANTUA BLACK HOLE RELATIVISTIC ACCRETION DISK & POLAR JETS
+    var jetG = ctx.createLinearGradient(cx, cy - spR * 1.9, cx, cy + spR * 1.9);
+    jetG.addColorStop(0, 'rgba(192, 132, 252, 0)');
+    jetG.addColorStop(0.5, 'rgba(251, 191, 36, 0.55)');
+    jetG.addColorStop(1, 'rgba(192, 132, 252, 0)');
+    ctx.strokeStyle = jetG; ctx.lineWidth = 10 * dpr;
+    ctx.beginPath(); ctx.moveTo(cx, cy - spR * 1.9); ctx.lineTo(cx, cy + spR * 1.9); ctx.stroke();
+  } else if (state.sysIdx === 2) {
+    // 🌀 ANDROMEDA TWIN SPIRAL GALAXY ARMS & STARBURST HALO
+    for (var arm = 0; arm < 4; arm++) {
+      ctx.strokeStyle = arm % 2 === 0 ? 'rgba(192, 132, 252, 0.52)' : 'rgba(247, 178, 196, 0.48)';
+      ctx.lineWidth = 5 * dpr;
+      ctx.beginPath();
+      for (var stp = 0; stp <= 40; stp++) {
+        var u = stp / 40;
+        var a = u * Math.PI * 2.6 + (arm * Math.PI * 0.5) + state.time * 0.6;
+        var rx = cx + Math.cos(a) * spR * (0.3 + u * 1.45);
+        var ry = cy + Math.sin(a) * spR * (0.3 + u * 1.45) * 0.58;
+        if (stp === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
+      }
+      ctx.stroke();
+    }
+  } else if (state.sysIdx === 3) {
+    // ☀️ CORONAL FLARE SUPERGIANT PROMINENCE LOOPS
+    for (var fl = 0; fl < 14; fl++) {
+      var fang = (fl / 14) * Math.PI * 2 + state.time * 0.5;
+      var fx = cx + Math.cos(fang) * spR * 1.18;
+      var fy = cy + Math.sin(fang) * spR * 1.18;
+      ctx.strokeStyle = 'rgba(251, 146, 60, 0.62)';
+      ctx.lineWidth = 3.2 * dpr;
+      ctx.beginPath(); ctx.arc(fx, fy, spR * 0.25, fang - 0.85, fang + 0.85); ctx.stroke();
+    }
+  } else if (state.sysIdx === 4) {
+    // 💎 DYSON SPHERE QUANTUM HEX-MEGASTRUCTURE RINGS
+    for (var dr = 0; dr < 3; dr++) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(state.time * (dr % 2 === 0 ? 0.35 : -0.35) + dr * 0.8);
+      ctx.strokeStyle = 'rgba(110, 231, 183, 0.55)';
+      ctx.lineWidth = 2.4 * dpr;
+      ctx.beginPath();
+      for (var hk = 0; hk < 8; hk++) {
+        var ha = (hk / 8) * Math.PI * 2;
+        var hx = Math.cos(ha) * spR * (1.22 + dr * 0.14);
+        var hy = Math.sin(ha) * spR * (0.55 + dr * 0.12);
+        if (hk === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath(); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Central Planet / Star Atmosphere & Body
+  var atmoGrad = ctx.createRadialGradient(cx - spR * 0.2, cy - spR * 0.2, spR * 0.15, cx, cy, spR * 1.55);
+  if (state.sysIdx === 1) {
+    atmoGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.98)');
+    atmoGrad.addColorStop(0.55, 'rgba(251, 191, 36, 0.65)');
+    atmoGrad.addColorStop(0.75, 'rgba(234, 88, 12, 0.28)');
+    atmoGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  } else if (state.sysIdx === 3) {
+    atmoGrad.addColorStop(0.0, 'rgba(254, 240, 138, 0.55)');
+    atmoGrad.addColorStop(0.5, 'rgba(249, 115, 22, 0.38)');
+    atmoGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  } else {
+    atmoGrad.addColorStop(0.0, 'rgba(147, 197, 253, 0.34)');
+    atmoGrad.addColorStop(0.45, 'rgba(99, 102, 241, 0.25)');
+    atmoGrad.addColorStop(0.72, 'rgba(247, 178, 196, 0.18)');
+    atmoGrad.addColorStop(1.0, 'rgba(15, 23, 42, 0.0)');
+  }
+  ctx.fillStyle = atmoGrad;
+  ctx.beginPath(); ctx.arc(cx, cy, spR * 1.55, 0, Math.PI * 2); ctx.fill();
+
+  var bodyGrad = ctx.createRadialGradient(cx - spR * 0.32, cy - spR * 0.32, spR * 0.05, cx, cy, spR);
+  if (state.sysIdx === 0) {
+    // Saturn Golden-Cyan Banded Ice Giant
+    bodyGrad.addColorStop(0.0, 'rgba(254, 243, 199, 0.78)');
+    bodyGrad.addColorStop(0.38, 'rgba(245, 158, 11, 0.45)');
+    bodyGrad.addColorStop(0.72, 'rgba(56, 189, 248, 0.42)');
+    bodyGrad.addColorStop(1.0, 'rgba(147, 197, 253, 0.65)');
+  } else if (state.sysIdx === 1) {
+    // Gargantua Black Hole Event Horizon
+    bodyGrad.addColorStop(0.0, '#000000');
+    bodyGrad.addColorStop(0.80, '#05050a');
+    bodyGrad.addColorStop(1.0, '#fbbf24');
+  } else if (state.sysIdx === 2) {
+    // Andromeda Magenta-Violet Galactic Bulge
+    bodyGrad.addColorStop(0.0, 'rgba(253, 244, 255, 0.85)');
+    bodyGrad.addColorStop(0.35, 'rgba(232, 121, 249, 0.52)');
+    bodyGrad.addColorStop(0.75, 'rgba(107, 33, 168, 0.62)');
+    bodyGrad.addColorStop(1.0, 'rgba(192, 132, 252, 0.65)');
+  } else if (state.sysIdx === 3) {
+    // Betelgeuse Blazing Solar Flare Supergiant
+    bodyGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.92)');
+    bodyGrad.addColorStop(0.32, 'rgba(253, 224, 71, 0.75)');
+    bodyGrad.addColorStop(0.70, 'rgba(234, 88, 12, 0.68)');
+    bodyGrad.addColorStop(1.0, 'rgba(185, 28, 28, 0.78)');
+  } else {
+    // Dyson Sphere Quantum Emerald-Cyan Core
+    bodyGrad.addColorStop(0.0, 'rgba(236, 253, 245, 0.82)');
+    bodyGrad.addColorStop(0.38, 'rgba(52, 211, 153, 0.48)');
+    bodyGrad.addColorStop(0.75, 'rgba(6, 95, 70, 0.65)');
+    bodyGrad.addColorStop(1.0, 'rgba(110, 231, 183, 0.68)');
+  }
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.fill();
+
+  // Volume: terminator + cloud bands + specular highlight (skip black hole / sun)
+  if (state.sysIdx === 0 || state.sysIdx === 2 || state.sysIdx === 4) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.clip();
+
+    var term = ctx.createLinearGradient(cx - spR, cy - spR, cx + spR, cy + spR);
+    term.addColorStop(0.0, 'rgba(255,255,255,0)');
+    term.addColorStop(0.55, 'rgba(2,6,23,0.08)');
+    term.addColorStop(1.0, 'rgba(2,6,23,0.62)');
+    ctx.fillStyle = term; ctx.fillRect(cx - spR, cy - spR, spR * 2, spR * 2);
+
+    for (var bi = 0; bi < 5; bi++) {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - spR * 0.42 + bi * spR * 0.20, spR * (0.90 - bi * 0.045), spR * 0.055, -0.12 + bi * 0.03, 0, Math.PI * 2);
+      ctx.fillStyle = (bi % 2 === 0) ? 'rgba(255,255,255,0.075)' : 'rgba(147,197,253,0.06)';
+      ctx.fill();
+    }
+
+    var spec = ctx.createRadialGradient(cx - spR * 0.38, cy - spR * 0.42, 0, cx - spR * 0.38, cy - spR * 0.42, spR * 0.55);
+    spec.addColorStop(0, 'rgba(255,255,255,0.30)');
+    spec.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = spec; ctx.fillRect(cx - spR, cy - spR, spR * 2, spR * 2);
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = state.sysIdx === 1 ? '#fde047' : 'rgba(224, 242, 254, 0.82)';
+  ctx.lineWidth = (2.0 + state.energyPulse * 1.2) * dpr;
+  ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.stroke();
+
+  // Aurora rim — a soft, animated curtain over the upper limb
+  if (state.sysIdx !== 1) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var ai = 0; ai < 2; ai++) {
+      var aurora = ctx.createLinearGradient(cx - spR, cy, cx + spR, cy);
+      aurora.addColorStop(0, 'rgba(125, 211, 252, 0)');
+      aurora.addColorStop(0.45, ai === 0 ? 'rgba(125, 211, 252, 0.30)' : 'rgba(247, 178, 196, 0.26)');
+      aurora.addColorStop(1, 'rgba(125, 211, 252, 0)');
+      ctx.strokeStyle = aurora;
+      ctx.lineWidth = (5.5 - ai * 1.5) * dpr;
+      ctx.shadowColor = ai === 0 ? '#7dd3fc' : '#f7b2c4';
+      ctx.shadowBlur = 18 * dpr;
+      ctx.beginPath();
+      ctx.arc(cx, cy, spR * (1.02 + ai * 0.035), Math.PI * (1.03 + Math.sin(state.time * 0.5 + ai) * 0.02), Math.PI * 1.94);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // 3D Geodesic Latitude & Longitude Harmonic Mesh
+  ctx.save();
+  var numLat = 9, numLon = 16;
+  for (var li = 1; li < numLat; li++) {
+    var lat = ((li / numLat) - 0.5) * Math.PI;
+    ctx.beginPath();
+    var first = true;
+    for (var s = 0; s <= 64; s++) {
+      var lon = (s / 64) * Math.PI * 2;
+      var waveR = spR * (1.0 + Math.sin(lon * (state.waveOrder || 6) + state.time * 4 + li) * (0.022 + 0.025 * state.energyPulse));
+      var pt = projectSpherePoint(lat, lon, waveR, cx, cy);
+      if (pt.z >= -spR * 0.15) {
+        if (first) { ctx.moveTo(pt.x, pt.y); first = false; } else ctx.lineTo(pt.x, pt.y);
+      } else first = true;
+    }
+    ctx.strokeStyle = li === Math.floor(numLat / 2) ? 'rgba(247, 178, 196, 0.50)' : 'rgba(186, 230, 253, 0.18)';
+    ctx.lineWidth = (li === Math.floor(numLat / 2) ? 1.5 : 0.85) * dpr;
+    ctx.stroke();
+  }
+  for (var mi = 0; mi < numLon; mi++) {
+    var lon = (mi / numLon) * Math.PI * 2;
+    ctx.beginPath();
+    var first = true;
+    for (var s = 0; s <= 48; s++) {
+      var lat = ((s / 48) - 0.5) * Math.PI;
+      var pt = projectSpherePoint(lat, lon, spR, cx, cy);
+      if (pt.z >= 0) {
+        if (first) { ctx.moveTo(pt.x, pt.y); first = false; } else ctx.lineTo(pt.x, pt.y);
+      } else first = true;
+    }
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.16)';
+    ctx.lineWidth = 0.8 * dpr;
+    ctx.stroke();
+  }
+
+  // Front Half of Saturn Ice Rings / Black Hole Accretion Disk!
+  if (state.sysIdx === 0 || state.sysIdx === 1) {
+    for (var rf = 0; rf < 3; rf++) {
+      ctx.strokeStyle = state.sysIdx === 1 ? 'rgba(251, 191, 36, 0.75)' : (rf === 1 ? 'rgba(247, 178, 196, 0.68)' : 'rgba(186, 230, 253, 0.62)');
+      ctx.lineWidth = (14 - rf * 3) * dpr;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, spR * (1.42 + rf * 0.16), spR * (0.38 + rf * 0.05), -0.18, 0, Math.PI);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Prime Meridian Starlight Scanner Beam
+  ctx.save();
+  var beamGrad = ctx.createLinearGradient(cx, cy - spR * 1.25, cx, cy + spR * 1.25);
+  beamGrad.addColorStop(0, 'rgba(253, 224, 71, 0.0)');
+  beamGrad.addColorStop(0.5, 'rgba(253, 224, 71, 0.85)');
+  beamGrad.addColorStop(1, 'rgba(253, 224, 71, 0.0)');
+  ctx.strokeStyle = beamGrad; ctx.lineWidth = 2.4 * dpr;
+  ctx.beginPath(); ctx.moveTo(cx, cy - spR * 1.25); ctx.lineTo(cx, cy + spR * 1.25); ctx.stroke();
+  ctx.restore();
+
+  // Surface Star Beacons
+  ctx.save();
+  var ch = sys.chords[state.barIdx % 4];
+  // Draw 3D Constellation Lines connecting planted Surface Stars (点击球面连续连线成星座)!
+  if (SPHERE_NODES.length > 1) {
+    for (var ci = 0; ci < SPHERE_NODES.length - 1; ci++) {
+      var nA = SPHERE_NODES[ci], nB = SPHERE_NODES[ci + 1];
+      var pA = projectSpherePoint(nA.lat, nA.lon, spR, cx, cy);
+      var pB = projectSpherePoint(nB.lat, nB.lon, spR, cx, cy);
+      if (pA.z > -spR * 0.15 && pB.z > -spR * 0.15) {
+        ctx.strokeStyle = nB.color || '#fde047';
+        ctx.globalAlpha = (pA.z >= 0 && pB.z >= 0) ? 0.55 : 0.18;
+        ctx.lineWidth = (1.4 + Math.max(nA.pulse || 0, nB.pulse || 0) * 1.2) * dpr;
+        ctx.beginPath(); ctx.moveTo(pA.x, pA.y); ctx.lineTo(pB.x, pB.y); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1.0;
+  }
+  SPHERE_NODES.forEach((nd, idx) => {
+    nd.pulse *= 0.92;
+    var oldLon = (nd.lon + state.rotY - state.spinSpeed + Math.PI * 4) % (Math.PI * 2);
+    var curLon = (nd.lon + state.rotY + Math.PI * 4) % (Math.PI * 2);
+    if (state.isPlaying && oldLon > 5.8 && curLon < 0.5) {
+      nd.pulse = 1.6;
+      state.energyPulse = 1.1;
+      var ptHit = projectSpherePoint(nd.lat, nd.lon, spR, cx, cy);
+      // Strict Latitude -> Musical Scale Degree Mapping (North Pole -pi/2 = High, South Pole +pi/2 = Low)
+      var latNorm = Math.max(0.0, Math.min(1.0, 0.5 - (nd.lat / Math.PI)));
+      var degIdx = Math.round(latNorm * (ch.stars.length - 1));
+      var fStar = ch.stars[Math.max(0, Math.min(ch.stars.length - 1, degIdx))];
+      triggerCelestialVoice(fStar, (ptHit.x - cx) / spR, nd.voice || sys.timbreMode);
+      LASER_ARCS.push({ x: ptHit.x, y: ptHit.y, alpha: 0.9, col: nd.color });
+    }
+    var pt = projectSpherePoint(nd.lat, nd.lon, spR, cx, cy);
+    if (pt.z > -spR * 0.2) {
+      ctx.globalAlpha = pt.z >= 0 ? 1.0 : 0.25;
+      ctx.shadowColor = nd.color; ctx.shadowBlur = (10 + nd.pulse * 14) * dpr;
+      ctx.strokeStyle = nd.color; ctx.lineWidth = 1.6 * dpr;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, (7 + nd.pulse * 6) * dpr, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, 4.2 * dpr, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = 'transparent';
+    }
+  });
+  ctx.restore();
+
+  // 6 Distinct Orbiting Celestial Bodies (Ringed Exoplanet, Halley Comet, Binary Pulsar, Voyager, Volcanic Moon, Cluster)
+  ctx.save();
+  MOONS.forEach((m) => {
+    var oldMA = m.angle;
+    if (state.isPlaying) m.angle = (m.angle + m.speed + Math.PI * 2) % (Math.PI * 2);
+    // Trigger Keplerian Satellite Note strictly when crossing Front Prime Meridian (angle = PI/2)!
+    if (state.isPlaying && !TRACK_STEMS[3].muted && oldMA < Math.PI * 0.5 && m.angle >= Math.PI * 0.5) {
+      var distNorm = Math.max(0.0, Math.min(1.0, (2.15 - (m.dist || 1.4)) / 0.95));
+      var mDeg = Math.round(distNorm * (ch.stars.length - 1));
+      var fMoon = ch.stars[Math.max(0, Math.min(ch.stars.length - 1, mDeg))];
+      triggerCelestialVoice(fMoon, Math.sin(m.tilt || 0) * 0.75, m.voice || 'harp');
+      LASER_ARCS.push({ x: cx, y: cy + Math.sin(m.angle) * (spR * m.dist) * Math.sin(state.rotX + m.tilt), alpha: 0.95, col: m.color });
+    }
+    var orbR = spR * m.dist;
+    ctx.strokeStyle = m.color; ctx.globalAlpha = 0.24; ctx.lineWidth = 1.0 * dpr;
+    ctx.beginPath();
+    for (var s = 0; s <= 64; s++) {
+      var a = (s / 64) * Math.PI * 2;
+      var mx0 = cx + Math.cos(a) * orbR;
+      var my0 = cy + Math.sin(a) * orbR * Math.sin(state.rotX + m.tilt);
+      if (s === 0) ctx.moveTo(mx0, my0); else ctx.lineTo(mx0, my0);
+    }
+    ctx.stroke();
+
+    var mxP = cx + Math.cos(m.angle) * orbR;
+    var myP = cy + Math.sin(m.angle) * orbR * Math.sin(state.rotX + m.tilt);
+    m.trail.push({ x: mxP, y: myP });
+    if (m.trail.length > 20) m.trail.shift();
+
+    ctx.beginPath();
+    m.trail.forEach((tp, ti) => { if (ti === 0) ctx.moveTo(tp.x, tp.y); else ctx.lineTo(tp.x, tp.y); });
+    ctx.strokeStyle = m.color; ctx.globalAlpha = 0.68; ctx.lineWidth = (m.type === 'comet' ? 4.2 : 2.2) * dpr;
+    ctx.stroke();
+
+    ctx.globalAlpha = 1.0;
+    ctx.shadowColor = m.color; ctx.shadowBlur = 14 * dpr;
+    var mGrad = ctx.createRadialGradient(mxP - 3*dpr, myP - 3*dpr, 1*dpr, mxP, myP, m.r * dpr);
+    mGrad.addColorStop(0, '#ffffff'); mGrad.addColorStop(0.5, m.color); mGrad.addColorStop(1, '#0f172a');
+    ctx.fillStyle = mGrad;
+    ctx.beginPath(); ctx.arc(mxP, myP, m.r * dpr, 0, Math.PI * 2); ctx.fill();
+
+    // Special Visual Details per Celestial Body Type!
+    if (m.type === 'ringed') {
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.8 * dpr;
+      ctx.beginPath(); ctx.ellipse(mxP, myP, m.r * 1.9 * dpr, m.r * 0.55 * dpr, 0.3, 0, Math.PI * 2); ctx.stroke();
+    } else if (m.type === 'pulsar') {
+      var bAng = state.time * 6.0;
+      ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2.0 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(mxP - Math.cos(bAng) * 24 * dpr, myP - Math.sin(bAng) * 24 * dpr);
+      ctx.lineTo(mxP + Math.cos(bAng) * 24 * dpr, myP + Math.sin(bAng) * 24 * dpr);
+      ctx.stroke();
+    } else if (m.type === 'earth') {
+      // Polar Emerald Aurora Ring & Continental Cloud Band
+      ctx.strokeStyle = '#6ee7b7'; ctx.lineWidth = 1.6 * dpr;
+      ctx.beginPath(); ctx.ellipse(mxP, myP - m.r * 0.55 * dpr, m.r * 0.85 * dpr, m.r * 0.28 * dpr, 0, 0, Math.PI * 2); ctx.stroke();
+    } else if (m.type === 'volcano') {
+      // Erupting Magma Plume & Lava Fissures
+      ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.8 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(mxP - m.r * 0.5 * dpr, myP); ctx.lineTo(mxP + m.r * 0.5 * dpr, myP - m.r * 0.4 * dpr);
+      ctx.moveTo(mxP, myP - m.r * dpr); ctx.lineTo(mxP + Math.sin(state.time * 8) * 6 * dpr, myP - m.r * 1.65 * dpr);
+      ctx.stroke();
+    } else if (m.type === 'comet') {
+      // Dual Ion (Cyan) & Dust (Gold) Tails
+      ctx.strokeStyle = 'rgba(253, 224, 71, 0.55)'; ctx.lineWidth = 2.4 * dpr;
+      ctx.beginPath(); ctx.moveTo(mxP, myP); ctx.lineTo(mxP - Math.cos(m.angle) * 26 * dpr, myP - Math.sin(m.angle) * 26 * dpr); ctx.stroke();
+    } else if (m.type === 'galaxy') {
+      ctx.strokeStyle = '#e9d5ff'; ctx.lineWidth = 1.6 * dpr;
+      for (var ga = 0; ga < 2; ga++) {
+        ctx.beginPath();
+        ctx.arc(mxP, myP, m.r * 1.55 * dpr, state.time * 3 + ga * Math.PI, state.time * 3 + ga * Math.PI + 1.8);
+        ctx.stroke();
+      }
+    } else if (m.type === 'voyager') {
+      ctx.strokeStyle = '#fde047'; ctx.lineWidth = 1.6 * dpr;
+      ctx.strokeRect(mxP - m.r * 1.45 * dpr, myP - m.r * 0.35 * dpr, m.r * 2.9 * dpr, m.r * 0.7 * dpr);
+    }
+    ctx.shadowColor = 'transparent';
+
+    if (m.name && mxP > w * 0.24 && mxP < w * 0.78 && Math.hypot(mxP - cx, myP - cy) > spR * 1.22) {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = `700 ${7.4 * dpr}px sans-serif`;
+      ctx.fillText(m.name, mxP + (m.r + 5) * dpr, myP + 3 * dpr);
+    }
+  });
+  ctx.restore();
+
+  // Shooting Meteors & Supernova Shockwave
+  ctx.save();
+  for (var mi = SHOOTING_METEORS.length - 1; mi >= 0; mi--) {
+    var mt = SHOOTING_METEORS[mi];
+    mt.x += mt.vx; mt.y += mt.vy; mt.alpha *= 0.96;
+    if (mt.alpha < 0.05) { SHOOTING_METEORS.splice(mi, 1); continue; }
+    ctx.strokeStyle = mt.col; ctx.globalAlpha = mt.alpha; ctx.lineWidth = 3.0 * dpr;
+    ctx.beginPath(); ctx.moveTo(mt.x * w, mt.y * h); ctx.lineTo((mt.x - mt.vx * 4) * w, (mt.y - mt.vy * 4) * h); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(mt.x * w, mt.y * h, 3.5 * dpr, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1.0;
+
+  if (state.supernovaRing > 0.02) {
+    ctx.strokeStyle = `rgba(247, 178, 196, ${state.supernovaRing})`;
+    ctx.lineWidth = 3.5 * dpr;
+    ctx.beginPath(); ctx.arc(cx, cy, spR * (1.0 + (1.0 - state.supernovaRing) * 0.9), 0, Math.PI * 2); ctx.stroke();
+    state.supernovaRing *= 0.91;
+  }
+  for (var i = LASER_ARCS.length - 1; i >= 0; i--) {
+    var la = LASER_ARCS[i];
+    la.alpha *= 0.88;
+    if (la.alpha < 0.04) { LASER_ARCS.splice(i, 1); continue; }
+    ctx.strokeStyle = la.col; ctx.globalAlpha = la.alpha; ctx.lineWidth = 2.0 * dpr;
+    ctx.beginPath(); ctx.moveTo(la.x, la.y); ctx.lineTo(cx, cy); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Left-Side 4 Cosmic Stem Mixer Cards
+  ctx.save();
+  ctx.fillStyle = '#94a3b8'; ctx.font = `700 ${8.5 * dpr}px sans-serif`;
+  ctx.fillText('声部开关 · 点击静音 / 开启', 22 * dpr, 0.25 * h);
+  TRACK_STEMS.forEach((ts, idx) => {
+    var cardX = 22 * dpr, cardY = (0.275 + idx * 0.098) * h, cardW = 190 * dpr, cardH = 46 * dpr;
+    ctx.fillStyle = ts.muted ? 'rgba(15, 20, 32, 0.45)' : 'rgba(18, 26, 48, 0.88)';
+    ctx.strokeStyle = ts.muted ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1.2 * dpr;
+    ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 8 * dpr); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = ts.muted ? '#475569' : ts.hex;
+    ctx.fillRect(cardX, cardY, 4 * dpr, cardH);
+
+    ctx.fillStyle = ts.muted ? '#64748b' : ts.hex;
+    ctx.beginPath(); ctx.arc(cardX + 20 * dpr, cardY + cardH * 0.5, 4.5 * dpr, 0, Math.PI * 2); ctx.fill();
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = ts.muted ? '#64748b' : '#86efac';
+    ctx.font = `800 ${7 * dpr}px monospace`;
+    ctx.fillText(ts.muted ? 'OFF' : 'ON', cardX + cardW - 10 * dpr, cardY + 16 * dpr);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = ts.muted ? '#64748b' : '#f8fafc';
+    ctx.font = `800 ${10.5 * dpr}px sans-serif`;
+    ctx.fillText(ts.name, cardX + 32 * dpr, cardY + 19 * dpr);
+    ctx.fillStyle = ts.muted ? '#475569' : '#94a3b8';
+    ctx.font = `700 ${8 * dpr}px monospace`;
+    ctx.fillText(ts.muted ? 'MUTE · 点击开启' : ts.sub, cardX + 32 * dpr, cardY + 34 * dpr);
+  });
+  ctx.restore();
+
+  // Right-Side 5 Custom-Illustrated Celestial System Medallions!
+  ctx.save();
+  var sysIcons = [
+    { name: '土星冰环', sub: 'DX7 BELL', col: '#93c5fd' },
+    { name: '黑洞吸积', sub: 'PIPE ORGAN', col: '#fbbf24' },
+    { name: '仙女星系', sub: 'CS80 BRASS', col: '#c084fc' },
+    { name: '日冕耀斑', sub: 'SOLAR ARP', col: '#fb923c' },
+    { name: '戴森母星', sub: 'SHIMMER PAD', col: '#6ee7b7' }
+  ];
+  sysIcons.forEach((si, idx) => {
+    var rx = w * 0.915, ry = h * (0.21 + idx * 0.122), rr = (state.sysIdx === idx ? 22 : 19) * dpr;
+    var isSel = (state.sysIdx === idx);
+    ctx.fillStyle = isSel ? 'rgba(30, 41, 59, 0.95)' : 'rgba(15, 23, 42, 0.75)';
+    ctx.strokeStyle = isSel ? si.col : 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = (isSel ? 2.8 : 1.5) * dpr;
+    ctx.beginPath(); ctx.arc(rx, ry, rr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // Custom miniature celestial icon inside each medallion!
+    ctx.save();
+    ctx.translate(rx, ry);
+    ctx.strokeStyle = si.col; ctx.fillStyle = si.col; ctx.lineWidth = 1.6 * dpr;
+    if (idx === 0) {
+      // Saturn with tilted ice ring
+      ctx.beginPath(); ctx.arc(0, 0, rr * 0.36, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 0, rr * 0.72, rr * 0.24, -0.25, 0, Math.PI * 2); ctx.stroke();
+    } else if (idx === 1) {
+      // Black hole with accretion disk & polar jet
+      ctx.beginPath(); ctx.ellipse(0, 0, rr * 0.68, rr * 0.22, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -rr * 0.65); ctx.lineTo(0, rr * 0.65); ctx.stroke();
+      ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, rr * 0.28, 0, Math.PI * 2); ctx.fill();
+    } else if (idx === 2) {
+      // Andromeda double spiral arms
+      for (var a = 0; a < 2; a++) {
+        ctx.beginPath();
+        for (var k = 0; k <= 16; k++) {
+          var u = k / 16, th = u * Math.PI * 2.2 + a * Math.PI;
+          var px = Math.cos(th) * u * rr * 0.68, py = Math.sin(th) * u * rr * 0.48;
+          if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+    } else if (idx === 3) {
+      // Solar corona supergiant with prominence rays
+      ctx.beginPath(); ctx.arc(0, 0, rr * 0.38, 0, Math.PI * 2); ctx.fill();
+      for (var r = 0; r < 8; r++) {
+        var ra = (r / 8) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(Math.cos(ra)*rr*0.42, Math.sin(ra)*rr*0.42);
+        ctx.lineTo(Math.cos(ra)*rr*0.68, Math.sin(ra)*rr*0.68); ctx.stroke();
+      }
+    } else {
+      // Dyson sphere hexagonal geodesic cage
+      ctx.beginPath();
+      for (var h = 0; h < 6; h++) {
+        var ha = (h / 6) * Math.PI * 2;
+        var hx = Math.cos(ha) * rr * 0.62, hy = Math.sin(ha) * rr * 0.62;
+        if (h === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, rr * 0.24, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = isSel ? '#ffffff' : '#cbd5e1';
+    ctx.font = '800 ' + (8.2 * dpr) + 'px sans-serif';
+    ctx.fillText(si.name, rx, ry + rr + 11 * dpr);
+    ctx.fillStyle = si.col;
+    ctx.font = '700 ' + (6.2 * dpr) + 'px monospace';
+    ctx.fillText(si.sub, rx, ry + rr + 19 * dpr);
+  });
+  ctx.restore();
+
+    // Top Header Bar — Dynamic Width Measurement so Title & Subtitle NEVER Overlap!
+  ctx.save();
+  ctx.fillStyle = 'rgba(8, 12, 24, 0.90)';
+  ctx.fillRect(0, 0, w, h * 0.062);
+  ctx.strokeStyle = 'rgba(147, 197, 253, 0.20)';
+  ctx.beginPath(); ctx.moveTo(0, h * 0.062); ctx.lineTo(w, h * 0.062); ctx.stroke();
+
+  var mainTitle = 'ASTRASPHERE · 星籁';
+  ctx.fillStyle = '#ffffff'; ctx.font = `800 ${15.5 * dpr}px sans-serif`;
+  ctx.fillText(mainTitle, 20 * dpr, h * 0.037);
+  var titleW = ctx.measureText(mainTitle).width;
+
+  ctx.fillStyle = '#94a3b8'; ctx.font = `600 ${9.5 * dpr}px sans-serif`;
+  ctx.fillText('点击球面种星铃 · 拖拽星球多普勒变调 · 点底部切换5大天体形态', 20 * dpr + titleW + 16 * dpr, h * 0.037);
+
+  ctx.fillStyle = 'rgba(147, 197, 253, 0.15)';
+  ctx.strokeStyle = 'rgba(147, 197, 253, 0.50)';
+  ctx.beginPath(); ctx.roundRect(w * 0.67, h * 0.011, w * 0.315, h * 0.040, 999); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#e0f2fe'; ctx.font = `700 ${9.0 * dpr}px monospace`;
+  ctx.fillText(`${sys.name.split(' ')[0]} ${sys.name.split(' ')[1]} · ${ch.label} ▼`, w * 0.685, h * 0.036);
+
+  var barY = h * 0.935;
+  BOTTOM_PILLS.forEach(bp => {
+    var bx = (bp.x - bp.w * 0.48) * w, bw = bp.w * 0.96 * w, bh = 32 * dpr;
+    ctx.fillStyle = 'rgba(16, 23, 42, 0.86)';
+    ctx.strokeStyle = 'rgba(147, 197, 253, 0.30)';
+    ctx.lineWidth = 1.1 * dpr;
+    ctx.beginPath(); ctx.roundRect(bx, barY - bh * 0.5, bw, bh, 999); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f1f5f9'; ctx.textAlign = 'center';
+    ctx.font = `700 ${9.0 * dpr}px sans-serif`;
+    ctx.fillText(bp.label, bp.x * w, barY + 3.5 * dpr);
+  });
+  ctx.restore();
+
+  if (audioReactive && audioEnergy > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    var pulse = Math.min(1, audioEnergy * audioSensitivity * 1.8);
+    for (var ri = 0; ri < 3; ri++) {
+      ctx.strokeStyle = 'rgba(125, 211, 252, ' + (0.10 + pulse * 0.22 - ri * 0.03) + ')';
+      ctx.lineWidth = (2.2 - ri * 0.4) * dpr;
+      ctx.beginPath();
+      ctx.arc(cx, cy, spR * (1.45 + ri * 0.18 + pulse * 0.20), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function loop() {
+  var liveAnalyser = (userAudioBuffer && userAudioAnalyser) ? userAudioAnalyser : analyserNode;
+  if (audioReactive && liveAnalyser) {
+    var bins = new Uint8Array(liveAnalyser.frequencyBinCount);
+    liveAnalyser.getByteFrequencyData(bins);
+    var sum = 0, wsum = 0;
+    for (var bi = 0; bi < bins.length; bi++) { sum += bins[bi]; wsum += bins[bi] * bi; }
+    var e = (sum / bins.length) / 255;
+    audioEnergy = audioEnergy * 0.82 + e * 0.18;
+    var cent = sum > 0 ? (wsum / sum) / bins.length : 0;
+    audioCentroid = audioCentroid * 0.85 + cent * 0.15;
+    state.energyPulse = Math.max(state.energyPulse, audioEnergy * audioSensitivity * 1.9);
+    var st = document.getElementById('asStatus');
+    if (st) st.textContent = (userAudioBuffer ? '分析源 · 能量 ' : '音频反应 · 能量 ') + audioEnergy.toFixed(2);
+  }
+  drawScene(); requestAnimationFrame(loop);
+}
+
+function asToast(msg) {
+  var t = document.querySelector('.as-toast'); if (t) t.remove();
+  t = document.createElement('div'); t.className = 'as-toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add('on'); });
+  setTimeout(function(){ t.classList.remove('on'); setTimeout(function(){ t.remove(); }, 250); }, 1800);
+}
+function asBindBar() {
+  var bar = document.getElementById('asBar'); if (!bar) return;
+  bar.querySelectorAll('[data-as]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var a = btn.getAttribute('data-as');
+      if (a === 'load') { if (userAudioBuffer) stopUserAudio(); else { var u = document.getElementById('upAudio1'); if (u) u.click(); } }
+      else if (a === 'demo') {
+        var c = document.querySelector('canvas'); if (!c) return;
+        var r = c.getBoundingClientRect();
+        var pts = [[0.50,0.38],[0.60,0.46],[0.42,0.52],[0.55,0.62],[0.66,0.55]];
+        pts.forEach(function(p, i){ setTimeout(function(){
+          ['mousedown','mouseup'].forEach(function(t){ c.dispatchEvent(new MouseEvent(t,{clientX:r.left+r.width*p[0],clientY:r.top+r.height*p[1],bubbles:true,button:0})); });
+        }, i * 260); });
+        asToast('已生成一段 5 星星群');
+      }
+      else if (a === 'reactive') {
+        audioReactive = !audioReactive;
+        btn.textContent = audioReactive ? '音频反应 · 开' : '音频反应';
+        if (audioReactive) { audioCtx && audioCtx.resume && audioCtx.resume(); asToast('音频反应已开启：载入音频或让合成器驱动画面'); }
+        else { var st = document.getElementById('asStatus'); if (st) st.textContent = '生成模式'; }
+      }
+      else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
+    });
+  });
+  var sens = document.getElementById('asSens');
+  if (sens) sens.addEventListener('input', function(){ audioSensitivity = parseFloat(sens.value) || 1.0; });
+}
+
+window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); requestAnimationFrame(loop); asBindBar(); });
+</script>
+<script>
+
+(function(){
+  var cfg = {"title": "先让一颗星发声", "sub": "ASTRASPHERE · 星籁", "lede": "这不是播放器。星球自己转，只有星标跨过金色子午线时，声音才会响。", "steps": [["01", "点球面", "在球面上点一下，种下一颗星标"], ["02", "等它转到中线", "星标跨过金色子午线，才会触发声音"], ["03", "拖拽星球", "上下拖拽改变倾角与滤波器，左右拖拽改变转速"]], "note": "底部可载入音频，进入音频反应；灵敏度可调。建议戴耳机。 载入音频=分析源：画面只跟导入文件的能量，不再被生成合成器带偏；再点“卸载音频”回到生成模式。", "panel": "#0d1526", "ink": "#eaf2ff", "subc": "#9fb3d1", "accent": "#7dd3fc", "line": "#22304d", "dark": true, "shareTitle": "星籁 ASTRASPHERE", "shareSub": "天体引力合成器 · WEB AUDIO", "shareFile": "Astrasphere"};
+  var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
+  if(!modal) return;
+  var card = modal.querySelector('.guide-card') || modal.firstElementChild;
+  if(!card || card.querySelector('.pm-guide')) return;
+  var st = document.createElement('style');
+  st.textContent = `
+  .pm-card{max-width:720px!important;width:100%!important;background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+  .pm-guide{--pm-panel:${cfg.panel};--pm-ink:${cfg.ink};--pm-sub:${cfg.subc};--pm-accent:${cfg.accent};--pm-line:${cfg.line};
+    background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);border-radius:8px;
+    padding:32px 38px 28px;box-shadow:0 26px 80px rgba(0,0,0,.42);text-align:left;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",sans-serif}
+  .pm-kicker{font-size:11px;letter-spacing:.22em;font-weight:800;color:var(--pm-accent);margin-bottom:14px}
+  .pm-guide h2{font-family:"Songti SC","STSong",serif;font-size:34px;line-height:1.2;font-weight:700;margin:0 0 10px;color:var(--pm-ink)}
+  .pm-lede{font-size:14.5px;line-height:1.75;color:var(--pm-sub);margin:0 0 22px}
+  .pm-steps{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px}
+  .pm-steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
+  .pm-steps span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;font-weight:800;color:var(--pm-accent);padding-top:2px}
+  .pm-steps b{display:block;font-size:15.5px;font-weight:700;color:var(--pm-ink);margin-bottom:2px}
+  .pm-steps em{display:block;font-style:normal;font-size:13px;line-height:1.6;color:var(--pm-sub)}
+  .pm-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:4px 0 16px}
+  .pm-actions button{cursor:pointer;font-family:inherit;font-size:13.5px;font-weight:700;border-radius:4px;padding:11px 18px;transition:.18s;border:1px solid transparent}
+  .pm-primary{background:var(--pm-accent);color:#06121e}
+  .pm-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .pm-ghost{background:transparent;color:var(--pm-ink);border-color:var(--pm-line)}
+  .pm-ghost:hover{border-color:var(--pm-accent);color:var(--pm-accent)}
+  .pm-note{font-size:11.5px;line-height:1.7;color:var(--pm-sub);border-top:1px dashed var(--pm-line);padding-top:12px}
+  .pm-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:80;background:var(--pm-panel);color:var(--pm-ink);border:1px solid var(--pm-line);padding:9px 16px;border-radius:999px;font-size:12.5px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .3s;pointer-events:none;font-family:-apple-system,"PingFang SC",sans-serif}
+  .pm-toast.on{opacity:1}
+  `;
+  document.head.appendChild(st);
+  card.classList.add('pm-card');
+  var steps = cfg.steps.map(function(s){return '<li><span>'+s[0]+'</span><div><b>'+s[1]+'</b><em>'+s[2]+'</em></div></li>';}).join('');
+  card.innerHTML = '<div class="pm-guide">'
+    + '<div class="pm-kicker">MING · 60 秒上手</div>'
+    + '<h2>'+cfg.title+'</h2>'
+    + '<p class="pm-lede">'+cfg.lede+'</p>'
+    + '<ol class="pm-steps">'+steps+'</ol>'
+    + '<div class="pm-actions">'
+    +   '<button class="pm-primary" type="button">开始</button>'
+    +   '<button class="pm-ghost pm-demo" type="button">一键试听</button>'
+    +   '<button class="pm-ghost pm-full" type="button">全屏演示</button>'
+    +   '<button class="pm-ghost pm-save" type="button">保存分享图</button>'
+    + '</div>'
+    + '<div class="pm-note">'+cfg.note+'</div>'
+    + '</div>';
+  function open(){ modal.classList.add('open'); modal.style.display='flex'; }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} }
+  card.querySelector('.pm-primary').addEventListener('click', close);
+  card.querySelector('.pm-demo').addEventListener('click', function(){
+    close();
+    setTimeout(function(){
+      var c = document.querySelector('canvas'); if(!c) return;
+      var r = c.getBoundingClientRect();
+      var x = r.left + r.width * 0.5, y = r.top + r.height * 0.52;
+      ['mousedown','mouseup'].forEach(function(t){
+        c.dispatchEvent(new MouseEvent(t,{clientX:x,clientY:y,bubbles:true,button:0}));
+      });
+    }, 400);
+  });
+  card.querySelector('.pm-full').addEventListener('click', function(){ close(); try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(e){} });
+  card.querySelector('.pm-save').addEventListener('click', function(){
+    var c = document.querySelector('canvas'); if(!c) return;
+    var W=1600,H=1000, out=document.createElement('canvas'); out.width=W; out.height=H;
+    var g=out.getContext('2d');
+    g.fillStyle=cfg.panel; g.fillRect(0,0,W,H);
+    g.fillStyle=cfg.ink; g.font='700 58px "Songti SC","STSong",serif'; g.fillText(cfg.shareTitle, 60, 96);
+    g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
+    var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
+    g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
+    g.fillStyle=cfg.subc; g.font='500 17px -apple-system,"PingFang SC",sans-serif'; g.fillText('MING · 2026', 60, H-38);
+    var a=document.createElement('a'); a.download=cfg.shareFile+'_share.png'; a.href=out.toDataURL('image/png'); a.click();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') close();
+    if(e.key==='?' ) open();
+    if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
+  });
+  open();
+})();
+
+</script>
+
+<script>
+(function(){
+  var hint = document.getElementById('pmHint'); if (!hint) return;
+  function hide(){ hint.style.display = 'none'; }
+  window.pmShowHint = function(){
+    hint.style.display = 'block';
+    clearTimeout(window.__pmHintT);
+    window.__pmHintT = setTimeout(hide, 8000);
+  };
+  var c = document.querySelector('canvas');
+  if (c) { c.addEventListener('pointerdown', hide, { once: true }); c.addEventListener('mousedown', hide, { once: true }); }
+})();
+</script>
+</body>
+</html>

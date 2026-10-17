@@ -131,7 +131,7 @@
   <button data-act="undo" title="Ctrl/Cmd+Z">撤销</button>
     <span class="mg-scenes">场景 <button data-scene="0" class="on" title="场景 A：独立的 31 步图案">A</button><button data-scene="1" title="场景 B：独立的 31 步图案">B</button><button data-scene="2" title="场景 C：独立的 31 步图案">C</button><button data-scene="3" title="场景 D：独立的 31 步图案">D</button></span>
   <span class="mg-bpm">BPM
-    <button data-act="bpmdown">−</button><input id="mgBpm" type="number" min="70" max="160" step="1" value="111" inputmode="numeric" aria-label="BPM"><button data-act="bpmup">＋</button>
+    <button data-act="bpmdown">−</button><input id="mgBpm" type="number" min="70" max="160" step="1" value="124" inputmode="numeric" aria-label="BPM"><button data-act="bpmup">＋</button>
   </span>
   <button data-act="midi" title="导出当前场景 MIDI">MIDI</button>
   <button data-act="midiall" title="导出四场景多轨 MIDI">批量</button>
@@ -252,7 +252,7 @@ var state = {
   step: 0,
   playMode3: 0, // 0=AI编曲, 1=🧬生命演化, 2=💣连锁波纹
   chordIdx: 0,
-  bpm: 111
+  bpm: 124
 };
 
 function resize() {
@@ -532,16 +532,16 @@ function triggerTileSound(r, c, cell) {
     // Lower rows (r >= 12) = Punchy Kick + Sidechain Duck; Mid rows (7..11) = Fat Snare; Upper rows (2..6) = Crisp Hi-Hat
     pan.connect(masterGain);
     if (r >= 12) {
-      playDlsNote_DLS_W3(audioCtx, pan, 'kick', 52.0, 0.58, 0.28, 0.002, 1.0);
+      playDlsNote_DLS_W3(audioCtx, pan, 'kick', 52.0, 0.68, 0.30, 0.002, 1.0);
       var o = audioCtx.createOscillator(), g = audioCtx.createGain();
       o.frequency.setValueAtTime(145, now);
       o.frequency.exponentialRampToValueAtTime(42, now + 0.12);
-      g.gain.setValueAtTime(0.42, now);
+      g.gain.setValueAtTime(0.50, now);
       g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
       o.connect(g); g.connect(pan); o.start(now); o.stop(now + 0.26);
       if (sidechainGain) {
-        sidechainGain.gain.setValueAtTime(0.22, now);
-        sidechainGain.gain.linearRampToValueAtTime(1.0, now + 0.20);
+        sidechainGain.gain.setValueAtTime(0.12, now);
+        sidechainGain.gain.linearRampToValueAtTime(1.0, now + 0.22);
       }
     } else if (r >= 7) {
       playDlsNote_DLS_W3(audioCtx, pan, 'snare', 180.0, 0.48, 0.24, 0.002, 1.0);

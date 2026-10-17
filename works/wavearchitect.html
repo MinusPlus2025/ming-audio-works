@@ -1487,8 +1487,8 @@ function drawBoard() {
 
 // Generative Multi-Instrument Jazz-Funk / Buchla / Hammond / French-Disco Improviser (Never repeats mechanically!)
 var pcbStep = 0;
-setInterval(() => {
-  if (!state.isRunning || !audioCtx || userAudioBuffer) return;
+function waSequencer() {
+  if (!state.isRunning || !audioCtx || userAudioBuffer) { setTimeout(waSequencer, 150); return; }
   var now = audioCtx.currentTime;
   var st = pcbStep % 16;
   var bar = Math.floor(pcbStep / 16) % 4;
@@ -1534,7 +1534,11 @@ setInterval(() => {
       playStudioSample(stem.mode, cf * pitchMul, 0.16 * midFader, (idx - 1.5) * 0.35, 0);
     });
   }
-}, 135);
+  var stepMs = 60000 / 96 / 4;
+  var swing = (pcbStep % 2 === 0) ? 1.24 : 0.76;
+  setTimeout(waSequencer, stepMs * 2 * swing);
+}
+waSequencer();
 function loop() { drawBoard(); requestAnimationFrame(loop); }
 
 function waToast(msg) {
