@@ -836,7 +836,7 @@ function mgBindBar() {
       else if (a === 'wav') mgWAV();
       else if (a === 'proj') mgExportProject();
       else if (a === 'loadproj') { var pf = document.getElementById('mgProjFile'); if (pf) pf.click(); }
-      else if (a === 'help') document.getElementById('guideModal').classList.add('open');
+      else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
       else if (a === 'bpmup' || a === 'bpmdown') {
         state.bpm = Math.max(70, Math.min(160, (state.bpm || 111) + (a === 'bpmup' ? 1 : -1)));
         if (bpmLabel) bpmLabel.textContent = state.bpm;
@@ -903,7 +903,6 @@ function handleTileClick(e, isDown, isDouble) {
       });
     }
     else if (c === 30) toggleVideoRecording(canvas, audioCtx, masterGain, 'MosaicGroove_Wall');
-    else if (c === 31) document.getElementById('guideModal').classList.add('open');
     return;
   }
 
@@ -1028,8 +1027,6 @@ function drawWall() {
       drawSingleTile(c * cw, 0, cw, ch, '#124296', 0, dpr, 0, '导', 'WAV', '#ffffff');
     } else if (c === 30) {
       drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0, '录', 'VIDEO', '#1c1d1f');
-    } else if (c === 31) {
-      drawSingleTile(c * cw, 0, cw, ch, '#e02819', 0, dpr, 0, '?', '玩法', '#ffffff');
     } else {
       drawSingleTile(c * cw, 0, cw, ch, '#f3efe6', 0, dpr, 0);
     }
@@ -1143,7 +1140,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     + '<div class="pm-note">'+cfg.note+'</div>'
     + '</div>';
   function open(){ modal.classList.add('open'); modal.style.display='flex'; }
-  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 按 ? 重新查看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
+  function close(){ modal.classList.remove('open'); modal.style.display='none'; try{ if(window.toggleGuide) window.toggleGuide(false); }catch(e){} var oldT=document.querySelector('.pm-toast'); if(oldT) oldT.remove(); var t=document.createElement('div'); t.className='pm-toast'; t.textContent='点击画面开始 · 点底部「说明」重看引导'; document.body.appendChild(t); requestAnimationFrame(function(){t.classList.add('on')}); setTimeout(function(){t.classList.remove('on'); setTimeout(function(){t.remove()},350)}, 4200); }
   card.querySelector('.pm-primary').addEventListener('click', close);
   card.querySelector('.pm-demo').addEventListener('click', function(){
     close();
