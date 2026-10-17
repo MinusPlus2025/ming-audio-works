@@ -113,6 +113,7 @@
 
 <div class="as-bar" id="asBar">
   <button data-as="load">载入音频</button>
+  <button data-as="demo" class="ghost">生成一段</button>
   <button data-as="reactive" class="ghost">音频反应</button>
   <label>灵敏度 <input type="range" id="asSens" min="0.4" max="2.4" step="0.05" value="1.0"></label>
   <button data-as="help" class="ghost">说明</button>
@@ -1432,6 +1433,15 @@ function asBindBar() {
     btn.addEventListener('click', function(){
       var a = btn.getAttribute('data-as');
       if (a === 'load') { var u = document.getElementById('upAudio1'); if (u) u.click(); }
+      else if (a === 'demo') {
+        var c = document.querySelector('canvas'); if (!c) return;
+        var r = c.getBoundingClientRect();
+        var pts = [[0.50,0.38],[0.60,0.46],[0.42,0.52],[0.55,0.62],[0.66,0.55]];
+        pts.forEach(function(p, i){ setTimeout(function(){
+          ['mousedown','mouseup'].forEach(function(t){ c.dispatchEvent(new MouseEvent(t,{clientX:r.left+r.width*p[0],clientY:r.top+r.height*p[1],bubbles:true,button:0})); });
+        }, i * 260); });
+        asToast('已生成一段 5 星星群');
+      }
       else if (a === 'reactive') {
         audioReactive = !audioReactive;
         btn.textContent = audioReactive ? '音频反应 · 开' : '音频反应';

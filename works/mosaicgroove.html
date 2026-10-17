@@ -108,10 +108,11 @@
   <span class="mg-bpm">BPM
     <button data-act="bpmdown">−</button><b id="mgBpm">111</b><button data-act="bpmup">＋</button>
   </span>
-  <button data-act="midi">导出 MIDI</button>
-  <button data-act="wav">导出 WAV</button>
-  <button data-act="proj">导出工程</button>
-  <button data-act="loadproj">导入工程</button>
+  <button data-act="midi" title="导出当前场景 MIDI">MIDI</button>
+  <button data-act="midiall" title="导出四场景多轨 MIDI">批量</button>
+  <button data-act="wav" title="导出当前场景 8 秒 WAV">WAV</button>
+  <button data-act="proj" title="导出四场景工程 JSON">工程</button>
+  <button data-act="loadproj" title="导入工程 JSON">导入</button>
   <button data-act="help">说明</button>
   <span class="mg-sp">MING</span>
 </div>
@@ -756,6 +757,42 @@ function mgMIDI() {
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MosaicGroove_Pattern.mid'; a.click();
   mgToast('MIDI 已导出：31 步 / ' + (state.bpm || 111) + ' BPM');
 }
+
+function mgMidiTrackBytes(g) {
+  var ev = [];
+  for (var c = 1; c < COLS; c++) for (var r = 2; r < ROWS - 1; r++) {
+    var cell = g[r] && g[r][c]; if (!cell || cell[0] <= 0) continue;
+    var col = cell[0], shape = cell[1];
+    var ch = col === 6 ? 9 : (col - 1);
+    var p = mgMidiPitch(r, col);
+    var t = (c - 1) * 120;
+    var dur = shape === 0 ? 240 : 120;
+    ev.push({ t: t, on: 1, ch: ch, p: p });
+    ev.push({ t: t + dur, on: 0, ch: ch, p: p });
+  }
+  ev.sort(function(a, b){ return a.t - b.t || a.on - b.on; });
+  var track = [], last = 0;
+  var tempo = Math.round(60000000 / (state.bpm || 111));
+  track.push(0, 0xFF, 0x51, 0x03, (tempo >> 16) & 255, (tempo >> 8) & 255, tempo & 255);
+  ev.forEach(function(e){
+    track = track.concat(mgVLQ(e.t - last)); last = e.t;
+    if (e.on) track.push(0x90 | e.ch, e.p, 100); else track.push(0x80 | e.ch, e.p, 0);
+  });
+  track = track.concat([0x00, 0xFF, 0x2F, 0x00]);
+  var len = track.length;
+  return [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 255, (len >> 16) & 255, (len >> 8) & 255, len & 255].concat(track);
+}
+function mgMIDIAll() {
+  mgSaveScene();
+  var tracks = [];
+  for (var i = 0; i < 4; i++) tracks.push(mgMidiTrackBytes(mgScenes[i] || mgGridSnapshot()));
+  var header = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 4, 0x01, 0xE0];
+  var bytes = header;
+  tracks.forEach(function(tr){ bytes = bytes.concat(tr); });
+  var blob = new Blob([new Uint8Array(bytes)], { type: 'audio/midi' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MosaicGroove_4Scenes.mid'; a.click();
+  mgToast('四场景 MIDI 已导出（format 1 / 4 轨）');
+}
 function mgWAV() {
   exportCurrentStateWAV('MosaicGroove_PolygonMatrix', function(L, R, sr, N) {
     for (var step = 0; step < 56; step++) {
@@ -795,6 +832,7 @@ function mgBindBar() {
       else if (a === 'save') mgSave();
       else if (a === 'load') mgLoad();
       else if (a === 'midi') mgMIDI();
+      else if (a === 'midiall') mgMIDIAll();
       else if (a === 'wav') mgWAV();
       else if (a === 'proj') mgExportProject();
       else if (a === 'loadproj') { var pf = document.getElementById('mgProjFile'); if (pf) pf.click(); }
