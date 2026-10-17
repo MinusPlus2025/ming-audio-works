@@ -323,12 +323,12 @@ var GALAXY_STARS = Array.from({ length: 420 }, (_, i) => {
 var SHOOTING_METEORS = [];
 
 var BOTTOM_PILLS = [
-  { id: 'play',   x: 0.14, w: 0.11, label: '■ 星系运转中' },
-  { id: 'system', x: 0.28, w: 0.16, label: '🪐 切换天体形态' },
-  { id: 'drop',   x: 0.44, w: 0.12, label: '✦ 超新星引力波' },
-  { id: 'meteor', x: 0.56, w: 0.11, label: '☄️ 召唤流星群' },
-  { id: 'clear',  x: 0.67, w: 0.09, label: '↺ 重置宇宙' },
-  { id: 'wav',    x: 0.84, w: 0.07, label: '🎵 导WAV' }
+  { id: 'play',   x: 0.130, w: 0.120, label: '■ 星系运转中' },
+  { id: 'system', x: 0.275, w: 0.120, label: '🪐 切换天体' },
+  { id: 'drop',   x: 0.420, w: 0.120, label: '✦ 超新星波' },
+  { id: 'meteor', x: 0.565, w: 0.120, label: '☄️ 流星群' },
+  { id: 'clear',  x: 0.710, w: 0.120, label: '↺ 重置宇宙' },
+  { id: 'wav',    x: 0.855, w: 0.120, label: '🎵 导WAV' }
 ];
 
 var LASER_ARCS = [];
@@ -1042,9 +1042,54 @@ function drawScene() {
   ctx.fillStyle = bodyGrad;
   ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.fill();
 
+  // Volume: terminator + cloud bands + specular highlight (skip black hole / sun)
+  if (state.sysIdx === 0 || state.sysIdx === 2 || state.sysIdx === 4) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.clip();
+
+    var term = ctx.createLinearGradient(cx - spR, cy - spR, cx + spR, cy + spR);
+    term.addColorStop(0.0, 'rgba(255,255,255,0)');
+    term.addColorStop(0.55, 'rgba(2,6,23,0.08)');
+    term.addColorStop(1.0, 'rgba(2,6,23,0.62)');
+    ctx.fillStyle = term; ctx.fillRect(cx - spR, cy - spR, spR * 2, spR * 2);
+
+    for (var bi = 0; bi < 5; bi++) {
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - spR * 0.42 + bi * spR * 0.20, spR * (0.90 - bi * 0.045), spR * 0.055, -0.12 + bi * 0.03, 0, Math.PI * 2);
+      ctx.fillStyle = (bi % 2 === 0) ? 'rgba(255,255,255,0.075)' : 'rgba(147,197,253,0.06)';
+      ctx.fill();
+    }
+
+    var spec = ctx.createRadialGradient(cx - spR * 0.38, cy - spR * 0.42, 0, cx - spR * 0.38, cy - spR * 0.42, spR * 0.55);
+    spec.addColorStop(0, 'rgba(255,255,255,0.30)');
+    spec.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = spec; ctx.fillRect(cx - spR, cy - spR, spR * 2, spR * 2);
+    ctx.restore();
+  }
+
   ctx.strokeStyle = state.sysIdx === 1 ? '#fde047' : 'rgba(224, 242, 254, 0.82)';
   ctx.lineWidth = (2.0 + state.energyPulse * 1.2) * dpr;
   ctx.beginPath(); ctx.arc(cx, cy, spR, 0, Math.PI * 2); ctx.stroke();
+
+  // Aurora rim — a soft, animated curtain over the upper limb
+  if (state.sysIdx !== 1) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (var ai = 0; ai < 2; ai++) {
+      var aurora = ctx.createLinearGradient(cx - spR, cy, cx + spR, cy);
+      aurora.addColorStop(0, 'rgba(125, 211, 252, 0)');
+      aurora.addColorStop(0.45, ai === 0 ? 'rgba(125, 211, 252, 0.30)' : 'rgba(247, 178, 196, 0.26)');
+      aurora.addColorStop(1, 'rgba(125, 211, 252, 0)');
+      ctx.strokeStyle = aurora;
+      ctx.lineWidth = (5.5 - ai * 1.5) * dpr;
+      ctx.shadowColor = ai === 0 ? '#7dd3fc' : '#f7b2c4';
+      ctx.shadowBlur = 18 * dpr;
+      ctx.beginPath();
+      ctx.arc(cx, cy, spR * (1.02 + ai * 0.035), Math.PI * (1.03 + Math.sin(state.time * 0.5 + ai) * 0.02), Math.PI * 1.94);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
   ctx.restore();
 
   // 3D Geodesic Latitude & Longitude Harmonic Mesh
@@ -1062,7 +1107,7 @@ function drawScene() {
         if (first) { ctx.moveTo(pt.x, pt.y); first = false; } else ctx.lineTo(pt.x, pt.y);
       } else first = true;
     }
-    ctx.strokeStyle = li === Math.floor(numLat / 2) ? 'rgba(247, 178, 196, 0.65)' : 'rgba(186, 230, 253, 0.28)';
+    ctx.strokeStyle = li === Math.floor(numLat / 2) ? 'rgba(247, 178, 196, 0.50)' : 'rgba(186, 230, 253, 0.18)';
     ctx.lineWidth = (li === Math.floor(numLat / 2) ? 1.5 : 0.85) * dpr;
     ctx.stroke();
   }
@@ -1077,7 +1122,7 @@ function drawScene() {
         if (first) { ctx.moveTo(pt.x, pt.y); first = false; } else ctx.lineTo(pt.x, pt.y);
       } else first = true;
     }
-    ctx.strokeStyle = 'rgba(186, 230, 253, 0.24)';
+    ctx.strokeStyle = 'rgba(186, 230, 253, 0.16)';
     ctx.lineWidth = 0.8 * dpr;
     ctx.stroke();
   }
@@ -1269,21 +1314,23 @@ function drawScene() {
   // Left-Side 4 Cosmic Stem Mixer Cards
   ctx.save();
   TRACK_STEMS.forEach((ts, idx) => {
-    var cardX = 18 * dpr, cardY = (0.28 + idx * 0.10) * h, cardW = 166 * dpr, cardH = 42 * dpr;
-    ctx.fillStyle = ts.muted ? 'rgba(15, 20, 32, 0.45)' : 'rgba(18, 26, 48, 0.86)';
-    ctx.strokeStyle = ts.muted ? 'rgba(148, 163, 184, 0.25)' : ts.hex;
-    ctx.lineWidth = 1.4 * dpr;
-    ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 10 * dpr); ctx.fill(); ctx.stroke();
+    var cardX = 22 * dpr, cardY = (0.275 + idx * 0.098) * h, cardW = 190 * dpr, cardH = 46 * dpr;
+    ctx.fillStyle = ts.muted ? 'rgba(15, 20, 32, 0.45)' : 'rgba(18, 26, 48, 0.88)';
+    ctx.strokeStyle = ts.muted ? 'rgba(148, 163, 184, 0.25)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1.2 * dpr;
+    ctx.beginPath(); ctx.roundRect(cardX, cardY, cardW, cardH, 8 * dpr); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = ts.muted ? '#475569' : ts.hex;
+    ctx.fillRect(cardX, cardY, 4 * dpr, cardH);
 
     ctx.fillStyle = ts.muted ? '#64748b' : ts.hex;
-    ctx.beginPath(); ctx.arc(cardX + 16 * dpr, cardY + cardH * 0.5, 5.5 * dpr, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cardX + 20 * dpr, cardY + cardH * 0.5, 4.5 * dpr, 0, Math.PI * 2); ctx.fill();
 
     ctx.fillStyle = ts.muted ? '#64748b' : '#f8fafc';
-    ctx.font = `800 ${9.5 * dpr}px sans-serif`;
-    ctx.fillText(ts.name, cardX + 30 * dpr, cardY + 18 * dpr);
+    ctx.font = `800 ${10.5 * dpr}px sans-serif`;
+    ctx.fillText(ts.name, cardX + 32 * dpr, cardY + 19 * dpr);
     ctx.fillStyle = ts.muted ? '#475569' : '#94a3b8';
-    ctx.font = `700 ${7.5 * dpr}px monospace`;
-    ctx.fillText(ts.muted ? 'MUTE (点击开启)' : ts.sub, cardX + 30 * dpr, cardY + 32 * dpr);
+    ctx.font = `700 ${8 * dpr}px monospace`;
+    ctx.fillText(ts.muted ? 'MUTE · 点击开启' : ts.sub, cardX + 32 * dpr, cardY + 34 * dpr);
   });
   ctx.restore();
 
