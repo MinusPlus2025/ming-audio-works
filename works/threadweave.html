@@ -954,7 +954,10 @@ function initAudio() {
   bodySend = audioCtx.createGain(); bodySend.gain.value = 0.09;
   masterGain.connect(bodyConv); bodyConv.connect(bodySend); bodySend.connect(comp);
 
-  comp.connect(audioCtx.destination);
+  var limiter = audioCtx.createDynamicsCompressor();
+  limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.10;
+  comp.connect(limiter); limiter.connect(audioCtx.destination);
   ensureIOGraph(audioCtx, comp);
 }
 

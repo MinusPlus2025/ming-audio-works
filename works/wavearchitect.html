@@ -667,7 +667,11 @@ function initAudio() {
   tapeDelayR.connect(fbGainR); fbGainR.connect(tapeDelayL);
   tapeDelayL.connect(masterGain); tapeDelayR.connect(masterGain);
 
-  masterGain.connect(comp); comp.connect(audioCtx.destination);
+  masterGain.connect(comp);
+  var limiter = audioCtx.createDynamicsCompressor();
+  limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.10;
+  comp.connect(limiter); limiter.connect(audioCtx.destination);
   updateTapeHardwareDSP();
   ensureIOGraph(audioCtx, comp);
   if (typeof waApplyMix === 'function') waApplyMix();

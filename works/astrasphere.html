@@ -493,7 +493,10 @@ function initAudio() {
   masterGain.connect(comp);
   masterGain.connect(delayNode); delayNode.connect(df); df.connect(fb); fb.connect(delayNode); df.connect(comp);
   masterGain.connect(reverbNode); reverbNode.connect(wet); wet.connect(comp);
-  comp.connect(audioCtx.destination);
+  var limiter = audioCtx.createDynamicsCompressor();
+  limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
+  limiter.attack.value = 0.002; limiter.release.value = 0.10;
+  comp.connect(limiter); limiter.connect(audioCtx.destination);
 
   pulsarOsc = audioCtx.createOscillator();
   pulsarOsc.type = 'sine'; pulsarOsc.frequency.value = 43.65;
