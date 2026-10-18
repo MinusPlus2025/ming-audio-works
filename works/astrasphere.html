@@ -101,28 +101,29 @@
     70% { transform: scale(1.35); opacity: 0; }
     100% { opacity: 0; }
   }
+
+  .ming-credit { position: fixed; right: 16px; bottom: 58px; z-index: 26; text-align: right; pointer-events: none; font: 700 9px/1 'PingFang SC',sans-serif; letter-spacing: .18em; color: #cbd5e1; opacity: .78; }
+  .ming-credit span { display: block; margin-top: 3px; font-size: 7px; letter-spacing: .28em; opacity: .65; }
+  @media (max-width: 720px) { .ming-credit { right: 10px; bottom: 56px; font-size: 8px; } }
 </style>
 </head>
 <body>
 <div class="atrium-shell">
   <canvas id="sphereCanvas"></canvas>
-  <div class="pm-hint" id="pmHint" style="left:50%;top:88%"><span class="ring"></span><span>载入一首歌，看星球呼吸</span></div>
+  <div class="pm-hint" id="pmHint" style="left:50%;top:88%"><span class="ring"></span><span>载入一首歌，看星球反应</span></div>
   <input type="file" id="upAudio1" class="hidden-input" accept="audio/*">
 
   <div class="guide-modal" id="guideModal">
     <div class="guide-card">
-      <h2>《ASTRASPHERE · 星籁》v17.0 多重星系与天体引力合成器 · 演奏指南</h2>
-      <p><strong>核心升级（5 大天体形态实时切换 × 6 种异构公转天体 × 马尔可夫生成式太空交响引擎）</strong>：</p>
+      <h2>《星籁 ASTRASPHERE》</h2>
+      <p>载入一首歌，星球跟着能量变化；也可以点球面种星，自己生成星铃。</p>
       <ul>
-        <li><strong>1. 五大主天体形态与专属音色库（点击底部 [🪐 切换星体] 或顶部天体栏切换）</strong>：
-          <br>· <strong>🪐 土星冰环巨行星</strong>：DX7 六算子水晶星铃 + 冰晶泛音琶音
-          <br>· <strong>🕳 卡冈图雅黑洞吸积盘</strong>：《星际穿越》巨型教堂管风琴（Pipe Organ）+ 重力透镜深空低音
-          <br>· <strong>🌀 仙女座双螺旋星系</strong>：CS-80《银翼杀手》模拟铜管（Analog Brass）+ 64 颗粒星云合唱
-          <br>· <strong>☀️ 日冕耀斑红超巨星</strong>：温暖模拟脉冲序列（Solar Moog Sequencer）+ 日珥共振峰滤波器
-          <br>· <strong>💎 戴森球星际母星</strong>：高频量子玻璃竖琴（Quantum Glass Harp）+ 多声部复节奏钟琴
-        </li>
-        <li><strong>2. 六大公转天体（环状行星、双尾哈雷彗星、双束脉冲中子星、旅行者金唱片、熔岩火卫、星云簇）</strong>：点击任意公转天体或球面即可种下新星标，单击深空背景可发射<strong>引力流星（Meteor Slingshot）</strong>穿过星轨激发连锁和弦！</li>
+        <li><strong>1 载入音频</strong>：底栏“载入音频”，或把文件拖进来。</li>
+        <li><strong>2 看反应</strong>：能量、脉冲、星环跟随导入的文件。</li>
+        <li><strong>3 种星</strong>：点球面种星；星标跨过金色子午线才发声。</li>
+        <li><strong>4 拖拽/切换</strong>：上下拖拽改倾角，底部切换天体。</li>
       </ul>
+      <p style="margin-top:10px;font-size:13px;opacity:.75">创作者：MING</p>
       <button class="close-guide-btn" onclick="toggleGuide(false)">我知道了 · 进入《星籁》多重星系宇宙</button>
     </div>
   </div>
@@ -130,11 +131,11 @@
 
 <div class="as-bar" id="asBar">
   <button data-as="load">载入音频</button>
-  <button data-as="demo" class="ghost">生成一段</button>
+  <button data-as="demo" class="ghost">生成星群</button>
   <button data-as="reactive" class="ghost">音频反应</button>
   <label>灵敏度 <input type="range" id="asSens" min="0.4" max="2.4" step="0.05" value="1.0"></label>
-  <button data-as="help" class="ghost">说明</button>
-  <span class="as-status" id="asStatus">生成模式</span>
+  <button data-as="help" class="ghost">玩法</button>
+  <span class="as-status" id="asStatus">待载入音频</span>
   <span class="as-sp">MING</span>
 </div>
 
@@ -153,7 +154,7 @@ function updateUserAudioUI(loaded) {
   var rb = document.querySelector('[data-as="reactive"]');
   if (rb) rb.textContent = loaded ? '音频反应 · 开' : '音频反应';
   var st = document.getElementById('asStatus');
-  if (st) st.textContent = loaded ? '分析源 · 等待能量' : '生成模式';
+  if (st) st.textContent = loaded ? '分析源 · 等待能量' : (appMode ? '待载入音频' : '生成模式');
 }
 function stopUserAudio(updateUI) {
   if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
@@ -1389,11 +1390,11 @@ function drawScene() {
   // Right-Side 5 Custom-Illustrated Celestial System Medallions!
   ctx.save();
   var sysIcons = [
-    { name: '土星冰环', sub: 'DX7 BELL', col: '#93c5fd' },
-    { name: '黑洞吸积', sub: 'PIPE ORGAN', col: '#fbbf24' },
-    { name: '仙女星系', sub: 'CS80 BRASS', col: '#c084fc' },
-    { name: '日冕耀斑', sub: 'SOLAR ARP', col: '#fb923c' },
-    { name: '戴森母星', sub: 'SHIMMER PAD', col: '#6ee7b7' }
+    { name: '土星冰环', sub: 'FM 钟', col: '#93c5fd' },
+    { name: '黑洞吸积', sub: '管风琴', col: '#fbbf24' },
+    { name: '仙女星系', sub: '模拟铜管', col: '#c084fc' },
+    { name: '日冕耀斑', sub: '脉冲琶音', col: '#fb923c' },
+    { name: '戴森母星', sub: '微光铺底', col: '#6ee7b7' }
   ];
   sysIcons.forEach((si, idx) => {
     var rx = w * 0.915, ry = h * (0.21 + idx * 0.122), rr = (state.sysIdx === idx ? 22 : 19) * dpr;
@@ -1471,7 +1472,7 @@ function drawScene() {
   var titleW = ctx.measureText(mainTitle).width;
 
   ctx.fillStyle = '#94a3b8'; ctx.font = `600 ${9.5 * dpr}px sans-serif`;
-  ctx.fillText('点击球面种星铃 · 拖拽星球多普勒变调 · 点底部切换5大天体形态', 20 * dpr + titleW + 16 * dpr, h * 0.037);
+  ctx.fillText('载入一首歌 → 星球随能量反应；也可点球面种星、拖拽星球、切换天体', 20 * dpr + titleW + 16 * dpr, h * 0.037);
 
   ctx.fillStyle = 'rgba(147, 197, 253, 0.15)';
   ctx.strokeStyle = 'rgba(147, 197, 253, 0.50)';
@@ -1574,12 +1575,12 @@ function asBindBar() {
         pts.forEach(function(p, i){ setTimeout(function(){
           ['mousedown','mouseup'].forEach(function(t){ c.dispatchEvent(new MouseEvent(t,{clientX:r.left+r.width*p[0],clientY:r.top+r.height*p[1],bubbles:true,button:0})); });
         }, i * 260); });
-        asToast('已生成一段 5 星星群');
+        asToast('已生成 5 颗星标');
       }
       else if (a === 'reactive') {
         audioReactive = !audioReactive;
         btn.textContent = audioReactive ? '音频反应 · 开' : '音频反应';
-        if (audioReactive) { audioCtx && audioCtx.resume && audioCtx.resume(); asToast('音频反应已开启：载入音频或让合成器驱动画面'); }
+        if (audioReactive) { audioCtx && audioCtx.resume && audioCtx.resume(); asToast('音频反应已开启：载入音频后画面跟随能量'); }
         else { var st = document.getElementById('asStatus'); if (st) st.textContent = '生成模式'; }
       }
       else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
@@ -1594,7 +1595,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); loadAstroState(); 
 <script>
 
 (function(){
-  var cfg = {"title": "载入一首歌，让星球呼吸", "sub": "ASTRASPHERE · 星籁", "lede": "这不是播放器。载入一首歌，星球会跟着能量呼吸；想自己种星，点球面。", "steps": [["01", "载入一首歌", "底栏“载入音频”，或把音频拖进来"], ["02", "看星球", "能量、脉冲、星环跟着音乐呼吸"], ["03", "也可以种星", "点球面种下星标，拖拽星球改引力"]], "note": "载入音频=分析源：画面只跟导入文件的能量；再点“卸载音频”回到生成模式。也可以点球面种星，自己生成星铃。", "panel": "#0d1526", "ink": "#eaf2ff", "subc": "#9fb3d1", "accent": "#7dd3fc", "line": "#22304d", "dark": true, "shareTitle": "星籁 ASTRASPHERE", "shareSub": "天体引力合成器 · WEB AUDIO", "shareFile": "Astrasphere"};
+  var cfg = {"title": "载入一首歌，看星球反应", "sub": "ASTRASPHERE · 星籁", "lede": "这不是播放器。载入一首歌，星球的亮度、星环和粒子跟着能量变化；想自己种星，点球面。", "steps": [["01", "载入一首歌", "底栏“载入音频”，或把音频拖进来"], ["02", "看星球", "能量、脉冲、星环跟着音乐变化"], ["03", "种一颗星", "点球面种星；星标跨过金色子午线才发声"], ["04", "拖拽/切换", "上下拖拽改倾角，底部切换天体形态"]], "note": "怎么玩：载入歌 → 看星球反应 → 点球面种星 → 拖拽/切换天体。没有音频时保持安静，生成式星铃是第二模式。创作者：MING。", "panel": "#0d1526", "ink": "#eaf2ff", "subc": "#9fb3d1", "accent": "#7dd3fc", "line": "#22304d", "dark": true, "shareTitle": "星籁 ASTRASPHERE", "shareSub": "天体引力合成器 · WEB AUDIO", "shareFile": "Astrasphere"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
@@ -1673,7 +1674,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); loadAstroState(); 
     if(e.key==='?' ) open();
     if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
   });
-  open();
+  setTimeout(function(){ try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} }, 600);
 })();
 
 </script>
@@ -1691,5 +1692,6 @@ window.addEventListener('DOMContentLoaded', () => { resize(); loadAstroState(); 
   if (c) { c.addEventListener('pointerdown', hide, { once: true }); c.addEventListener('mousedown', hide, { once: true }); }
 })();
 </script>
+<div class="ming-credit">MING<span>创作者</span></div>
 </body>
 </html>

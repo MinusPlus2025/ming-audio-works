@@ -106,6 +106,10 @@
   }
   .mg-bpm input::-webkit-outer-spin-button, .mg-bpm input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .mg-bpm input { -moz-appearance: textfield; }
+
+  .ming-credit { position: fixed; right: 16px; bottom: 58px; z-index: 26; text-align: right; pointer-events: none; font: 700 9px/1 'PingFang SC',sans-serif; letter-spacing: .18em; color: #1c2024; opacity: .78; }
+  .ming-credit span { display: block; margin-top: 3px; font-size: 7px; letter-spacing: .28em; opacity: .65; }
+  @media (max-width: 720px) { .ming-credit { right: 10px; bottom: 56px; font-size: 8px; } }
 </style>
 </head>
 <body>
@@ -117,12 +121,15 @@
 
   <div class="guide-modal" id="guideModal">
     <div class="guide-card">
-      <h2>《MOSAICGROOVE · 电音瓷砖墙》波表电音与侧链浩室像素工作站</h2>
-      <p><strong>专属音频引擎（Wavetable EDM & Sidechain Future-House Matrix Engine）</strong>：704 块釉面瓷砖全部可交互，内置 <strong>7 声部宽体超级锯齿波（Supersaw）、Talkbox 人声元音共振峰合唱、热带马林巴木琴、Future Bass 四音九和弦垫与 TR-909 电音鼓机（带真实侧链抽吸 Sidechain Ducking）</strong>。</p>
+      <h2>《电音瓷砖墙 MOSAICGROOVE》</h2>
+      <p>贴砖就是写 beat：行=音高，列=时间，颜色=乐器，形状=奏法。</p>
       <ul>
-        <li><strong>1. 顶部两行带呼吸光效与脉冲指示灯的瓷砖均可直接点击</strong>：切换 6 种音色画笔、开启三角滑音笔刷、切换 <strong>[AI编曲 / 🧬生命演化 / 💣连锁波纹]</strong> 三种动态模式，或点击 <strong>[清 CLR]</strong> 一键清空墙面重画；</li>
-        <li><strong>2. 双击任意瓷砖（或右键点击）= 对角切开变成三角形电音特效砖</strong>：依次切换为 <strong>◢（八度激光上滑）、◣（深潜低音炸弹）、◤（32分机枪连击）、◥（反向吸气倒放）</strong>。</li>
+        <li><strong>1 选颜色</strong>：顶部六种颜色，就是六种乐器画笔。</li>
+        <li><strong>2 点砖/切砖</strong>：点砖；双击切成三角，改变奏法。</li>
+        <li><strong>3 按 PLAY</strong>：扫描线经过哪一列，哪一列的砖才发声。</li>
+        <li><strong>4 场景/编排</strong>：A/B/C/D 存段落；开编排串联；“多轨”导出编排 MIDI。</li>
       </ul>
+      <p style="margin-top:10px;font-size:13px;opacity:.75">创作者：MING</p>
       <button class="close-btn" onclick="document.getElementById('guideModal').classList.remove('open')">开始在瓷砖墙上拼贴电音</button>
     </div>
   </div>
@@ -135,12 +142,12 @@
     <button data-act="bpmdown">−</button><input id="mgBpm" type="number" min="70" max="160" step="1" value="124" inputmode="numeric" aria-label="BPM"><button data-act="bpmup">＋</button>
   </span>
   <button data-act="midi" title="导出当前场景 MIDI">MIDI</button>
-  <button data-act="midiall" title="导出四场景多轨 MIDI">批量</button>
+  <button data-act="midiall" title="导出四场景多轨 MIDI；编排模式下导出编排">多轨</button>
   <button data-act="wav" title="导出当前场景 8 秒 WAV">WAV</button>
   <button data-act="proj" title="导出四场景工程 JSON">工程</button>
   <button data-act="loadproj" title="导入工程 JSON">导入</button>
-  <button data-act="help">说明</button>
-  <button data-act="song" id="mgSongBtn" title="Song 模式：A→B→C→D 串联">Song</button>
+  <button data-act="help">玩法</button>
+  <button data-act="song" id="mgSongBtn" title="编排模式：A→B→C→D 串联">编排</button>
 </div>
 
 <script>
@@ -251,7 +258,7 @@ var state = {
   triShapePick: 1,
   isPlaying: true,
   step: 0,
-  playMode3: 0, // 0=AI编曲, 1=🧬生命演化, 2=💣连锁波纹
+  playMode3: 0, // 0=手动, 1=🧬生命演化, 2=💣连锁波纹
   chordIdx: 0,
   bpm: 124
 };
@@ -984,7 +991,7 @@ function mgSongMIDI() {
   var tr = [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 255, (len >> 16) & 255, (len >> 8) & 255, len & 255].concat(track);
   var blob = new Blob([new Uint8Array(header.concat(tr))], { type: 'audio/midi' });
   var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'MosaicGroove_Song_ABCD.mid'; a.click();
-  mgToast('Song MIDI 已导出：A→B→C→D 单轨编排');
+  mgToast('编排 MIDI 已导出：A→B→C→D 单轨');
 }
 
 function mgMIDIAll() {
@@ -1069,7 +1076,7 @@ function mgBindBar() {
         mgSongMode = !mgSongMode;
         btn.classList.toggle('on', mgSongMode);
         if (mgSongMode) mgSongScene = mgActiveScene;
-        mgToast(mgSongMode ? 'Song 模式：A→B→C→D 每 31 步切换' : 'Song 模式关闭');
+        mgToast(mgSongMode ? '编排模式：A→B→C→D 每 31 步切换' : '编排模式关闭');
       }
       else if (a === 'help') { var g = document.getElementById('guideModal'); if (g) { g.classList.add('open'); g.style.display = 'flex'; } }
       else if (a === 'bpmup' || a === 'bpmdown') {
@@ -1223,10 +1230,10 @@ function drawWall() {
     } else if (c === 22) {
       drawSingleTile(c * cw, 0, cw, ch, state.isPlaying ? '#e02819' : '#0b8a3e', 0, dpr, 0.5, state.isPlaying ? '■' : '▶', 'PLAY', '#ffffff');
     } else if (c === 24) {
-      var mNames = [['AI','编曲'], ['🧬','演化'], ['💣','连锁']][state.playMode3];
+      var mNames = [['手','动'], ['🧬','演化'], ['💣','连锁']][state.playMode3];
       drawSingleTile(c * cw, 0, cw, ch, '#124296', 0, dpr, 0.6, mNames[0], mNames[1], '#ffffff');
     } else if (c === 25) {
-      drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0.4, 'B' + (state.chordIdx + 1), 'Fm9', '#1c1d1f');
+      drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0.4, 'B' + (state.chordIdx + 1), '和弦', '#1c1d1f');
     } else if (c === 26) {
       drawSingleTile(c * cw, 0, cw, ch, '#0b8a3e', 0, dpr, 0, '舞', 'SEED', '#ffffff');
     } else if (c === 27) {
@@ -1301,7 +1308,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖", "在网格里点几块砖；双击可以切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "A/B/C/D 是什么", "四份独立的 31 步图案，像同一面墙的四个版本：A 主段、B 变奏、C break、D drop。点字母切换，编辑自动存回当前场景；工程和批量 MIDI 会带上四个场景。"]], "note": "底部可撤销、直接输入 BPM、切换 A/B/C/D 场景；工程 JSON 与批量 MIDI 会带上四个场景。建议戴耳机。 顶部“传”=底音：循环播放，不改变瓷砖图案；载入后按钮变“停”，再点卸载。 Song 模式会每 31 步自动串联 A→B→C→D，适合做段落试听。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖/切砖", "在网格里点砖；双击切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "存场景/编排", "A/B/C/D 存不同段落；开编排模式串联，点“多轨”导出编排 MIDI"]], "note": "怎么玩：选颜色 → 点砖 → 按 PLAY → 存场景/编排。A/B/C/D 是四份独立 31 步图案；开编排模式后每 31 步自动串联，点“多轨”导出编排 MIDI。创作者：MING。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
@@ -1314,7 +1321,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     padding:32px 38px 28px;box-shadow:0 26px 80px rgba(0,0,0,.42);text-align:left;
     font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",sans-serif}
   .pm-kicker{font-size:11px;letter-spacing:.22em;font-weight:800;color:var(--pm-accent);margin-bottom:14px}
-  .pm-guide h2{font-family:"Songti SC","STSong",serif;font-size:34px;line-height:1.2;font-weight:700;margin:0 0 10px;color:var(--pm-ink)}
+  .pm-guide h2{font-family:"编排ti SC","ST编排",serif;font-size:34px;line-height:1.2;font-weight:700;margin:0 0 10px;color:var(--pm-ink)}
   .pm-lede{font-size:14.5px;line-height:1.75;color:var(--pm-sub);margin:0 0 22px}
   .pm-steps{list-style:none;margin:0 0 22px;padding:0;display:grid;gap:12px}
   .pm-steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start}
@@ -1367,7 +1374,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     var W=1600,H=1000, out=document.createElement('canvas'); out.width=W; out.height=H;
     var g=out.getContext('2d');
     g.fillStyle=cfg.panel; g.fillRect(0,0,W,H);
-    g.fillStyle=cfg.ink; g.font='700 58px "Songti SC","STSong",serif'; g.fillText(cfg.shareTitle, 60, 96);
+    g.fillStyle=cfg.ink; g.font='700 58px "编排ti SC","ST编排",serif'; g.fillText(cfg.shareTitle, 60, 96);
     g.fillStyle=cfg.subc; g.font='600 22px -apple-system,"PingFang SC",sans-serif'; g.fillText(cfg.shareSub, 60, 134);
     var maxW=1480,maxH=740, s=Math.min(maxW/c.width,maxH/c.height);
     g.drawImage(c,(W-c.width*s)/2,178,c.width*s,c.height*s);
@@ -1379,7 +1386,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
     if(e.key==='?' ) open();
     if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
   });
-  open();
+  setTimeout(function(){ try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} }, 600);
 })();
 
 </script>
@@ -1397,5 +1404,6 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
   if (c) { c.addEventListener('pointerdown', hide, { once: true }); c.addEventListener('mousedown', hide, { once: true }); }
 })();
 </script>
+<div class="ming-credit">MING<span>创作者</span></div>
 </body>
 </html>

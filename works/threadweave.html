@@ -109,6 +109,10 @@
     70% { transform: scale(1.35); opacity: 0; }
     100% { opacity: 0; }
   }
+
+  .ming-credit { position: fixed; right: 16px; bottom: 58px; z-index: 26; text-align: right; pointer-events: none; font: 700 9px/1 'PingFang SC',sans-serif; letter-spacing: .18em; color: #4a2511; opacity: .78; }
+  .ming-credit span { display: block; margin-top: 3px; font-size: 7px; letter-spacing: .28em; opacity: .65; }
+  @media (max-width: 720px) { .ming-credit { right: 10px; bottom: 56px; font-size: 8px; } }
 </style>
 </head>
 <body>
@@ -119,17 +123,15 @@
 
   <div class="guide-modal" id="guideModal">
     <div class="guide-card">
-      <h2>《穿针织音 · 锦瑟八音》v19.0 故宫非遗纹样与八音民乐交响织机</h2>
-      <p><strong>核心设计（左侧 8 款独立造型传统乐器图牌 × 右侧 8 款 1:1 同构非遗纹样 × 四声部江南丝竹/盛唐雅乐编曲引擎）</strong>：</p>
+      <h2>《穿针织音 · 锦瑟八音》</h2>
+      <p>绷架就是乐器：点线、等梭、听声；上传图片会改变音色与触发密度。</p>
       <ul>
-        <li><strong>1. 左侧 8 款独立乐器造型（告别圆圈，直接绘制每件中国传统乐器本体）</strong>：
-          <br>· <strong>朱砂·古筝刮奏</strong>（二十一弦桐木雁柱古筝） · <strong>翡翠·琵琶轮指</strong>（曲项梨形四轴琵琶）
-          <br>· <strong>靛青·古琴走手</strong>（仲尼式十三金徽漆琴） · <strong>紫檀·二胡悲吟</strong>（六角蟒皮琴筒与马尾弯弓）
-          <br>· <strong>明黄·昆曲竹笛</strong>（湘妃竹节笛配朱砂中国结穗） · <strong>鎏金·曾侯编钟</strong>（雕龙钟梁配三枚合瓦青铜钟）
-          <br>· <strong>胭脂·凤翼笙簧</strong>（十七簧参差凤翼笙苗配鎏金笙斗） · <strong>墨玉·堂鼓木鱼</strong>（朱漆双环堂鼓配双鼓槌）
-        </li>
-        <li><strong>2. 右侧 8 款非遗纹样徽章与中央绣绷 1:1 完全同构（共享几何生成算法）</strong>：右侧微缩图标直接渲染对应非遗纹样的真实丝线拓扑（敦煌藻井重台莲花、宋锦四合如意云纹、太极阴阳双鱼八卦、吉祥盘长中国结、盛唐联珠宝相牡丹、汝窑开片冰裂金缮、商周青铜云雷回纹、龙凤金剪拆线），点击即可在中央绣绷织出完全一致的传统图案并切换四声部民乐曲牌！</li>
+        <li><strong>1 选乐器</strong>：左侧八件民乐，点一件作为主奏。</li>
+        <li><strong>2 拨线</strong>：在绷架上点击或拖过丝线；线越长音越低。</li>
+        <li><strong>3 等竹梭</strong>：竹梭扫过丝线才发声；顶部曲目切换动机。</li>
+        <li><strong>4 上传图片</strong>：颜色→乐器，半径→音区/奏法，横向→声像，密度→触发。</li>
       </ul>
+      <p style="margin-top:10px;font-size:13px;opacity:.75">创作者：MING</p>
       <button class="close-btn" onclick="document.getElementById('guideModal').classList.remove('open')">开始抚弦织锦</button>
     </div>
   </div>
@@ -287,7 +289,7 @@ var TOP_HOOPS = [
   { id: 'wav',    x: 0.700, y: 0.068, r: 19, label: '🎵 导WAV',   sub: 'EXPORT',   col: '#b45309' },
   { id: 'video',  x: 0.765, y: 0.068, r: 19, label: '🎥 录视频',  sub: 'VIDEO',    col: '#b91c1c' },
   { id: 'play',   x: 0.830, y: 0.068, r: 19, label: '■ 抚琴中',   sub: 'RUNNING',  col: '#b91c1c' },
-  { id: 'guide',  x: 0.895, y: 0.068, r: 19, label: '? 雅集',     sub: 'GUIDE',    col: '#4a2511' }
+  { id: 'guide',  x: 0.895, y: 0.068, r: 19, label: '? 玩法',     sub: 'GUIDE',    col: '#4a2511' }
 ];
 
 // 4 Famous Chinese Classical Repertoire Modes with Structured Melodic Motifs!
@@ -663,7 +665,7 @@ function recomputeKnotsAndGeometry() {
     }
   }
   if (THREADS.length === 0) {
-    shapeMetrics.polygonType = '素帛待绣 (点击针孔或右侧非遗纹样即可织锦抚琴)';
+    shapeMetrics.polygonType = '素帛待绣 (点击针孔或右侧传统纹样即可织锦抚琴)';
     return;
   }
   var patTitles = {
@@ -1327,7 +1329,9 @@ function playMotifStep() {
   if (!best) { motifStep = (motifStep + 1) % 256; return; } // image density can create rests
 
   if (motifStep % 4 === 0) motifLeadColor = best.colorId;
-  var deg = motif[motifStep % motif.length] % notes.length;
+  var baseDeg = motif[motifStep % motif.length] % notes.length;
+  var octShift = best.len > 0.52 ? -3 : (best.len < 0.28 ? 3 : 0);
+  var deg = (baseDeg + octShift + notes.length) % notes.length;
   var freq = notes[deg];
   var lead = Object.assign({}, best);
   lead.colorId = motifLeadColor;
@@ -2220,7 +2224,7 @@ function drawLoom() {
   ctx.fillText('织锦', sealX + 7*dpr, sealY + 29*dpr);
 
   ctx.fillStyle = '#2b1810'; ctx.font = '900 ' + (15.5 * dpr) + 'px serif';
-  ctx.fillText('穿针织音 · 锦瑟八音 [故宫非遗纹样与八音民乐织机]', sealX + sealS + 14 * dpr, h * 0.060);
+  ctx.fillText('穿针织音 · 锦瑟八音 [传统纹样灵感与八音民乐织机]', sealX + sealS + 14 * dpr, h * 0.060);
   ctx.fillStyle = '#b91c1c'; ctx.font = '800 ' + (9.8 * dpr) + 'px monospace';
   ctx.fillText(shapeMetrics.polygonType + ' · 丝弦:' + THREADS.length + ' · 金结:' + KNOTS.length, sealX + sealS + 14 * dpr, h * 0.088);
   ctx.restore();
@@ -2427,7 +2431,7 @@ function drawLoom() {
   ctx.save();
   ctx.fillStyle = '#4a2511'; ctx.font = '800 ' + (9.5 * dpr) + 'px serif';
   ctx.textAlign = 'center';
-  ctx.fillText('◀ 穿针织音：① 点左侧选乐器线轴（保留已有乐器） ② 用针在绣绷内点击/连线才织入该乐器音色 ③ 点[独奏|✕]可单留或拆线 ▶', w * 0.50, h * 0.966);
+  ctx.fillText('点绷架拨线 · 等竹梭扫过 · 上传图片改变音色与密度', w * 0.50, h * 0.966);
   ctx.restore();
 }
 
@@ -2471,7 +2475,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选乐器", "左侧八件民乐，先选一件你想听的"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线"], ["03", "等竹梭", "竹梭扫过丝线时，会自动把这段织体演奏出来"]], "note": "底部可上传图片：颜色→乐器、半径→音高/奏法、横向→声像、密度→触发；可导出声图。每件乐器已叠加共鸣/泛音层；悬停可看大字提示。顶部春江/姑苏/兰陵/霓裳是 4 个曲目动机（16 步旋律 + 8 步低音），点击切换，不是播放整首曲子。 顶部“传音频”是底音：载入后只作 32% 循环底音，不改变织机音高与画面；再点一次“停底音”卸载。 支持 Web MIDI 键盘：接上键盘，按键直接拨弦。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "非遗纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选一件民乐", "左侧八件民乐，点一件作为主奏"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线；线越长音越低"], ["03", "等竹梭", "竹梭扫过丝线时自动演奏；点顶部曲目切换动机"], ["04", "上传图片", "颜色映射乐器、半径映射音区、横向映射声像、密度决定触发；可导出声图"]], "note": "怎么玩：先选乐器 → 拨线 → 等竹梭。图片映射：颜色→乐器；半径/线长→音区与奏法；横向→声像；亮部密度→哪些线发声；音高骨架来自顶部曲目动机。创作者：MING。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "传统纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
@@ -2549,7 +2553,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if(e.key==='?' ) open();
     if(e.key==='f'||e.key==='F'){ try{ if(document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); }catch(err){} }
   });
-  open();
+  setTimeout(function(){ try{ if(window.pmShowHint) window.pmShowHint(); }catch(e){} }, 600);
 })();
 
 </script>
@@ -2566,5 +2570,6 @@ window.addEventListener('DOMContentLoaded', () => {
   if (c) { c.addEventListener('pointerdown', hide, { once: true }); c.addEventListener('mousedown', hide, { once: true }); }
 })();
 </script>
+<div class="ming-credit">MING<span>创作者</span></div>
 </body>
 </html>
