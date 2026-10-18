@@ -376,6 +376,7 @@ function toggleGuide(show) {
 
 var audioCtx = null, masterGain = null, reverbNode = null, delayNode = null;
 var audioEnergy = 0, audioCentroid = 0, audioReactive = false, audioSensitivity = 1.0;
+var appMode = true;
 var nebulaOscs = [], nebulaFilter = null, nebulaGain = null, pulsarOsc = null, pulsarGain = null;
 var dopplerBowOsc = null, dopplerBowGain = null, dopplerBowFilter = null;
 var SAMPLE_BANK = {};
@@ -502,14 +503,14 @@ function initAudio() {
   pulsarOsc.type = 'sine'; pulsarOsc.frequency.value = 43.65;
   var pulsarLFO = audioCtx.createOscillator(), pulsarLFOGain = audioCtx.createGain();
   pulsarLFO.frequency.value = 0.45; pulsarLFOGain.gain.value = 0.08;
-  pulsarGain = audioCtx.createGain(); pulsarGain.gain.value = 0.045;
+  pulsarGain = audioCtx.createGain(); pulsarGain.gain.value = appMode ? 0.0001 : 0.045;
   pulsarLFO.connect(pulsarLFOGain); pulsarLFOGain.connect(pulsarGain.gain);
   pulsarOsc.connect(pulsarGain); pulsarGain.connect(masterGain);
   pulsarOsc.start(); pulsarLFO.start();
 
   nebulaFilter = audioCtx.createBiquadFilter();
   nebulaFilter.type = 'lowpass'; nebulaFilter.frequency.value = 1200; nebulaFilter.Q.value = 2.8;
-  nebulaGain = audioCtx.createGain(); nebulaGain.gain.value = 0.015;
+  nebulaGain = audioCtx.createGain(); nebulaGain.gain.value = appMode ? 0.0001 : 0.015;
   [174.61, 220.00, 261.63, 329.63, 392.00].forEach((f, idx) => {
     var o = audioCtx.createOscillator();
     o.type = idx % 2 === 0 ? 'sawtooth' : 'triangle';
@@ -634,7 +635,7 @@ function celestialSynthVoice(freq, role, dur, dest) {
 }
 
 function triggerCelestialVoice(freq, panVal, customRole) {
-  if (!audioCtx) return;
+  if (!audioCtx || appMode) return;
   var sys = CELESTIAL_SYSTEMS[state.sysIdx % CELESTIAL_SYSTEMS.length];
   var bankKey = customRole || sys.timbreMode;
   if (bankKey === sys.timbreMode && TRACK_STEMS[2].muted) return;
@@ -1531,6 +1532,15 @@ function asToast(msg) {
   requestAnimationFrame(function(){ t.classList.add('on'); });
   setTimeout(function(){ t.classList.remove('on'); setTimeout(function(){ t.remove(); }, 250); }, 1800);
 }
+
+function asSetAppMode(on) {
+  appMode = !!on;
+  if (audioCtx) {
+    if (pulsarGain) pulsarGain.gain.setTargetAtTime(appMode ? 0.0001 : 0.045, audioCtx.currentTime, 0.08);
+    if (nebulaGain) nebulaGain.gain.setTargetAtTime(appMode ? 0.0001 : 0.015, audioCtx.currentTime, 0.08);
+  }
+}
+
 function asBindBar() {
   var bar = document.getElementById('asBar'); if (!bar) return;
   bar.querySelectorAll('[data-as]').forEach(function(btn){
@@ -1538,6 +1548,7 @@ function asBindBar() {
       var a = btn.getAttribute('data-as');
       if (a === 'load') { if (userAudioBuffer) stopUserAudio(); else { var u = document.getElementById('upAudio1'); if (u) u.click(); } }
       else if (a === 'demo') {
+        asSetAppMode(false);
         var c = document.querySelector('canvas'); if (!c) return;
         var r = c.getBoundingClientRect();
         var pts = [[0.50,0.38],[0.60,0.46],[0.42,0.52],[0.55,0.62],[0.66,0.55]];
@@ -1616,6 +1627,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); reque
   card.querySelector('.pm-demo').addEventListener('click', function(){
     close();
     setTimeout(function(){
+      try { if (typeof asSetAppMode === 'function') asSetAppMode(false); } catch(e){}
       var c = document.querySelector('canvas'); if(!c) return;
       var r = c.getBoundingClientRect();
       var x = r.left + r.width * 0.5, y = r.top + r.height * 0.52;
