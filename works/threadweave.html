@@ -815,7 +815,7 @@ function saveLoomState() {
 
 function loadLoomState() {
   try {
-    var raw = localStorage.getItem('ThreadWeave_V19_Pattern');
+    var raw = localStorage.getItem('ThreadWeave_V21_ContourPattern') || localStorage.getItem('ThreadWeave_V19_Pattern');
     if (raw) {
       var p = JSON.parse(raw);
       if (p.threads && p.threads.length > 0) {

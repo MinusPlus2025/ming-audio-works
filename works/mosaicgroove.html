@@ -1023,6 +1023,25 @@ function mgWAV() {
   });
   mgToast('WAV 已导出：8 秒 / 48kHz');
 }
+
+var MOSAIC_STATE_KEY = 'MosaicGroove_V1';
+function saveMosaicState() { try {
+  mgSaveScene();
+  localStorage.setItem(MOSAIC_STATE_KEY, JSON.stringify({
+    bpm: state.bpm, active: mgActiveScene, songMode: mgSongMode,
+    scenes: mgScenes.map(function(s){ return s || null; })
+  }));
+} catch(e){} }
+function loadMosaicState() { try {
+  var d = JSON.parse(localStorage.getItem(MOSAIC_STATE_KEY) || 'null'); if (!d) return;
+  if (typeof d.bpm === 'number') mgSetBpm(d.bpm);
+  if (Array.isArray(d.scenes)) mgScenes = d.scenes;
+  if (typeof d.active === 'number') mgActiveScene = Math.max(0, Math.min(3, d.active));
+  if (typeof d.songMode === 'boolean') { mgSongMode = d.songMode; var sb = document.getElementById('mgSongBtn'); if (sb) sb.classList.toggle('on', mgSongMode); }
+  if (mgScenes[mgActiveScene]) mgGridApply(mgScenes[mgActiveScene]);
+} catch(e){} }
+setInterval(saveMosaicState, 2500);
+
 function mgBindBar() {
   var bar = document.getElementById('mgBar'); if (!bar) return;
   var bpmLabel = document.getElementById('mgBpm');
@@ -1277,7 +1296,7 @@ function drawWall() {
 }
 
 function loop() { drawWall(); requestAnimationFrame(loop); }
-window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); drawWall(); requestAnimationFrame(loop); mgBindBar(); mgScenes[0] = mgGridSnapshot(); mgUpdateSceneButtons(); });
+window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicArtwork(); loadMosaicState(); drawWall(); requestAnimationFrame(loop); mgBindBar(); if (!mgScenes[0]) mgScenes[0] = mgGridSnapshot(); mgUpdateSceneButtons(); });
 </script>
 <script>
 

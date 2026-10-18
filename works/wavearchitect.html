@@ -1611,6 +1611,25 @@ function waPreset(name) {
   if (audioCtx) { updateTapeHardwareDSP(); waApplyMix(); }
   waToast('预设：' + name + ' · 干湿 ' + Math.round(waWet * 100) + '%');
 }
+
+var WAVE_STATE_KEY = 'WaveArchitect_V1';
+function saveWaveState() { try {
+  localStorage.setItem(WAVE_STATE_KEY, JSON.stringify({
+    stemIdx: state.stemIdx, faders: state.faders, knobs: state.knobs,
+    midKnobs: state.midKnobs, botLeftKnobs: state.botLeftKnobs, tapeKnobs: state.tapeKnobs,
+    activeChordPin: state.activeChordPin, waWet: waWet, waBypass: waBypass
+  }));
+} catch(e){} }
+function loadWaveState() { try {
+  var d = JSON.parse(localStorage.getItem(WAVE_STATE_KEY) || 'null'); if (!d) return;
+  ['stemIdx','faders','knobs','midKnobs','botLeftKnobs','tapeKnobs','activeChordPin'].forEach(function(k){ if (d[k] !== undefined) state[k] = d[k]; });
+  if (typeof d.waWet === 'number') waWet = d.waWet;
+  waBypass = !!d.waBypass;
+  state.isRunning = false;
+  var wet = document.getElementById('waWet'); if (wet) wet.value = waWet;
+} catch(e){} }
+setInterval(saveWaveState, 2500);
+
 function waBindBar() {
   var up = document.getElementById('upDry');
   var bar = document.getElementById('waBar'); if (!bar) return;
@@ -1631,7 +1650,7 @@ function waBindBar() {
   waApplyMix();
 }
 
-window.addEventListener('DOMContentLoaded', () => { resize(); drawBoard(); requestAnimationFrame(loop); waBindBar(); waMeterLoop(); });
+window.addEventListener('DOMContentLoaded', () => { resize(); loadWaveState(); drawBoard(); requestAnimationFrame(loop); waBindBar(); waMeterLoop(); });
 </script>
 <script>
 

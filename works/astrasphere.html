@@ -1541,6 +1541,25 @@ function asSetAppMode(on) {
   }
 }
 
+
+var ASTRO_STATE_KEY = 'Astrasphere_V1';
+function saveAstroState() { try {
+  localStorage.setItem(ASTRO_STATE_KEY, JSON.stringify({
+    sysIdx: state.sysIdx, appMode: appMode, audioReactive: audioReactive,
+    sensitivity: audioSensitivity, muted: TRACK_STEMS.map(function(t){ return !!t.muted; })
+  }));
+} catch(e){} }
+function loadAstroState() { try {
+  var d = JSON.parse(localStorage.getItem(ASTRO_STATE_KEY) || 'null'); if (!d) return;
+  if (typeof d.sysIdx === 'number') state.sysIdx = Math.max(0, Math.min(CELESTIAL_SYSTEMS.length - 1, d.sysIdx));
+  if (typeof d.appMode === 'boolean') appMode = d.appMode;
+  if (typeof d.audioReactive === 'boolean') audioReactive = d.audioReactive;
+  if (typeof d.sensitivity === 'number') audioSensitivity = d.sensitivity;
+  if (d.muted && d.muted.length === TRACK_STEMS.length) d.muted.forEach(function(m,i){ TRACK_STEMS[i].muted = !!m; });
+  var sens = document.getElementById('asSens'); if (sens) sens.value = audioSensitivity;
+} catch(e){} }
+setInterval(saveAstroState, 2500);
+
 function asBindBar() {
   var bar = document.getElementById('asBar'); if (!bar) return;
   bar.querySelectorAll('[data-as]').forEach(function(btn){
@@ -1570,7 +1589,7 @@ function asBindBar() {
   if (sens) sens.addEventListener('input', function(){ audioSensitivity = parseFloat(sens.value) || 1.0; });
 }
 
-window.addEventListener('DOMContentLoaded', () => { resize(); drawScene(); requestAnimationFrame(loop); asBindBar(); });
+window.addEventListener('DOMContentLoaded', () => { resize(); loadAstroState(); drawScene(); requestAnimationFrame(loop); asBindBar(); });
 </script>
 <script>
 
