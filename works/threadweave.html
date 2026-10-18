@@ -129,7 +129,7 @@
         <li><strong>1 选乐器</strong>：左侧八件民乐，点一件作为主奏。</li>
         <li><strong>2 拨线</strong>：在绷架上点击或拖过丝线；线越长音越低。</li>
         <li><strong>3 等竹梭</strong>：竹梭扫过丝线才发声；顶部曲目切换动机。</li>
-        <li><strong>4 上传图片</strong>：颜色→乐器，半径→音区/奏法，横向→声像，密度→触发。</li>
+        <li><strong>4 上传图片</strong>：纹样决定针脚路径；图片沿针脚取色/亮度/密度，影响音色/音区/声像/触发；音频只做底音与光晕。</li>
       </ul>
       <p style="margin-top:10px;font-size:13px;opacity:.75">创作者：MING</p>
       <button class="close-btn" onclick="document.getElementById('guideModal').classList.remove('open')">开始抚弦织锦</button>
@@ -152,7 +152,7 @@
 <div id="twTip" class="tw-tip"></div>
 
 <script>
-var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
+var userAudioBuffer = null, userAudioSource = null, userAudioGainNode = null, twAudioAnalyser = null, twAudioPulse = 0, analyserNode = null, mediaStreamDest = null, mediaRecorder = null, recordedChunks = [], isRecordingVideo = false;
 
 function ensureIOGraph(ctx, masterNode) {
   if (!analyserNode) { analyserNode = ctx.createAnalyser(); analyserNode.fftSize = 256; masterNode.connect(analyserNode); }
@@ -169,6 +169,7 @@ function updateUserAudioUI(loaded) {
 function stopUserAudio(updateUI) {
   if (userAudioSource) { try { userAudioSource.stop(); } catch(e){} try { userAudioSource.disconnect(); } catch(e){} userAudioSource = null; }
   if (userAudioGainNode) { try { userAudioGainNode.disconnect(); } catch(e){} userAudioGainNode = null; }
+  twAudioAnalyser = null; twAudioPulse = 0;
   userAudioBuffer = null;
   if (updateUI !== false) updateUserAudioUI(false);
 }
@@ -183,6 +184,7 @@ function handleUserAudioUpload(file, ctx, targetNode) {
       userAudioSource.buffer = userAudioBuffer; userAudioSource.loop = true;
       userAudioGainNode = ctx.createGain(); userAudioGainNode.gain.value = 0.32;
       userAudioSource.connect(userAudioGainNode); userAudioGainNode.connect(targetNode);
+      twAudioAnalyser = ctx.createAnalyser(); twAudioAnalyser.fftSize = 512; userAudioGainNode.connect(twAudioAnalyser);
       userAudioSource.start(0);
       updateUserAudioUI(true);
     }, function(){ if (typeof twToast === 'function') twToast('音频解码失败：换一个 WAV/MP3 试试'); });
@@ -740,6 +742,7 @@ function addSymmetricStitch(p1Id, p2Id, colorId) {
     addSingleThread(id1, id2, useColor);
   }
   recomputeKnotsAndGeometry();
+  if (loomImage) { loomBackup = THREADS.map(function(t){ return Object.assign({}, t); }); twApplyImage(); }
   saveLoomState();
 }
 
@@ -791,6 +794,7 @@ function weavePresetPattern(patId) {
   if (patId === 'clear') {
     THREADS = []; KNOTS = []; state.lastPegId = -1;
     state.activePatternId = 'clear';
+    loomImage = null; loomBackup = null;
     initBasePegs();
     recomputeKnotsAndGeometry(); saveLoomState(); return;
   }
@@ -1327,6 +1331,12 @@ function playMotifStep() {
     if (d < bd) { bd = d; best = th; }
   }
   if (!best) { motifStep = (motifStep + 1) % 256; return; } // image density can create rests
+  if (userAudioGainNode && audioCtx) {
+    var gt = audioCtx.currentTime;
+    userAudioGainNode.gain.cancelScheduledValues(gt);
+    userAudioGainNode.gain.setTargetAtTime(0.16, gt, 0.02);
+    userAudioGainNode.gain.setTargetAtTime(0.32, gt + 0.10, 0.25);
+  }
 
   if (motifStep % 4 === 0) motifLeadColor = best.colorId;
   var baseDeg = motif[motifStep % motif.length] % notes.length;
@@ -2011,43 +2021,54 @@ function twApplyImage() {
   var data = g.getImageData(0, 0, s, s).data;
   var threshold = imageThreshold;
   THREADS.forEach(function(t) {
-    var a = t.angle || 0, dx = Math.cos(a), dy = Math.sin(a);
-    var best = 0, peak = 0, edges = 0, wasOn = false;
-    var hueSum = 0, hueW = 0, fx = 256, fy = 256;
-    for (var r = 0.12; r <= 0.96; r += 0.012) {
-      var x = Math.round(256 + dx * r * 256), y = Math.round(256 + dy * r * 256);
-      if (x < 0 || x >= s || y < 0 || y >= s) continue;
-      var i = (y * s + x) * 4;
-      var rr = data[i], gg = data[i + 1], bb = data[i + 2];
+    var a = PEGS[t.p1], b = PEGS[t.p2];
+    var x1 = a ? a.nx * s : 256, y1 = a ? a.ny * s : 256;
+    var x2 = b ? b.nx * s : 256, y2 = b ? b.ny * s : 256;
+    var N = 16, bright = 0, peak = 0, far = 0, xsum = 0;
+    var hueX = 0, hueY = 0, hueW = 0;
+    for (var k = 0; k < N; k++) {
+      var u = 0.12 + (k / (N - 1)) * 0.88;
+      var px = Math.round(x1 + (x2 - x1) * u);
+      var py = Math.round(y1 + (y2 - y1) * u);
+      var rr = 0, gg = 0, bb = 0, n = 0;
+      for (var oy = -1; oy <= 1; oy++) for (var ox = -1; ox <= 1; ox++) {
+        var sx = px + ox, sy = py + oy;
+        if (sx < 0 || sx >= s || sy < 0 || sy >= s) continue;
+        var di = (sy * s + sx) * 4;
+        rr += data[di]; gg += data[di + 1]; bb += data[di + 2]; n++;
+      }
+      if (!n) continue;
+      rr /= n; gg /= n; bb /= n;
       var lum = (rr * 0.299 + gg * 0.587 + bb * 0.114) / 255;
       var hsv = twRgbToHsv(rr, gg, bb);
       var signal = Math.max(lum, hsv[1] * 0.65, hsv[2] * 0.5);
       if (imageInvert) signal = 1 - signal;
       if (signal > peak) peak = signal;
-      var on = signal > threshold;
-      if (on && !wasOn) edges++;
-      wasOn = on;
-      if (on) {
-        best = r; fx = x; fy = y;
-        hueSum += hsv[0] * signal * hsv[1];
-        hueW += signal * hsv[1];
+      if (signal > threshold) {
+        bright++; far = u; xsum += px;
+        var w = Math.max(0.001, hsv[1] * signal);
+        hueX += Math.cos(hsv[0] * Math.PI / 180) * w;
+        hueY += Math.sin(hsv[0] * Math.PI / 180) * w;
+        hueW += w;
       }
     }
-    var density = Math.min(1, edges / 6);
-    t.len = best > 0 ? Math.max(0.12, Math.min(0.72, 0.12 + 0.60 * best)) : 0.30;
+    var density = bright / N;
+    t.len = far > 0 ? Math.max(0.12, Math.min(0.72, 0.12 + 0.60 * far)) : 0.30;
     t.vel = Math.max(0.16, Math.min(0.64, 0.16 + 0.48 * peak));
     t.density = density;
-    t.active = best > 0 && density >= densityThreshold;
-    t.panOverride = Math.max(-0.85, Math.min(0.85, (fx / 512 - 0.5) * 1.7));
-    t.rim = best > 0.62;
+    t.active = bright > 0 && density >= densityThreshold;
+    t.panOverride = Math.max(-0.85, Math.min(0.85, (bright ? (xsum / bright) / s - 0.5 : 0) * 1.7));
+    t.rim = far > 0.62;
     t.img = true;
     if (imageColorMap && hueW > 0.02) {
-      t.colorId = twNearestSpool(hueSum / hueW, 1.0);
+      var hue = Math.atan2(hueY, hueX) * 180 / Math.PI;
+      if (hue < 0) hue += 360;
+      t.colorId = twNearestSpool(hue, 1.0);
     }
   });
   twUpdateStatus();
   var active = THREADS.filter(function(t){ return t.active !== false; }).length;
-  twToast('图片已映射：' + active + '/' + THREADS.length + ' 根丝线触发 · 颜色/位置/密度');
+  twToast('图片已映射：' + active + '/' + THREADS.length + ' 根丝线 · 沿线取色/亮度/密度');
 }
 function twLoadImage(file) {
   if (!file) return;
@@ -2353,6 +2374,13 @@ function drawLoom() {
     ctx.restore();
   }
 
+  if (twAudioAnalyser) {
+    var ad = new Uint8Array(twAudioAnalyser.fftSize);
+    twAudioAnalyser.getByteTimeDomainData(ad);
+    var asum = 0; for (var ai = 0; ai < ad.length; ai++) { var av = (ad[ai] - 128) / 128; asum += av * av; }
+    twAudioPulse = twAudioPulse * 0.82 + Math.sqrt(asum / ad.length) * 0.18;
+  } else { twAudioPulse *= 0.92; }
+  var pulseGlow = Math.max(0, Math.min(0.9, twAudioPulse * 1.8));
   THREADS.forEach(th => {
     var a = PEGS[th.p1], b = PEGS[th.p2];
     if (!a || !b) return;
@@ -2360,10 +2388,11 @@ function drawLoom() {
     var sp = SPOOLS[th.colorId % SPOOLS.length];
     ctx.save();
     ctx.strokeStyle = sp.hex;
-    ctx.lineWidth = (1.65 + (th.glow || 0) * 1.8) * dpr;
-    if (th.glow > 0.1) {
+    var drawGlow = Math.max(th.glow || 0, pulseGlow);
+    ctx.lineWidth = (1.65 + drawGlow * 1.8) * dpr;
+    if (drawGlow > 0.1) {
       ctx.shadowColor = sp.hex;
-      ctx.shadowBlur = th.glow * 10 * dpr;
+      ctx.shadowBlur = drawGlow * 10 * dpr;
       th.glow *= 0.92;
     }
     ctx.beginPath();
@@ -2475,7 +2504,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选一件民乐", "左侧八件民乐，点一件作为主奏"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线；线越长音越低"], ["03", "等竹梭", "竹梭扫过丝线时自动演奏；点顶部曲目切换动机"], ["04", "上传图片", "颜色映射乐器、半径映射音区、横向映射声像、密度决定触发；可导出声图"]], "note": "怎么玩：先选乐器 → 拨线 → 等竹梭。图片映射：颜色→乐器；半径/线长→音区与奏法；横向→声像；亮部密度→哪些线发声；音高骨架来自顶部曲目动机。创作者：MING。 其他：顶部导WAV/录视频/玩法；底栏阈值/密度/反相/颜色映射；导出声图。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "传统纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选一件民乐", "左侧八件民乐，点一件作为主奏"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线；线越长音越低"], ["03", "等竹梭", "竹梭扫过丝线时自动演奏；点顶部曲目切换动机"], ["04", "上传图片", "纹样决定针脚路径；图片沿每根针脚取色/亮度/密度；音频只做底音与光晕"]], "note": "怎么玩：先选乐器 → 拨线 → 等竹梭。纹样决定针脚路径与调式；图片沿每根针脚取色/亮度/密度，影响音色、音区、声像与是否发声；音高骨架来自曲目动机；音频只做底音与光晕，不决定音符。创作者：MING。 其他：顶部导WAV/录视频/玩法；底栏阈值/密度/反相/颜色映射；导出声图。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "传统纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

@@ -76,6 +76,8 @@ canvas{display:block;width:100%;height:100%;touch-action:none}</style>
     pluck(i, vel){
       const s = this.s[i];
       if (!s) return;
+      // 拨弦瞬间用目标值，避免参数被平滑滞后吞掉
+      for (const k of ["pluckForce","pluckPos","tension","fingerForce","fret"]) this.q[k] = this.p[k];
       const p = this.q;
       const ringing = s.amp > 0.004;
       this.tune(i);
@@ -284,7 +286,7 @@ const PRESETS=[
 ];
 
 const cv=document.getElementById("c"), g=cv.getContext("2d");
-let W=0,H=0,DPR=1,SCALE=1000,CX=0,CY=0,spots=[];
+let W=0,H=0,DPR=1,bloomCv=null,bloomCx=null,glowWarm=null,glowCool=null,SCALE=1000,CX=0,CY=0,spots=[];
 const CAM={yaw:-.24,pitch:.56,zoom:1};
 function layout(){
  W=innerWidth;H=innerHeight;DPR=Math.min(2,devicePixelRatio||1);
@@ -413,6 +415,12 @@ function board(){
       g.fillStyle=warm?"rgba(255,186,132,.92)":"rgba(186,236,255,.86)";
       if(on){g.shadowColor=warm?"rgba(255,150,80,.95)":"rgba(120,220,255,.95)";g.shadowBlur=18;}
       g.fill(); g.shadowBlur=0;
+      if(bloomCx){
+        const sp=warm?glowWarm:glowCool, sz=on?52:30;
+        bloomCx.globalAlpha=on?0.85:0.35;
+        bloomCx.drawImage(sp,x-sz/2,y-sz/2,sz,sz);
+        bloomCx.globalAlpha=1;
+      }
       const hg=g.createRadialGradient(x,y,1,x,y,r*3.2);
       hg.addColorStop(0,warm?"rgba(255,160,90,.20)":"rgba(130,220,255,.18)");
       hg.addColorStop(1,"rgba(0,0,0,0)");
@@ -425,6 +433,17 @@ function board(){
       }
     }
   }
+  // bloom 合成
+  if(bloomCv && bloomCx){
+    g.save(); g.globalCompositeOperation="lighter"; g.filter="blur(6px)";
+    g.drawImage(bloomCv,0,0); g.restore();
+    bloomCx.clearRect(0,0,W,H);
+  }
+  // 主光：板面上一团柔光
+  const key=g.createRadialGradient(B.x0+w*0.35,B.y0-20,10,B.x0+w*0.35,B.y0-20,w*0.55);
+  key.addColorStop(0,"rgba(255,240,215,.10)"); key.addColorStop(1,"rgba(255,240,215,0)");
+  g.save(); g.globalCompositeOperation="lighter"; g.fillStyle=key; g.fillRect(B.x0,B.y0-120,w,h+40); g.restore();
+
   // 琴枕 / 琴桥
   g.strokeStyle="rgba(225,228,210,.5)"; g.lineWidth=3;
   g.beginPath(); g.moveTo(B.x0,B.y0+8); g.lineTo(B.x0,B.y1-8); g.stroke();
@@ -501,11 +520,11 @@ function modesUI(){
 function params(){
   const top=536, x0=64, x1=W-64, colW=(x1-x0)/5;
   const groups=[
-   ["弦 / STRING",["tension","radius","pluckPos","pluckForce","lowDecay"]],
-   ["品 / FRET",["fret","barrierH","barrierAlpha","barrierStiff","highDecay"]],
-   ["指 / FINGER",["fingerPos","fingerForce","fingerStiff"]],
-   ["反馈 / FEEDBACK",["fbAmt","fbPos","fbFilter"]],
-   ["输出 / OUTPUT",["out1","out2","volume","safety"]]
+   ["弦 / STRING",["tension","pluckForce"]],
+   ["品 / FRET",["fret","barrierH","highDecay"]],
+   ["指 / FINGER",["fingerPos"]],
+   ["反馈 / FEEDBACK",["fbAmt"]],
+   ["输出 / OUTPUT",["out1","volume","safety"]]
   ];
   groups.forEach((gr,gi)=>{
     const x=x0+gi*colW, tw=colW-26;
@@ -819,7 +838,21 @@ function camLoop(){
   prevE=e;
   requestAnimationFrame(camLoop);
 }
-layout();makeGrain();draw();
+function makeBloom(){
+  bloomCv=document.createElement("canvas"); bloomCv.width=W; bloomCv.height=H;
+  bloomCx=bloomCv.getContext("2d");
+  const mk=(r,gg,b)=>{
+    const c=document.createElement("canvas"); c.width=64; c.height=64;
+    const q=c.getContext("2d");
+    const gr=q.createRadialGradient(32,32,0,32,32,32);
+    gr.addColorStop(0,"rgba("+r+","+gg+","+b+",0.9)");
+    gr.addColorStop(.35,"rgba("+r+","+gg+","+b+",0.30)");
+    gr.addColorStop(1,"rgba("+r+","+gg+","+b+",0)");
+    q.fillStyle=gr; q.fillRect(0,0,64,64); return c;
+  };
+  glowWarm=mk(255,170,110); glowCool=mk(140,225,255);
+}
+layout();makeGrain();makeBloom();draw();
 window.__noir={P,state,pluck,applyPreset,get lang(){return lang;}};
 
 </script><div id="help"><div class="card">
