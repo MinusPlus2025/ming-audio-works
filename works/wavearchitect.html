@@ -169,6 +169,7 @@ function handleUserAudioUpload(file, ctx, targetNode) {
       userAudioSource.connect(userAudioGainNode);
       if (inputGain) userAudioGainNode.connect(inputGain); else userAudioGainNode.connect(targetNode);
       userAudioSource.start(0);
+      state.tapeSpeed = 1.0;
       state.isRunning = false;
       updateUserAudioUI(true);
       if (typeof waOnInputLoaded === 'function') waOnInputLoaded();
@@ -814,11 +815,10 @@ function handleBoardDown(e) {
 
   // 4) Discrete Button & Matrix Clicks
   if (my < 0.065) {
-    if (mx > 0.50 && mx < 0.82) {
+    if (mx > 0.55) {
       state.stemIdx = (state.stemIdx + 1) % STEMS.length;
+      showControlHUD('STEM ' + (state.stemIdx + 1) + '/' + STEMS.length, (state.stemIdx + 1) / STEMS.length, 0.68, 0.03);
       triggerStationAudio(STATIONS[0], CARS[0]);
-    } else if (mx >= 0.82) {
-      state.isRunning = !state.isRunning;
     }
     return;
   }
@@ -863,7 +863,7 @@ function handleBoardDown(e) {
 
   // Left-Edge 7 Solder Pad Action Buttons
   if (px >= 0.005 && px <= 0.085 && py >= 0.56 && py <= 0.85) {
-    var padIdx = Math.max(0, Math.min(3, Math.round((py - 0.58) / 0.065)));
+    var padIdx = Math.max(0, Math.min(2, Math.round((py - 0.58) / 0.065)));
     if (padIdx === 0) {
       // +抽头: Add a new F1 Delay Tap Car while preserving existing cars!
       var ratios = [1.0, 1.498, 2.0, 0.75, 1.25, 1.335];
@@ -882,30 +882,6 @@ function handleBoardDown(e) {
     }
     if (padIdx === 1) { resetPCBToCleanDefault(); return; }
     if (padIdx === 2) { state.stemIdx = (state.stemIdx + 1) % STEMS.length; return; }
-    if (padIdx === 3) {
-      exportCurrentStateWAV('WaveArchitect_AvantTape_MultiTap', function(L, R, sr, N) {
-        var stem = STEMS[state.stemIdx % STEMS.length];
-        var icTrans = Math.pow(2.0, ((state.activeChordPin || 0) % 12) / 12.0);
-        for (var st = 0; st < 52; st++) {
-          var t0 = st * 0.15;
-          if (t0 >= 7.8) break;
-          var s16 = st % 16, bar = Math.floor(st / 16) % 4;
-          if (s16 === 0 || s16 === 8) mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W2_DATA, 'kick', t0, 0.25, 55.0, 0.48, 0.0, 1.0);
-          if (s16 === 4 || s16 === 12) mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W2_DATA, 'snare', t0, 0.22, 185.0, 0.38, 0.0, 1.0);
-          if (s16 % 2 === 0) mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W2_DATA, 'bass', t0, 0.22, stem.bass[bar] * 2.0 * icTrans, 0.36, -0.2, 1.0);
-          if (s16 === 0 || s16 === 10) {
-            stem.chords[bar].forEach((cf, ci) => {
-              mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W2_DATA, 'rhodes', t0, 0.50, cf * icTrans, 0.20, (ci - 1.5) * 0.35, 1.0);
-            });
-          }
-          if (CARS.length > 0 && (s16 % 3 === 1)) {
-            var sf = stem.solo[st % stem.solo.length] * icTrans;
-            mixDlsNoteIntoFloatArrays(L, R, sr, DLS_W2_DATA, 'sax', t0, 0.36, sf, 0.32, Math.sin(st) * 0.65, 1.0);
-          }
-        }
-      });
-      return;
-    }
   }
 
   // Clicking on the PCB Racetrack places a new F1 Delay Tap Car at that exact track position (preserving existing cars)!
@@ -957,6 +933,9 @@ function handleBoardMove(e) {
   } else if (activeDrag2.kind === 'reel') {
     var dAng = (mx - activeDrag2.startMx) * 8.0 + (activeDrag2.startMy - my) * 8.0;
     state.reelAngle += dAng * 0.25;
+    state.tapeSpeed = Math.max(0.75, Math.min(1.25, (state.tapeSpeed || 1) + dAng * 0.03));
+    if (userAudioSource && audioCtx) userAudioSource.playbackRate.setTargetAtTime(state.tapeSpeed, audioCtx.currentTime, 0.03);
+    showControlHUD('TAPE SPEED ×' + state.tapeSpeed.toFixed(2), 0.5, 0.74, 0.58);
     activeDrag2.startMx = mx; activeDrag2.startMy = my;
     if (wowDelay && audioCtx) {
       wowDelay.delayTime.setTargetAtTime(Math.max(0.002, Math.min(0.045, 0.015 + dAng * 0.01)), audioCtx.currentTime, 0.02);
@@ -1177,8 +1156,8 @@ function drawBoard() {
   ctx.fillStyle = '#1c2024';
   for (var i = 0; i < 8; i++) ctx.fillRect(bx + 40 * dpr, by + (36 + i * 11) * dpr, 10 * dpr, 4 * dpr);
 
-  var leftLabels = ['+抽头', '清空车', '换曲风', '导WAV'];
-  ['#1c2024', '#ebe5d3', '#1c2024', '#0c9e44'].forEach((col, idx) => {
+  var leftLabels = ['+抽头', '清空车', '换曲风'];
+  ['#1c2024', '#ebe5d3', '#1c2024'].forEach((col, idx) => {
     var rpx = bx + 26 * dpr, rpy = by + bh * (0.58 + idx * 0.065);
     ctx.fillStyle = col; ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2 * dpr;
     ctx.beginPath(); ctx.arc(rpx, rpy, 9.5 * dpr, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
