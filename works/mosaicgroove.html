@@ -136,7 +136,7 @@
 </div>
 
 <div class="mg-bar" id="mgBar">
-  <button data-act="undo" title="Ctrl/Cmd+Z">撤销</button>
+  <button data-act="undo" title="撤销上一步编辑">撤销</button>
     <span class="mg-scenes">场景 <button data-scene="0" class="on" title="场景 A：独立的 31 步图案">A</button><button data-scene="1" title="场景 B：独立的 31 步图案">B</button><button data-scene="2" title="场景 C：独立的 31 步图案">C</button><button data-scene="3" title="场景 D：独立的 31 步图案">D</button></span>
   <span class="mg-bpm">BPM
     <button data-act="bpmdown">−</button><input id="mgBpm" type="number" min="70" max="160" step="1" value="124" inputmode="numeric" aria-label="BPM"><button data-act="bpmup">＋</button>
@@ -146,7 +146,7 @@
   <button data-act="wav" title="导出当前场景 8 秒 WAV">WAV</button>
   <button data-act="proj" title="导出四场景工程 JSON">工程</button>
   <button data-act="loadproj" title="导入工程 JSON">导入</button>
-  <button data-act="help">玩法</button>
+  <button data-act="help" title="查看玩法">玩法</button>
   <button data-act="song" id="mgSongBtn" title="编排模式：A→B→C→D 串联">编排</button>
 </div>
 
@@ -1233,7 +1233,7 @@ function drawWall() {
       var mNames = [['手','动'], ['🧬','演化'], ['💣','连锁']][state.playMode3];
       drawSingleTile(c * cw, 0, cw, ch, '#124296', 0, dpr, 0.6, mNames[0], mNames[1], '#ffffff');
     } else if (c === 25) {
-      drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0.4, 'B' + (state.chordIdx + 1), '和弦', '#1c1d1f');
+      drawSingleTile(c * cw, 0, cw, ch, '#f2c111', 0, dpr, 0.4, 'CH' + (state.chordIdx + 1), '和弦', '#1c1d1f');
     } else if (c === 26) {
       drawSingleTile(c * cw, 0, cw, ch, '#0b8a3e', 0, dpr, 0, '舞', 'SEED', '#ffffff');
     } else if (c === 27) {
@@ -1308,7 +1308,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); seedDefaultMosaicA
 <script>
 
 (function(){
-  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖/切砖", "在网格里点砖；双击切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "存场景/编排", "A/B/C/D 存不同段落；开编排模式串联，点“多轨”导出编排 MIDI"]], "note": "怎么玩：选颜色 → 点砖 → 按 PLAY → 存场景/编排。A/B/C/D 是四份独立 31 步图案；开编排模式后每 31 步自动串联，点“多轨”导出编排 MIDI。创作者：MING。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
+  var cfg = {"title": "贴第一块砖", "sub": "MOSAICGROOVE · 电音瓷砖墙", "lede": "在墙上贴砖，就是写一段 beat。行是音高，列是时间，颜色是乐器。", "steps": [["01", "选颜色", "顶部一排颜色，就是六种乐器画笔"], ["02", "点砖/切砖", "在网格里点砖；双击切成三角，改变奏法"], ["03", "按 PLAY", "扫描线经过哪一列，哪一列的砖才发声"], ["04", "存场景/编排", "A/B/C/D 存不同段落；开编排模式串联，点“多轨”导出编排 MIDI"]], "note": "怎么玩：选颜色 → 点砖 → 按 PLAY → 存场景/编排。A/B/C/D 是四份独立 31 步图案；开编排模式后每 31 步自动串联，点“多轨”导出编排 MIDI。创作者：MING。 其他：撤销/种子/清除/传音频/录视频/工程/导入；BPM 可直接输入。", "panel": "#f7f3ea", "ink": "#171412", "subc": "#6b6358", "accent": "#c23a2b", "line": "#d8cbb8", "dark": false, "shareTitle": "电音瓷砖墙 MOSAICGROOVE", "shareSub": "交互式律动墙 · WEB AUDIO", "shareFile": "MosaicGroove"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

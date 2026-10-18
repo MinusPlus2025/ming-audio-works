@@ -126,13 +126,13 @@
 </div>
 
 <div class="wa-bar" id="waBar">
-  <button data-wa="load">载入干声</button>
+  <button data-wa="load" title="载入一段干声，走 FX 链">载入干声</button>
   <label>预设 <select id="waPreset"><option value="init">Init</option><option value="slap">Tape Slap</option><option value="dub">Dub Chamber</option><option value="radio">Broken Radio</option></select></label>
   <label>干湿 <input type="range" id="waWet" min="0" max="1" step="0.01" value="0.65"></label>
-  <button data-wa="bypass" class="ghost">旁通</button>
+  <button data-wa="bypass" class="ghost" title="旁通：干声直通，不听 FX">旁通</button>
   <button data-wa="rec" title="录制当前处理结果（WebM）">录制输出</button>
   <span class="wa-meter-label">IN</span><span class="wa-meter" title="输入电平"><i id="waMeterBar"></i></span>
-  <button data-wa="help" class="ghost">玩法</button>
+  <button data-wa="help" class="ghost" title="查看玩法">玩法</button>
   <span class="wa-status" id="waStatus">输入模式 · 请载入干声</span>
   <span class="wa-sp">MING</span>
 </div>
@@ -1635,7 +1635,7 @@ window.addEventListener('DOMContentLoaded', () => { resize(); loadWaveState(); d
 <script>
 
 (function(){
-  var cfg = {"title": "先载入一段干声", "sub": "WAVEARCHITECT · KERS-0174", "lede": "这不是生成器。载入一段干声，磁带链才开始工作；想听生成器，点左上 RUN。", "steps": [["01", "载入干声", "底栏“载入干声”；没有干声时保持安静"], ["02", "调磁带", "预设/干湿/6 段 EQ/磁带旋钮，听前后差异"], ["03", "录制输出", "底栏“录制输出”录下当前处理结果（WebM）"], ["04", "试听生成器", "点左上 RUN 或引导“一键试听”，听生成器演示"]], "note": "怎么玩：载入干声 → 调预设/干湿/EQ → 录制输出。赛车/焊盘只做视觉与调制；想听生成器点左上 RUN。左列重复的导WAV已移除。创作者：MING。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
+  var cfg = {"title": "先载入一段干声", "sub": "WAVEARCHITECT · KERS-0174", "lede": "这不是生成器。载入一段干声，磁带链才开始工作；想听生成器，点左上 RUN。", "steps": [["01", "载入干声", "底栏“载入干声”；没有干声时保持安静"], ["02", "调磁带", "预设/干湿/6 段 EQ/磁带旋钮，听前后差异"], ["03", "录制输出", "底栏“录制输出”录下当前处理结果（WebM）"], ["04", "试听生成器", "点左上 RUN 或引导“一键试听”，听生成器演示"]], "note": "怎么玩：载入干声 → 调预设/干湿/EQ → 录制输出。赛车/焊盘只做视觉与调制；想听生成器点左上 RUN。左列重复的导WAV已移除。创作者：MING。 其他：预设/旁通/6段EQ/录制输出；顶部曲风可点；点赛道放车，拖开盘轮变速。", "panel": "#0f2b1e", "ink": "#f2f7ee", "subc": "#9db8a5", "accent": "#ff6b45", "line": "#2b4a38", "dark": true, "shareTitle": "声波建筑师 WAVEARCHITECT", "shareSub": "KERS-0174 · 开盘磁带与多抽头延迟", "shareFile": "WaveArchitect"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;

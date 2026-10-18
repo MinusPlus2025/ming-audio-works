@@ -139,12 +139,12 @@
 
 <div class="tw-bar" id="twBar">
   <button data-tw="upload" title="也可以把图片直接拖进页面">上传图片</button>
-  <button data-tw="clear" class="ghost">清除图样</button>
-  <button data-tw="invert" class="ghost">反相</button>
+  <button data-tw="clear" class="ghost" title="清除当前图片映射，保留丝线">清除图样</button>
+  <button data-tw="invert" class="ghost" title="反相：亮部变暗部">反相</button>
   <label>阈值 <input type="range" id="twThreshold" min="0.25" max="0.85" step="0.01" value="0.55"></label>
   <label>密度 <input type="range" id="twDensity" min="0" max="0.6" step="0.01" value="0.12"></label>
-  <button data-tw="color" class="ghost">颜色映射 · 开</button>
-  <button data-tw="sound">导出声图</button>
+  <button data-tw="color" class="ghost" title="颜色→乐器开关">颜色映射 · 开</button>
+  <button data-tw="sound" title="导出含图案与 8 秒音频的单文件 HTML">导出声图</button>
   <span class="tw-status" id="twStatus">织锦模式</span>
   <span class="tw-sp">MING</span>
 </div>
@@ -162,7 +162,7 @@ function ensureIOGraph(ctx, masterNode) {
 
 function updateUserAudioUI(loaded) {
   var hoop = TOP_HOOPS.find(function(t){ return t.id === 'upload'; });
-  if (hoop) { hoop.label = loaded ? '停底音' : '📂 传音频'; hoop.sub = loaded ? 'BED' : 'UPLOAD'; }
+  if (hoop) { hoop.label = loaded ? '停底音' : '底音'; hoop.sub = 'BED'; }
   var st = document.getElementById('twStatus');
   if (st) st.textContent = loaded ? '底音 · 单曲循环' : '织锦模式';
 }
@@ -285,7 +285,7 @@ var PATTERN_HOOPS = [
 var TOP_HOOPS = [
   { id: 'sym',    x: 0.505, y: 0.068, r: 19, label: '对称: 8x',   sub: 'SYMMETRY', col: '#1e3a8a' },
   { id: 'scale',  x: 0.570, y: 0.068, r: 19, label: '春江',     sub: 'MOTIF',    col:'#0f766e' },
-  { id: 'upload', x: 0.635, y: 0.068, r: 19, label: '📂 传音频',  sub: 'UPLOAD',   col: '#6b21a8' },
+  { id: 'upload', x: 0.635, y: 0.068, r: 19, label: '底音',      sub: 'BED',      col: '#6b21a8' },
   { id: 'wav',    x: 0.700, y: 0.068, r: 19, label: '🎵 导WAV',   sub: 'EXPORT',   col: '#b45309' },
   { id: 'video',  x: 0.765, y: 0.068, r: 19, label: '🎥 录视频',  sub: 'VIDEO',    col: '#b91c1c' },
   { id: 'play',   x: 0.830, y: 0.068, r: 19, label: '■ 抚琴中',   sub: 'RUNNING',  col: '#b91c1c' },
@@ -2475,7 +2475,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <script>
 
 (function(){
-  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选一件民乐", "左侧八件民乐，点一件作为主奏"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线；线越长音越低"], ["03", "等竹梭", "竹梭扫过丝线时自动演奏；点顶部曲目切换动机"], ["04", "上传图片", "颜色映射乐器、半径映射音区、横向映射声像、密度决定触发；可导出声图"]], "note": "怎么玩：先选乐器 → 拨线 → 等竹梭。图片映射：颜色→乐器；半径/线长→音区与奏法；横向→声像；亮部密度→哪些线发声；音高骨架来自顶部曲目动机。创作者：MING。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "传统纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
+  var cfg = {"title": "绣出第一根线", "sub": "THREADWEAVE · 穿针织音", "lede": "绷架就是乐器。丝线越长，音越低；线离圆心越近，奏法越绵长。", "steps": [["01", "选一件民乐", "左侧八件民乐，点一件作为主奏"], ["02", "拨线", "在绷架上点击，或按住拖过几根丝线；线越长音越低"], ["03", "等竹梭", "竹梭扫过丝线时自动演奏；点顶部曲目切换动机"], ["04", "上传图片", "颜色映射乐器、半径映射音区、横向映射声像、密度决定触发；可导出声图"]], "note": "怎么玩：先选乐器 → 拨线 → 等竹梭。图片映射：颜色→乐器；半径/线长→音区与奏法；横向→声像；亮部密度→哪些线发声；音高骨架来自顶部曲目动机。创作者：MING。 其他：顶部导WAV/录视频/玩法；底栏阈值/密度/反相/颜色映射；导出声图。", "panel": "#f6efe2", "ink": "#1c1510", "subc": "#6d5f4e", "accent": "#a8342a", "line": "#d8cbb8", "dark": false, "shareTitle": "穿针织音 THREADWEAVE", "shareSub": "传统纹样与八音民乐织机 · WEB AUDIO", "shareFile": "ThreadWeave"};
   var modal = document.getElementById('guideModal') || document.querySelector('.guide-modal');
   if(!modal) return;
   var card = modal.querySelector('.guide-card') || modal.firstElementChild;
