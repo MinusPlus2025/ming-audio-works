@@ -2955,6 +2955,7 @@ function drawLoom() {
   } else { twAudioPulse *= 0.92; }
   var pulseGlow = Math.max(0, Math.min(0.9, twAudioPulse * 1.8));
   if (window.TW_POSTER_CLEAN) pulseGlow = 0;
+  var _posterWeight = window.TW_POSTER_BOLD ? 2.25 : 1;
   // 16-step motif halo: the selected repertoire is visible as a score ring
   var _sc = SCALES[state.scaleIdx % SCALES.length];
   var _motif = _sc.leadMotif || [];
@@ -3009,13 +3010,13 @@ function drawLoom() {
     ctx.save();
     ctx.translate(1.15*dpr, 1.35*dpr);
     ctx.strokeStyle = 'rgba(40,18,8,.20)';
-    ctx.lineWidth = (1.9 + drawGlow * 0.8) * dpr;
+    ctx.lineWidth = (1.9 + drawGlow * 0.8) * dpr * _posterWeight;
     traceThread(); ctx.stroke();
     ctx.restore();
     // silk core
     ctx.save();
     ctx.strokeStyle = sp.hex;
-    ctx.lineWidth = (1.35 + drawGlow * 0.9) * dpr;
+    ctx.lineWidth = (1.35 + drawGlow * 0.9) * dpr * _posterWeight;
     if (drawGlow > 0.1) {
       ctx.shadowColor = sp.hex;
       ctx.shadowBlur = drawGlow * 5 * dpr;
@@ -3024,8 +3025,8 @@ function drawLoom() {
     traceThread(); ctx.stroke();
     // silk highlight
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,246,226,.52)';
-    ctx.lineWidth = .5 * dpr;
+    ctx.strokeStyle = window.TW_POSTER_BOLD ? 'rgba(255,252,240,.78)' : 'rgba(255,246,226,.52)';
+    ctx.lineWidth = .5 * dpr * (_posterWeight > 1 ? 1.35 : 1);
     traceThread(); ctx.stroke();
     ctx.restore();
   });
@@ -3822,7 +3823,7 @@ document.getElementById('tw3Bpm').addEventListener('input',setBpm);document.getE
   document.getElementById('tw3Poster').onclick=function(){
     var _saveGlow = [], _saveVib = [], _savePeg = [], _saveKnot = [];
     try {
-      window.TW_POSTER_CLEAN = true;
+      window.TW_POSTER_CLEAN = true; window.TW_POSTER_BOLD = true;
       for (var _i=0;_i<THREADS.length;_i++){ _saveGlow.push(THREADS[_i].glow||0); _saveVib.push(THREADS[_i].vibAmp||0); THREADS[_i].glow=0; THREADS[_i].vibAmp=0; }
       for (var _p=0;_p<PEGS.length;_p++){ _savePeg.push(PEGS[_p].glow||0); PEGS[_p].glow=0; }
       for (var _k=0;_k<KNOTS.length;_k++){ _saveKnot.push(KNOTS[_k].glow||0); KNOTS[_k].glow=0; }
@@ -3838,7 +3839,7 @@ document.getElementById('tw3Bpm').addEventListener('input',setBpm);document.getE
     g.strokeStyle='rgba(185,65,50,.55)';g.lineWidth=1;g.setLineDash([5,5]);g.strokeRect(34,34,W-68,H-68);g.setLineDash([]);
     var sw=W-80, sh=Math.round(sw*src.height/src.width);
     var sy=175; var ih=Math.min(sh,820); g.drawImage(src,40,sy,sw,ih);
-    window.TW_POSTER_CLEAN = false; for (var _r=0;_r<THREADS.length;_r++){THREADS[_r].glow=_saveGlow[_r]||0;THREADS[_r].vibAmp=_saveVib[_r]||0;} for (var _rp=0;_rp<PEGS.length;_rp++){PEGS[_rp].glow=_savePeg[_rp]||0;} for (var _rk=0;_rk<KNOTS.length;_rk++){KNOTS[_rk].glow=_saveKnot[_rk]||0;}
+    window.TW_POSTER_CLEAN = false; window.TW_POSTER_BOLD = false; for (var _r=0;_r<THREADS.length;_r++){THREADS[_r].glow=_saveGlow[_r]||0;THREADS[_r].vibAmp=_saveVib[_r]||0;} for (var _rp=0;_rp<PEGS.length;_rp++){PEGS[_rp].glow=_savePeg[_rp]||0;} for (var _rk=0;_rk<KNOTS.length;_rk++){KNOTS[_rk].glow=_saveKnot[_rk]||0;}
     g.strokeStyle='rgba(139,106,69,.65)';g.lineWidth=1;g.strokeRect(40,sy,sw,ih);
     var tg=g.createLinearGradient(60,55,680,125);tg.addColorStop(0,'#5a1712');tg.addColorStop(.32,'#b94132');tg.addColorStop(.55,'#d4af37');tg.addColorStop(.78,'#8f2e23');tg.addColorStop(1,'#4a2511');g.fillStyle=tg;g.textAlign='left';g.font='800 48px "Songti SC",serif';g.fillText('穿针织音 · 八声织锦',60,105);
     g.strokeStyle='#b94132';g.lineWidth=2;g.setLineDash([6,5]);g.beginPath();g.moveTo(60,154);g.lineTo(590,154);g.stroke();g.setLineDash([]);
