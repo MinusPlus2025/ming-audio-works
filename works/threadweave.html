@@ -330,12 +330,12 @@ window.TW_REAL_MAP[9]="sheng_cn";
  <div class="tw3-hint">选风格与声部，在绣绷上画线；发光的线就是当前发声线。</div>
  <aside class="tw3-left"><div class="tw3-cap">声部 <span>VOICES</span></div><div id="tw3Roles"></div><div class="tw3-drawhint">当前：<b id="tw3NowName">古筝</b> · 画线即发声</div><div class="tw3-vfx"><div class="tw3-cap">声部效果 <span id="tw3VName">主奏</span></div><label>TONE <input id="tw3VTone" type="range" min="0" max="100" value="62"></label><label>DRIVE <input id="tw3VDrive" type="range" min="0" max="100" value="8"></label><label>RES <input id="tw3VRes" type="range" min="0" max="100" value="20"></label><label>BODY <input id="tw3VBody" type="range" min="0" max="100" value="48"></label><label>LEVEL <input id="tw3VLevel" type="range" min="0" max="100" value="80"></label><label>ECHO <input id="tw3VEcho" type="range" min="0" max="100" value="10"></label><label>DELAY <input id="tw3VDelay" type="range" min="0" max="100" value="8"></label><label>SPACE <input id="tw3VSpace" type="range" min="0" max="100" value="18"></label></div></aside>
  <aside class="tw3-right"><div class="tw3-cap">纹样 <span>PATTERNS</span></div><div class="tw3-patterns" id="tw3Patterns"></div><details class="tw3-master" open><summary>全局总线 <span>MASTER BUS</span></summary><p class="tw3-master-note">作用于所有声部；不是纹样效果</p><div class="tw3-fx"><label>TONE <input id="tw3Tone" type="range" min="0" max="100" value="64"></label><label>RES <input id="tw3MasterRes" type="range" min="0" max="100" value="18"></label><label>DRIVE <input id="tw3MasterDrive" type="range" min="0" max="100" value="6"></label><label>CHORUS <input id="tw3Chorus" type="range" min="0" max="100" value="20"></label><label>DELAY <input id="tw3Delay" type="range" min="0" max="100" value="12"></label><label>REPEAT <input id="tw3MasterRepeat" type="range" min="0" max="100" value="22"></label><label>SPACE <input id="tw3Space" type="range" min="0" max="100" value="30"></label></div></details><details class="tw3-master tw3-elec-mix"><summary>电子层 <span>ELECTRO MIX</span></summary><p class="tw3-master-note">分别控制电子声部音量</p><div class="tw3-fx">
-<label>KICK <input id="twEMKick" type="range" min="0" max="100" value="100"></label>
-<label>HAT <input id="twEMHat" type="range" min="0" max="100" value="100"></label>
-<label>CLAP <input id="twEMClap" type="range" min="0" max="100" value="100"></label>
-<label>BASS <input id="twEMBass" type="range" min="0" max="100" value="100"></label>
-<label>PAD <input id="twEMPAD" type="range" min="0" max="100" value="100"></label>
-<label>ARP <input id="twEMArp" type="range" min="0" max="100" value="100"></label></div></details></aside>
+<label>KICK <input id="twEMKick" type="range" min="0" max="100" value="90"></label>
+<label>HAT <input id="twEMHat" type="range" min="0" max="100" value="72"></label>
+<label>CLAP <input id="twEMClap" type="range" min="0" max="100" value="78"></label>
+<label>BASS <input id="twEMBass" type="range" min="0" max="100" value="84"></label>
+<label>PAD <input id="twEMPAD" type="range" min="0" max="100" value="68"></label>
+<label>ARP <input id="twEMArp" type="range" min="0" max="100" value="62"></label></div></details></aside>
  <footer class="tw3-foot"><button class="tw3-quick" id="tw3Quick">一键开始</button><button class="tw3-next" id="tw3Next">换风格</button><button class="tw3-drums" id="tw3Drums" title="内置电子鼓组开关">鼓组 关</button><button class="tw3-electro" id="tw3Electro" title="电子 Pad / Sub 声部开关">电子 开</button><button class="tw3-mode" id="tw3Mode">专业模式</button><div class="tw3-scenes"><span>预设 · 存/取</span><div id="tw3SceneBtns"></div></div><button class="tw3-guide-btn" id="tw3Guide" title="玩法"><span class="tw3-qmark">?</span> 玩法</button><button class="tw3-about" id="tw3About" title="关于">关于</button><button class="tw3-share" id="tw3Poster" title="导出分享海报">▣ 海报</button><button class="tw3-clear" id="tw3Clear" title="清空纹样重新开始"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.2"></circle><circle cx="6" cy="18" r="2.2"></circle><path d="M8 7.2 20 17M8 16.8 20 7"></path></svg> 清空</button><button class="tw3-mobile" id="tw3Mobile">纹样 / FX</button><div class="tw3-sig">创作者：MING</div></footer>
 </div>
 <div class="loom-shell">
@@ -3433,7 +3433,7 @@ window.addEventListener('DOMContentLoaded', () => {
     motifStep=(motifStep+1)%256;
   };
   window.TW_ELECTRO = true;
-  window.TW_ELECTRO_MIX={kick:1,hat:1,clap:1,bass:1,pad:1,arp:1};
+  window.TW_ELECTRO_MIX={kick:.90,hat:.72,clap:.78,bass:.84,pad:.68,arp:.62};
   function twMix(k){var m=window.TW_ELECTRO_MIX;return (m && m[k]!==undefined)?m[k]:1;}
   function twElecMixVal(k){var v=parseFloat(document.getElementById('twEM'+{kick:'Kick',hat:'Hat',clap:'Clap',bass:'Bass',pad:'PAD',arp:'Arp'}[k]).value);return isNaN(v)?1:Math.max(0,Math.min(1,v/100));}
   ['kick','hat','clap','bass','pad','arp'].forEach(function(k){var el=document.getElementById('twEM'+{kick:'Kick',hat:'Hat',clap:'Clap',bass:'Bass',pad:'PAD',arp:'Arp'}[k]);if(el)el.addEventListener('input',function(){window.TW_ELECTRO_MIX[k]=twElecMixVal(k);});});
@@ -3783,7 +3783,7 @@ document.getElementById('tw3Bpm').addEventListener('input',setBpm);document.getE
   };
   function twSyncElectroMixUI(){
     var map={kick:'Kick',hat:'Hat',clap:'Clap',bass:'Bass',pad:'PAD',arp:'Arp'};
-    Object.keys(map).forEach(function(k){var el=document.getElementById('twEM'+map[k]);if(el){el.value=Math.round((window.TW_ELECTRO_MIX&&window.TW_ELECTRO_MIX[k]!==undefined?window.TW_ELECTRO_MIX[k]:1)*100);paintRange(el);}});
+    Object.keys(map).forEach(function(k){var el=document.getElementById('twEM'+map[k]);if(el){el.value=Math.round((window.TW_ELECTRO_MIX&&window.TW_ELECTRO_MIX[k]!==undefined?window.TW_ELECTRO_MIX[k]:({kick:.90,hat:.72,clap:.78,bass:.84,pad:.68,arp:.62}[k]||1))*100);paintRange(el);}});
   }
   function twSetElectro(on){window.TW_ELECTRO=!!on;var b=document.getElementById('tw3Electro');if(b){b.textContent='电子 '+(window.TW_ELECTRO?'开':'关');b.style.background=window.TW_ELECTRO?'#b94132':'#fbf3e3';b.style.color=window.TW_ELECTRO?'#fff8ec':'#5f432b';}}
   document.getElementById('tw3Electro').onclick=function(){twSetElectro(!window.TW_ELECTRO);twToast('电子声部 '+(window.TW_ELECTRO?'开':'关'));};
