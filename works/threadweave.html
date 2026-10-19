@@ -329,7 +329,7 @@ window.TW_REAL_MAP[9]="sheng_cn";
  </header>
  <div class="tw3-hint">选风格与声部，在绣绷上画线；发光的线就是当前发声线。</div>
  <aside class="tw3-left"><div class="tw3-cap">声部 <span>VOICES</span></div><div id="tw3Roles"></div><div class="tw3-drawhint">当前：<b id="tw3NowName">古筝</b> · 画线即发声</div><div class="tw3-vfx"><div class="tw3-cap">声部效果 <span id="tw3VName">主奏</span></div><label>TONE <input id="tw3VTone" type="range" min="0" max="100" value="62"></label><label>DRIVE <input id="tw3VDrive" type="range" min="0" max="100" value="8"></label><label>RES <input id="tw3VRes" type="range" min="0" max="100" value="20"></label><label>BODY <input id="tw3VBody" type="range" min="0" max="100" value="48"></label><label>LEVEL <input id="tw3VLevel" type="range" min="0" max="100" value="80"></label><label>ECHO <input id="tw3VEcho" type="range" min="0" max="100" value="10"></label><label>DELAY <input id="tw3VDelay" type="range" min="0" max="100" value="8"></label><label>SPACE <input id="tw3VSpace" type="range" min="0" max="100" value="18"></label></div></aside>
- <aside class="tw3-right"><div class="tw3-cap">纹样 <span>PATTERNS</span></div><div class="tw3-patterns" id="tw3Patterns"></div><details class="tw3-master" open><summary>全局总线 <span>MASTER BUS</span></summary><p class="tw3-master-note">作用于所有声部；不是纹样效果</p><div class="tw3-fx"><label>TONE <input id="tw3Tone" type="range" min="0" max="100" value="64"></label><label>RES <input id="tw3MasterRes" type="range" min="0" max="100" value="18"></label><label>DRIVE <input id="tw3MasterDrive" type="range" min="0" max="100" value="6"></label><label>CHORUS <input id="tw3Chorus" type="range" min="0" max="100" value="20"></label><label>DELAY <input id="tw3Delay" type="range" min="0" max="100" value="12"></label><label>REPEAT <input id="tw3MasterRepeat" type="range" min="0" max="100" value="22"></label><label>SPACE <input id="tw3Space" type="range" min="0" max="100" value="30"></label></div></details><details class="tw3-master tw3-elec-mix"><summary>电子层 <span>ELECTRO MIX</span></summary><p class="tw3-master-note">分别控制电子声部音量</p><div class="tw3-fx">
+ <aside class="tw3-right"><div class="tw3-cap">纹样 <span>PATTERNS</span></div><div class="tw3-patterns" id="tw3Patterns"></div><details class="tw3-master" open><summary>全局总线 <span>MASTER BUS</span></summary><p class="tw3-master-note">作用于所有声部；不是纹样效果</p><div class="tw3-fx"><label>TONE <input id="tw3Tone" type="range" min="0" max="100" value="64"></label><label>RES <input id="tw3MasterRes" type="range" min="0" max="100" value="18"></label><label>DRIVE <input id="tw3MasterDrive" type="range" min="0" max="100" value="6"></label><label>CHORUS <input id="tw3Chorus" type="range" min="0" max="100" value="20"></label><label>DELAY <input id="tw3Delay" type="range" min="0" max="100" value="12"></label><label>REPEAT <input id="tw3MasterRepeat" type="range" min="0" max="100" value="22"></label><label>SPACE <input id="tw3Space" type="range" min="0" max="100" value="30"></label></div></details><details class="tw3-master tw3-elec-mix"><summary>电子层 <span>ELECTRO MIX</span></summary><p class="tw3-master-note">分别控制电子声部音量 · <b id="twElecPage">PAGE A</b></p><div class="tw3-fx">
 <label>KICK <input id="twEMKick" type="range" min="0" max="100" value="90"></label>
 <label>HAT <input id="twEMHat" type="range" min="0" max="100" value="72"></label>
 <label>CLAP <input id="twEMClap" type="range" min="0" max="100" value="78"></label>
@@ -3532,18 +3532,27 @@ window.addEventListener('DOMContentLoaded', () => {
     var g=audioCtx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.linearRampToValueAtTime(.045,t+.55); g.gain.exponentialRampToValueAtTime(.0001,t+.78);
     n.connect(f); f.connect(g); g.connect(masterGain); n.start(t); n.stop(t+.8);
   }
+  var TW_ELECTRO_PAGES=[
+    {kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],clap:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],bass:[1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0],arp:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],open:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],pad:true},
+    {kick:[1,0,0,1,0,0,0,1,1,0,0,1,0,0,0,0],hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],clap:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],bass:[0,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0],arp:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0],open:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],pad:false},
+    {kick:[1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],clap:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],bass:[1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],arp:[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1],open:[0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1],pad:true},
+    {kick:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],hat:[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],clap:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],bass:[1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1],arp:[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],open:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],pad:true}
+  ];
+  function twElectroPage(){return TW_ELECTRO_PAGES[Math.max(0,Math.min(3,threadSection))];}
   window.twElectroStep=function(step, sc, root, sec, inBar){
     if(!audioCtx || !state.isPlaying || !window.TW_ELECTRO) return;
     var notes=sc.notes; var base=notes[root%notes.length];
+    var s=((step%16)+16)%16; var page=TW_ELECTRO_PAGES[sec%4];
     twElectroBus();
-    if(inBar===0){ twElecPad(base, 3.8, .075); }
-    if(sec>=1 && (inBar===0 || inBar===3 || inBar===6)){ twElecBass(base/2, .20, .23); }
-    if(inBar===0 || inBar===4){ twElecKick(); }
-    if(sec>=1 && (inBar===1 || inBar===3 || inBar===5 || inBar===7)){ twElecHat(); }
-    if(sec>=2 && (inBar===2 || inBar===6)){ twElecClap(); }
-    if(sec>=2 && (inBar===3 || inBar===7)){ twElecOpenHat(); }
-    if(sec>=1 && inBar%2===0){ twElecPluck(base*2, .22, .045, inBar%4<2?-.38:.38); }
-    if(sec===2 && inBar===7){ twElecRiser(); }
+    try{var pg=document.getElementById('twElecPage');if(pg)pg.textContent='PAGE '+['A','B','C','D'][sec%4];}catch(e){}
+    if(page.pad && s===0){ twElecPad(base, 3.8, .075); }
+    if(page.bass[s]){ twElecBass(base/2, .20, .23); }
+    if(page.kick[s]){ twElecKick(); }
+    if(page.hat[s]){ twElecHat(); }
+    if(page.clap[s]){ twElecClap(); }
+    if(page.open[s]){ twElecOpenHat(); }
+    if(page.arp[s]){ twElecPluck(base*2, .22, .045, s%4<2?-.38:.38); }
+    if(sec===2 && s===15){ twElecRiser(); }
   };
   window.playElectronicGroove=function(step){
     if(!audioCtx||!masterGain)return;
